@@ -2,7 +2,7 @@
 using CommunityToolkit.HighPerformance;
 using Pack3r.IO;
 
-namespace Pack3r;
+namespace Pack3r.Core.Parsers;
 
 public class MapParser(ILineReader reader)
 {

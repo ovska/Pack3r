@@ -1,4 +1,4 @@
-﻿namespace Pack3r;
+﻿namespace Pack3r.Core.Parsers;
 
 public interface IResourceParser
 {

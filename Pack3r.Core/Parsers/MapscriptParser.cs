@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
-using CommunityToolkit.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Pack3r.Core.Parsers;
 using Pack3r.IO;
 
 namespace Pack3r;
@@ -14,8 +14,6 @@ public class MapscriptParser(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        Guard.IsEqualTo(Path.GetExtension(path), ".script", "path");
-
         await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
         {
             // skip everything except: playsound, remapshader, set, create
