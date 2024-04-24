@@ -1,25 +1,34 @@
-﻿namespace Pack3r;
+﻿using CommunityToolkit.Diagnostics;
+
+namespace Pack3r;
 
 public static class Extensions
 {
-    public static IEnumerable<ReadOnlyMemory<char>> SplitWords(
+    public static ArraySegment<Range> Split(
         this ReadOnlyMemory<char> value,
+        char separator,
         StringSplitOptions options = StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
     {
         var ranges = new Range[32];
 
-        int count = value.Span.Split(ranges.AsSpan(), ' ', options);
+        int count = value.Span.Split(ranges.AsSpan(), separator, options);
 
         if (count == 0)
         {
-            yield return value;
+            ranges[0] = Range.All;
+            count = 1;
         }
-        else
+
+        return new ArraySegment<Range>(ranges, 0, count);
+    }
+
+    public static IEnumerable<ReadOnlyMemory<char>> SplitWords(
+        this ReadOnlyMemory<char> value,
+        StringSplitOptions options = StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    {
+        foreach (var range in value.Split(' ', options))
         {
-            foreach (var range in new ArraySegment<Range>(ranges, 0, count))
-            {
-                yield return value[range];
-            }
+            yield return value[range];
         }
     }
 
@@ -67,5 +76,24 @@ public static class Extensions
 
         remainder = default;
         return false;
+    }
+
+    public static (ReadOnlyMemory<char> key, ReadOnlyMemory<char> value) ReadKeyValue(in this Line line)
+    {
+        if (line.Value.Span.IndexOf("\" \"") is int index and >= 0)
+        {
+            return (
+                line.Value[1..index],
+                line.Value[(index + 3)..^1]);
+        }
+
+        ThrowForInvalidKVP(in line);
+        return default;
+    }
+
+    private static void ThrowForInvalidKVP(in Line line)
+    {
+        ThrowHelper.ThrowInvalidDataException(
+            $"Invalid key/value pair in {line.Path} on line {line.Index}: {line.Raw}");
     }
 }

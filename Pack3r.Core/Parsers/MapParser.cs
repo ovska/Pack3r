@@ -1,25 +1,37 @@
 ﻿using CommunityToolkit.Diagnostics;
 using CommunityToolkit.HighPerformance;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Pack3r.IO;
+using ROMC = System.ReadOnlyMemory<char>;
 
 namespace Pack3r.Core.Parsers;
 
-public class MapParser(ILineReader reader)
+public class MapParser(
+    ILogger<MapParser> logger,
+    ILineReader reader,
+    IOptions<PackOptions> options)
 {
-    public async Task<HashSet<ReadOnlyMemory<char>>> Parse(
+    private const StringComparison cmp = StringComparison.OrdinalIgnoreCase;
+    private readonly bool _devFiles = options.Value.DevFiles;
+
+    public async Task<HashSet<ROMC>> Parse(
         string path,
         CancellationToken cancellationToken)
     {
         State state = State.None;
         char expect = default;
 
-        HashSet<ReadOnlyMemory<char>> shaders = new(ROMCharComparer.Instance);
+        Dictionary<ROMC, ROMC> entitydata = new(ROMCharComparer.Instance);
+        HashSet<ROMC> shaders = new(ROMCharComparer.Instance);
+        HashSet<ROMC> resources = new(ROMCharComparer.Instance);
 
+        ROMC currentEntity;
         await foreach (var line in reader.ReadLines(path, new LineOptions(KeepRaw: true), cancellationToken))
         {
             if (expect != default)
             {
-                if (line.FirstChar == expect && (line.Raw.Length == 1 || line.Value.Trim().Length == 1))
+                if (line.FirstChar == expect)
                 {
                     expect = default;
                     continue;
@@ -45,17 +57,24 @@ public class MapParser(ILineReader reader)
 
             if (state == State.None)
             {
-                Expect("// entity ", in line);
+                Expect("// entity ", in line, out currentEntity);
                 state = State.Entity;
                 expect = '{';
+                HandleKeysAndClear();
                 continue;
             }
 
             if (state == State.Entity)
             {
-                // TODO: read keys and values
+                if (line.FirstChar == '/' && line.FirstChar == '{')
+                    continue;
 
-                if (line.FirstChar == 'b')
+                if (line.FirstChar == '"')
+                {
+                    var (key, value) = line.ReadKeyValue();
+                    entitydata[key] = value;
+                }
+                else if (line.FirstChar == 'b')
                 {
                     if (line.Raw.Equals("brushDef"))
                     {
@@ -78,7 +97,7 @@ public class MapParser(ILineReader reader)
             if (state == State.BrushDef)
             {
                 int lastParen = line.Raw.LastIndexOf(')');
-                ReadOnlyMemory<char> shaderPart = line.Raw.AsMemory(lastParen + 2);
+                ROMC shaderPart = line.Raw.AsMemory(lastParen + 2);
 
                 if (!CanSkip(shaderPart))
                 {
@@ -112,13 +131,106 @@ public class MapParser(ILineReader reader)
         }
 
         return shaders;
+
+        void HandleKeysAndClear()
+        {
+            foreach (var (key, value) in entitydata)
+            {
+                var span = key.Span;
+
+                if (span.IsEmpty)
+                    continue;
+
+                if (span[0] == '_')
+                {
+                    if (span.StartsWith("_remap", cmp))
+                    {
+                        foreach (var range in value.Split(';'))
+                        {
+                            shaders.Add(value[range]);
+                        }
+                    }
+                    else if (span.Equals("_fog", cmp))
+                    {
+                        shaders.Add(value);
+                    }
+                    else if (span.Equals("_celshader", cmp))
+                    {
+                        shaders.Add($"textures/{value}".AsMemory());
+                    }
+                }
+                else if (span.StartsWith("model", cmp))
+                {
+                    if (span.Length == 5)
+                    {
+                        if (_devFiles || !IsClassName("misc_model"))
+                        {
+                            resources.Add(value);
+                        }
+                    }
+                    else if (span.Length == 6 && span[5] == '2')
+                    {
+                        resources.Add(value);
+                    }
+                }
+                else if (span.Equals("skin", cmp) || span.Equals("_skin", cmp))
+                {
+                    logger.LogWarning(
+                        "Entity {entity} has a skin {value}, please check the files required by the skin manually",
+                        currentEntity,
+                        value);
+                    resources.Add(value);
+                }
+                else if (span.Equals("noise", cmp)
+                    || (span.Equals("sound", cmp) && IsClassName("dlight")))
+                {
+                    resources.Add(value);
+                }
+                else if (span.Equals("shader", cmp))
+                {
+                    // terrains require some extra trickery
+                    ROMC val = value;
+                    if (entitydata.ContainsKey("terrain".AsMemory()) &&
+                        !value.Span.StartsWith("textures/", cmp))
+                    {
+                        val = $"textures/{value}".AsMemory();
+
+                    }
+
+                    shaders.Add(val);
+                }
+                else if (span.StartsWith("targetShader", cmp))
+                {
+                    if (span.Equals("targetShaderName", cmp) ||
+                        span.Equals("targetShaderNewName", cmp))
+                    {
+                        shaders.Add(value);
+                    }
+                }
+                else if (span.Equals("sun", cmp))
+                {
+                    shaders.Add(value);
+                }
+                else if (span.Equals("music", cmp) && IsClassName("worldspawn"))
+                {
+                    resources.Add(value);
+                }
+            }
+
+            entitydata.Clear();
+        }
+
+        bool IsClassName(string className)
+        {
+            return entitydata.GetValueOrDefault("classname".AsMemory()).Span.Equals(className, cmp);
+        }
     }
 
     /// <summary>
     /// Whether the shader is one of the most common ones and should be skipped.
     /// </summary>
     /// <param name="shaderPart"><c>pgm/holo 0 0 0</c></param>
-    private static bool CanSkip(ReadOnlyMemory<char> shaderPart)
+    private static bool CanSkip(ROMC shaderPart)
     {
         var span = shaderPart.Span;
 
@@ -146,13 +258,15 @@ public class MapParser(ILineReader reader)
         return false;
     }
 
-    private static void Expect(string prefix, in Line line)
+    private static void Expect(string prefix, in Line line, out ROMC entityId)
     {
         if (!line.Value.Span.StartsWith(prefix))
         {
             ThrowHelper.ThrowInvalidDataException(
                 $"Expected line {line.Index} to start with \"{prefix}\", actual value: {line.Raw}");
         }
+
+        entityId = line.Value.Slice(prefix.Length);
     }
 
     private enum State : byte
