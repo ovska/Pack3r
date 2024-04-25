@@ -38,9 +38,11 @@ public sealed class Packager(
 
         if (lightmapDir.Exists)
         {
-            // TODO: check bsp timestamps
+            bool timestampWarned = false;
+
             foreach (var file in lightmapDir.GetFiles("lm_????.tga"))
             {
+                timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
                 AddFileAbsolute(file.FullName, required: true);
             }
         }
@@ -58,8 +60,6 @@ public sealed class Packager(
 
         bool styleLights = map.HasStyleLights;
         var shadersByName = await shaderParseTask;
-
-        char[] buffer = new char[1024];
 
         foreach (var shaderName in data.Map.Shaders)
         {
@@ -104,6 +104,24 @@ public sealed class Packager(
                     continue;
 
                 AddTexture(file.ToString());
+            }
+        }
+
+        if (styleLights)
+        {
+            var styleShader = Path.Combine("scripts", $"q3map_{map.Name}.shader");
+            var file = new FileInfo(styleShader);
+
+            if (file.Exists)
+            {
+                logger.CheckAndLogTimestampWarning("Stylelight shader", bsp, file);
+                AddFileRelative(styleShader.AsMemory());
+            }
+            else
+            {
+                logger.LogError(
+                    "Map has style lights, but shader file {path} was not found",
+                    styleShader);
             }
         }
 

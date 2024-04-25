@@ -68,4 +68,33 @@ public static partial class LoggingExtensions
         ReadOnlyMemory<char> parent,
         ReadOnlyMemory<char> parentPath,
         ReadOnlyMemory<char> child);
+
+    public static bool CheckAndLogTimestampWarning(
+        this ILogger logger,
+        string type,
+        FileInfo bsp,
+        FileInfo other)
+    {
+        TimeSpan delta = (other.LastWriteTimeUtc - bsp.LastWriteTimeUtc).Duration();
+        bool isStale = delta > TimeSpan.FromHours(1);
+
+        if (isStale)
+        {
+            var humanreadable = delta switch
+            {
+                { TotalDays: <= 1 } => $"{delta:%h} hours",
+                _ => $"{delta:%d} day(s)",
+            };
+
+            logger.LogWarning(
+                "{type} file(s) have different timestamps ({delta}+) than BSP, ensure they are from a recent compile " +
+                "- bsp: {bsp:o} - lm: {lm:o}",
+                type,
+                humanreadable,
+                bsp.LastWriteTime,
+                other.LastWriteTime);
+        }
+
+        return isStale;
+    }
 }

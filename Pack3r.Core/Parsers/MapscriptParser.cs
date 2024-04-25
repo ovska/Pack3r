@@ -17,6 +17,8 @@ public class MapscriptParser(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        bool unsupportedPrinted = false;
+
         await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
         {
             // skip everything except: playsound, remapshader, set, create
@@ -43,13 +45,13 @@ public class MapscriptParser(
                 foreach (var range in token.Split(' '))
                     yield return new Resource(token[range], IsShader: true);
             }
-            else if (Tokens.UnsupportedMapscript().IsMatch(line.Value.Span))
+            else if (!unsupportedPrinted && Tokens.UnsupportedMapscript().IsMatch(line.Value.Span))
             {
+                unsupportedPrinted = true;
                 logger.LogWarning(
-                    "Unsupported mapscript keyword that potentially affects required files " +
-                    "in line {line} in file '{path}': '{value}'",
-                    line.Index,
+                    "One or more unsupported mapscript keyword(s) ({keyword}) on line {line} in file {path}",
                     line.Path,
+                    line.Index,
                     line.Value);
             }
         }
