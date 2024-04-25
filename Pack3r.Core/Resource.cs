@@ -1,4 +1,6 @@
-﻿namespace Pack3r;
+﻿using Pack3r.Extensions;
+
+namespace Pack3r;
 
 /// <summary>
 /// Generic resource referenced in a map.

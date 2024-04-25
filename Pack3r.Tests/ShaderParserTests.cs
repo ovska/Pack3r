@@ -7,7 +7,7 @@ public class ShaderParserTests
     private static async Task<Shader> ParseSingle(string data, bool includeDevFiles = false)
     {
         var parser = GetParser(data, includeDevFiles);
-        var results = await parser.Parse("", default).ToList();
+        var results = await parser.Parse("Ö:\\test.map", default).ToList();
 
         Assert.Single(results);
         return results[0];
@@ -41,7 +41,7 @@ public class ShaderParserTests
             }
             """);
 
-        var results = await parser.Parse("", default).ToList();
+        var results = await parser.Parse("Ö:\\test.map", default).ToList();
 
         Assert.Equal(2, results.Count);
 
@@ -63,19 +63,23 @@ public class ShaderParserTests
     public async Task Should_Parse_Implicit_Shader()
     {
         var shader = await ParseSingle("""
-            textures/pgm/roof
+            textures/pgm/light_rec_blu_5000
             {
-            	surfaceparm roofsteps
-            	implicitMap -
+            	qer_editorimage textures/pgm/abal2.tga
+            	surfaceparm metalsteps
+            	q3map_surfacelight 5000
+            	q3map_shadeangle 46
+            	q3map_lightimage textures/pgm/ei/light_blue.tga
+            	implicitMap	textures/pgm/abal2.tga
             }
             """);
 
-        Assert.Equal("textures/pgm/roof", shader.Name.ToString());
+        Assert.Equal("textures/pgm/light_rec_blu_5000", shader.Name.ToString());
         Assert.Empty(shader.Shaders);
         Assert.Empty(shader.Files);
 
         Assert.Single(shader.Textures);
-        Assert.Equal("textures/pgm/roof", shader.Textures[0].ToString());
+        Assert.Equal("textures/pgm/abal2.tga", shader.Textures[0].ToString());
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Pack3r.Core.Parsers;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r;
@@ -10,6 +11,8 @@ public class MapscriptParser(
     ILogger<MapscriptParser> logger)
     : IResourceParser
 {
+    public string Description => "mapscript";
+
     public async IAsyncEnumerable<Resource> Parse(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -37,10 +40,8 @@ public class MapscriptParser(
             }
             else if (line.MatchPrefix("remapshader ", out token))
             {
-                foreach (var shader in token.SplitWords())
-                {
-                    yield return new Resource(shader, IsShader: true);
-                }
+                foreach (var range in token.Split(' '))
+                    yield return new Resource(token[range], IsShader: true);
             }
             else if (Tokens.UnsupportedMapscript().IsMatch(line.Value.Span))
             {

@@ -6,12 +6,10 @@ namespace Pack3r.Tests;
 internal sealed class StringLineReader(string data) : ILineReader
 {
     public async IAsyncEnumerable<Line> ReadLines(
-        string path,
+        ResourcePath path,
         LineOptions options,
          [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await Task.Yield();
-
         using var reader = new StringReader(data);
 
         string? line;

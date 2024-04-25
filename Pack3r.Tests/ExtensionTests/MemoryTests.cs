@@ -1,4 +1,6 @@
-﻿namespace Pack3r.Tests.ExtensionTests;
+﻿using Pack3r.Extensions;
+
+namespace Pack3r.Tests.ExtensionTests;
 
 public static class MemoryTests
 {
@@ -27,7 +29,8 @@ public static class MemoryTests
     [InlineData("test arg ", (string[])["test", "arg"])]
     public static void Should_Split_By_Whitespace(string input, string[] expected)
     {
-        Assert.Equal(expected, input.AsMemory().SplitWords().Select(m => m.ToString()));
+
+        Assert.Equal(expected, input.AsMemory().Split(' ').Select(r => input.AsMemory(r).ToString()));
     }
 
     [Theory]
@@ -37,5 +40,15 @@ public static class MemoryTests
         var (k, v) = new Line(input, 1, input, true).ReadKeyValue();
         Assert.Equal(key, k.ToString());
         Assert.Equal(value, v.ToString());
+    }
+
+    [Theory]
+    [InlineData("scripts/common.shader", true)]
+    [InlineData("scripts/medieval_soc.shader", true)]
+    [InlineData("scripts/shaderlist.txt", false)]
+    [InlineData("wrongfolder/common.shader", false)]
+    public static void Should_Check_For_Shader_File(string input, bool expected)
+    {
+        Assert.Equal(expected, Tokens.ShaderPath().IsMatch(input));
     }
 }

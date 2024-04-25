@@ -2,20 +2,29 @@
 using CommunityToolkit.HighPerformance;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Pack3r.Extensions;
 using Pack3r.IO;
 using ROMC = System.ReadOnlyMemory<char>;
 
 namespace Pack3r.Core.Parsers;
 
-public class MapParser(
-    ILogger<MapParser> logger,
+public interface IMapFileParser
+{
+    Task<MapAssets> ParseMapAssets(
+        string path,
+        CancellationToken cancellationToken);
+}
+
+public class MapFileParser(
+    ILogger<MapFileParser> logger,
     ILineReader reader,
     IOptions<PackOptions> options)
+    : IMapFileParser
 {
     private const StringComparison cmp = StringComparison.OrdinalIgnoreCase;
     private readonly bool _devFiles = options.Value.DevFiles;
 
-    public async Task<HashSet<ROMC>> Parse(
+    public async Task<MapAssets> ParseMapAssets(
         string path,
         CancellationToken cancellationToken)
     {
@@ -26,7 +35,9 @@ public class MapParser(
         HashSet<ROMC> shaders = new(ROMCharComparer.Instance);
         HashSet<ROMC> resources = new(ROMCharComparer.Instance);
 
-        ROMC currentEntity;
+        ROMC currentEntity = default;
+        bool hasStyleLights = false;
+
         await foreach (var line in reader.ReadLines(path, new LineOptions(KeepRaw: true), cancellationToken))
         {
             if (expect != default)
@@ -52,6 +63,12 @@ public class MapParser(
                     _ => ThrowHelper.ThrowInvalidOperationException<State>(
                         $"Invalid .map file, dangling closing bracket on line {line.Index}!")
                 };
+
+                if (state == State.None)
+                {
+                    HandleKeysAndClear();
+                }
+
                 continue;
             }
 
@@ -60,7 +77,6 @@ public class MapParser(
                 Expect("// entity ", in line, out currentEntity);
                 state = State.Entity;
                 expect = '{';
-                HandleKeysAndClear();
                 continue;
             }
 
@@ -130,7 +146,12 @@ public class MapParser(
             }
         }
 
-        return shaders;
+        return new MapAssets
+        {
+            Shaders = shaders,
+            Resources = resources,
+            HasStyleLights = hasStyleLights,
+        };
 
         void HandleKeysAndClear()
         {
@@ -141,14 +162,14 @@ public class MapParser(
                 if (span.IsEmpty)
                     continue;
 
-                if (span[0] == '_')
+                if (span[0] == '_' && span.Length >= 4 && span[1] != 's')
                 {
                     if (span.StartsWith("_remap", cmp))
                     {
-                        foreach (var range in value.Split(';'))
-                        {
-                            shaders.Add(value[range]);
-                        }
+                        var ranges = value.Split(';');
+
+                        if (ranges.Count >= 2)
+                            shaders.Add(value[ranges[1]]);
                     }
                     else if (span.Equals("_fog", cmp))
                     {
@@ -195,6 +216,10 @@ public class MapParser(
                     {
                         val = $"textures/{value}".AsMemory();
 
+                        logger.LogWarning(
+                            "Entity {id} has a terrain shader '{value}', please manually ensure the shaders are included",
+                            currentEntity,
+                            value);
                     }
 
                     shaders.Add(val);
@@ -211,10 +236,11 @@ public class MapParser(
                 {
                     shaders.Add(value);
                 }
-                else if (span.Equals("music", cmp) && IsClassName("worldspawn"))
+                else if (!hasStyleLights && span.Equals("style", cmp) && IsClassName("light"))
                 {
-                    resources.Add(value);
+                    hasStyleLights = true;
                 }
+                // "music" ignored, doesn't work in etjump
             }
 
             entitydata.Clear();
@@ -266,7 +292,7 @@ public class MapParser(
                 $"Expected line {line.Index} to start with \"{prefix}\", actual value: {line.Raw}");
         }
 
-        entityId = line.Value.Slice(prefix.Length);
+        entityId = line.Value[prefix.Length..];
     }
 
     private enum State : byte

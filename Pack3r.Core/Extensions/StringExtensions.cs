@@ -1,8 +1,9 @@
 ﻿using CommunityToolkit.Diagnostics;
+using Pack3r.Extensions;
 
-namespace Pack3r;
+namespace Pack3r.Extensions;
 
-public static class Extensions
+public static class StringExtensions
 {
     public static ArraySegment<Range> Split(
         this ReadOnlyMemory<char> value,
@@ -22,21 +23,11 @@ public static class Extensions
         return new ArraySegment<Range>(ranges, 0, count);
     }
 
-    public static IEnumerable<ReadOnlyMemory<char>> SplitWords(
-        this ReadOnlyMemory<char> value,
-        StringSplitOptions options = StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-    {
-        foreach (var range in value.Split(' ', options))
-        {
-            yield return value[range];
-        }
-    }
-
     public static bool TryReadUpToWhitespace(in this ReadOnlyMemory<char> value, out ReadOnlyMemory<char> token)
     {
         var span = value.Span;
 
-        int space = span.IndexOf(' ');
+        int space = span.IndexOfAny(Tokens.SpaceOrTab);
 
         if (space == -1)
         {
@@ -52,7 +43,7 @@ public static class Extensions
     {
         var span = value.Span;
 
-        int space = span.IndexOf(' ');
+        int space = span.IndexOfAny(Tokens.SpaceOrTab);
 
         if (space == -1)
         {

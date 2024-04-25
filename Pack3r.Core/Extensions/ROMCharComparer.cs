@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using CommunityToolkit.HighPerformance.Helpers;
 
-namespace Pack3r;
+namespace Pack3r.Extensions;
 
 public sealed class ROMCharComparer : IEqualityComparer<ReadOnlyMemory<char>>
 {

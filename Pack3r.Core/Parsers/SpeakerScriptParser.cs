@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r.Core.Parsers;
@@ -6,6 +7,8 @@ namespace Pack3r.Core.Parsers;
 public class SpeakerScriptParser(
     ILineReader reader) : IResourceParser
 {
+    public string Description => "speakerscript";
+
     public async IAsyncEnumerable<Resource> Parse(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)

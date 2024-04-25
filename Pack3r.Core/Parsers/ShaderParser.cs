@@ -1,19 +1,49 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using CommunityToolkit.HighPerformance;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r;
 
+public readonly struct ResourcePath
+{
+    public string Path { get; }
+    public ZipArchiveEntry? Entry { get; }
+
+    public ResourcePath(string archivePath, ZipArchiveEntry entry)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(archivePath);
+        ArgumentNullException.ThrowIfNull(entry);
+
+        Path = System.IO.Path.GetFullPath(System.IO.Path.Combine(archivePath, entry.FullName));
+        Entry = entry;
+    }
+
+    public ResourcePath(string absolutePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
+        Path = absolutePath;
+    }
+
+    public static implicit operator ResourcePath(string path) => new(path);
+    public static implicit operator string(ResourcePath resource) => resource.Path;
+}
+
 public interface IShaderParser
 {
-    Task<ICollection<Shader>> ParseAllShaders(
-        DirectoryInfo etmain,
-        HashSet<ReadOnlyMemory<char>>? referencedShaders,
+    Task<ICollection<Shader>> GetReferencedShaders(
+        Map map,
+        CancellationToken cancellationToken);
+
+    IAsyncEnumerable<Shader> Parse(
+        ResourcePath path,
         CancellationToken cancellationToken);
 }
 
@@ -25,25 +55,22 @@ public class ShaderParser(
 {
     private readonly bool _includeDevFiles = options.Value.DevFiles;
 
-    public async Task<ICollection<Shader>> ParseAllShaders(
-        DirectoryInfo etmain,
-        HashSet<ReadOnlyMemory<char>>? referencedShaders,
+    public async Task<ICollection<Shader>> GetReferencedShaders(
+        Map map,
         CancellationToken cancellationToken)
     {
-        var scriptsDir = etmain
+        var scriptsDir = map.ETMain
             .GetDirectories("scripts", new EnumerationOptions { MatchCasing = MatchCasing.CaseSensitive })
             .SingleOrDefault()
-            ?? throw new InvalidOperationException($"Could not find 'scripts'-folder in {etmain.FullName}");
+            ?? throw new InvalidOperationException($"Could not find 'scripts'-folder in {map.ETMain.FullName}");
 
         HashSet<string>? shaderlist = options.Value.ShaderlistOnly
             ? await ReadShaderlist(scriptsDir.FullName, cancellationToken)
             : null;
 
-        ConcurrentDictionary<Shader, object?> shaders = [];
+        ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders = new(ROMCharComparer.Instance);
 
-        var files = scriptsDir.GetFiles("*.shader");
-
-        await Parallel.ForEachAsync(files, cancellationToken, async (file, ct) =>
+        await Parallel.ForEachAsync(scriptsDir.GetFiles("*.shader"), cancellationToken, async (file, ct) =>
         {
             if (shaderlist?.Contains(Path.GetFileNameWithoutExtension(file.Name)) == false)
             {
@@ -55,7 +82,7 @@ public class ShaderParser(
 
             if (file.Name.StartsWith("q3map_"))
             {
-                logger.LogInformation(
+                logger.LogDebug(
                     "Skipping shader parsing from compiler generated file {fileName}",
                     file.Name);
                 return;
@@ -63,10 +90,8 @@ public class ShaderParser(
 
             await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
             {
-                if (referencedShaders?.Contains(shader.Name) == false)
-                    continue;
-
-                if (!shaders.TryAdd(shader, null))
+                // TODO: check for built-in shaders
+                if (!allShaders.TryAdd(shader.Name, shader))
                 {
                     logger.LogWarning(
                         "Shader {name} found multiple times, including in file {file}",
@@ -76,22 +101,79 @@ public class ShaderParser(
             }
         }).ConfigureAwait(false);
 
-        logger.LogInformation("Parsed {shaderCount} shaders total shaders", shaders.Count);
+        logger.LogInformation("Parsed {shaderCount} shaders total shaders", allShaders.Count);
 
-        return shaders.Keys;
+        var included = new Dictionary<ReadOnlyMemory<char>, Shader>(ROMCharComparer.Instance);
+        AddShaders(
+            map.Shaders.GetEnumerator(),
+            allShaders,
+            included,
+            cancellationToken);
+
+        return included.Values;
+    }
+
+    private void AddShaders<TEnumerator>(
+        TEnumerator enumerator,
+        ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders,
+        Dictionary<ReadOnlyMemory<char>, Shader> included,
+        CancellationToken cancellationToken)
+        where TEnumerator : IEnumerator<ReadOnlyMemory<char>>
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        while (enumerator.MoveNext())
+        {
+            ReadOnlyMemory<char> name = enumerator.Current;
+
+            ref Shader? dictRef = ref CollectionsMarshal.GetValueRefOrAddDefault(included, name, out bool exists);
+
+            if (exists)
+                continue;
+
+            if (!allShaders.TryGetValue(name, out Shader? shader))
+            {
+                logger.ShaderNotFound(name);
+                included.Remove(name);
+                continue;
+            }
+
+            dictRef = shader;
+
+            if (shader.Shaders.Count != 0)
+            {
+                AddShaders(shader.Shaders.GetEnumerator(), allShaders, included, cancellationToken);
+            }
+        }
     }
 
     public async IAsyncEnumerable<Shader> Parse(
-        string path,
+        ResourcePath path,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         State state = State.None;
 
-        Shader shader = default;
+        Shader? shader = null;
         ReadOnlyMemory<char> token;
+        bool inComment = false;
 
         await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
         {
+            if (inComment)
+            {
+                if (line.FirstChar == '*' && line.Value.Length == 2 && line.Value.Span[1] == '/')
+                {
+                    inComment = false;
+                }
+                continue;
+            }
+
+            if (line.FirstChar == '/' && line.Value.Length == 2 && line.Value.Span[1] == '*')
+            {
+                inComment = true;
+                continue;
+            }
+
             if (state == State.AfterShaderName)
             {
                 if (!line.IsOpeningBrace)
@@ -116,6 +198,8 @@ public class ShaderParser(
                 state = State.AfterShaderName;
                 continue;
             }
+
+            Debug.Assert(shader != null);
 
             if (state == State.Stage)
             {
@@ -151,7 +235,8 @@ public class ShaderParser(
                     // read past the frames-agument
                     if (token.TryReadPastWhitespace(out token))
                     {
-                        shader.Textures.AddRange(token.SplitWords());
+                        foreach (var range in token.Split(' '))
+                            shader.Textures.Add(token[range]);
                     }
                     else
                     {
@@ -176,7 +261,7 @@ public class ShaderParser(
 
                 if (line.IsClosingBrace)
                 {
-                    Debug.Assert(!shader.Name.IsEmpty);
+                    Debug.Assert(shader != null);
                     yield return shader;
                     state = State.None;
                     continue;
@@ -269,6 +354,10 @@ public class ShaderParser(
                     {
                         logger.UnparsableKeyword(path, line.Index, "q3map_surfaceModel", line.Raw);
                     }
+                }
+                else if (!shader.HasLightStyles && line.MatchPrefix("q3map_lightstyle ", out _))
+                {
+                    shader.HasLightStyles = true;
                 }
             }
         }

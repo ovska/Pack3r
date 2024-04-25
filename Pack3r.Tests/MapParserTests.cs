@@ -1,9 +1,47 @@
-﻿using Pack3r.Core.Parsers;
+﻿using Microsoft.Extensions.Logging.Abstractions;
+using Pack3r.Core.Parsers;
+using Pack3r.IO;
 
 namespace Pack3r.Tests;
 
 public static class MapParserTests
 {
+    private static MapFileParser CreateParser(ILineReader reader, PackOptions? options = null)
+    {
+        return new MapFileParser(NullLogger<MapFileParser>.Instance, reader, options ?? new());
+    }
+
+    [Theory, InlineData(true), InlineData(false)]
+    public static async Task Should_Include_Dev_Assets(bool include)
+    {
+        var reader = new StringLineReader("""
+            // entity 0
+            {
+            "classname" "worldspawn"
+            "nofalldamage" "2"
+            "portalsurfaces" "0"
+            }
+            // entity 1
+            {
+            "classname" "misc_model"
+            "model" "path/to/model.md3"
+            }
+            """);
+
+        var map = await CreateParser(reader, new PackOptions { DevFiles = include })
+            .ParseMapAssets("C:/ET/etmain/maps/test.map", default);
+
+        if (include)
+        {
+            Assert.Single(map.Resources);
+            Assert.Equal("path/to/model.md3", map.Resources.First().ToString());
+        }
+        else
+        {
+            Assert.Empty(map.Resources);
+        }
+    }
+
     [Fact]
     public static async Task Should_Parse_Simple_Map()
     {
@@ -27,12 +65,12 @@ public static class MapParserTests
             
             """);
 
-        var parser = new MapParser(reader);
+        var parser = CreateParser(reader);
 
-        var shaders = await parser.Parse("", default);
+        var map = await parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
-        Assert.Single(shaders);
-        Assert.Equal("pgm_props/crate_01", shaders.First().ToString());
+        Assert.Single(map.Shaders);
+        Assert.Equal("pgm_props/crate_01", map.Shaders.First().ToString());
     }
 
     [Fact]
@@ -420,11 +458,11 @@ public static class MapParserTests
         }
         """);
 
-        var parser = new MapParser(reader);
+        var parser = CreateParser(reader);
 
-        var shaders = await parser.Parse("", default);
+        var map = await parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
-        Assert.Single(shaders);
-        Assert.Equal("pgm/holo", shaders.First().ToString());
+        Assert.Single(map.Shaders);
+        Assert.Equal("pgm/holo", map.Shaders.First().ToString());
     }
 }
