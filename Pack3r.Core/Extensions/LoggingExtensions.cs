@@ -80,19 +80,10 @@ public static partial class LoggingExtensions
 
         if (isStale)
         {
-            var humanreadable = delta switch
-            {
-                { TotalDays: <= 1 } => $"{delta:%h} hours",
-                _ => $"{delta:%d} day(s)",
-            };
-
             logger.LogWarning(
-                "{type} file(s) have different timestamps ({delta}+) than BSP, ensure they are from a recent compile " +
-                "- bsp: {bsp:o} - lm: {lm:o}",
+                "{type} file(s) have different timestamps ({delta}+) than BSP, ensure they are from a recent compile",
                 type,
-                humanreadable,
-                bsp.LastWriteTime,
-                other.LastWriteTime);
+                delta.TotalDays < 1 ? $"{delta:%h} hours" : $"{delta:%d} day(s)");
         }
 
         return isStale;

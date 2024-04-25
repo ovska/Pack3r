@@ -76,6 +76,8 @@ public class ShaderParser(
 
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders = new(ROMCharComparer.Instance);
 
+        int counter = 0;
+
         await Parallel.ForEachAsync(scriptsDir.GetFiles("*.shader"), cancellationToken, async (file, ct) =>
         {
             if (shaderlist?.Contains(Path.GetFileNameWithoutExtension(file.Name)) == false)
@@ -94,20 +96,35 @@ public class ShaderParser(
                 return;
             }
 
+            Interlocked.Increment(ref counter);
+
             await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
             {
                 // TODO: check for built-in shaders ?
                 if (!allShaders.TryAdd(shader.Name, shader))
                 {
-                    logger.LogWarning(
-                        "Shader {name} found multiple times, including in file {file}",
-                        shader.Name,
-                        shader.Path.Path);
+                    var existing = allShaders[shader.Name];
+
+                    if (shader.Equals(existing))
+                    {
+                        logger.LogWarning(
+                            "Shader {name} found multiple times in file '{file}'",
+                            shader.Name,
+                            data.Map.RelativePath(shader.Path.Path));
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "Shader {name} both in file '{existing}' and '{current}'",
+                            shader.Name,
+                            data.Map.RelativePath(shader.Path.Path),
+                            data.Map.RelativePath(existing.Path.Path));
+                    }
                 }
             }
         }).ConfigureAwait(false);
 
-        logger.LogInformation("Parsed {shaderCount} shaders total shaders", allShaders.Count);
+        logger.LogInformation("Parsed {shaders} shaders from {files} .shader-files", allShaders.Count, counter);
 
         var included = new Dictionary<ReadOnlyMemory<char>, Shader>(ROMCharComparer.Instance);
 
