@@ -100,10 +100,12 @@ public class ShaderParser(
 
             await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
             {
-                // TODO: check for built-in shaders ?
                 if (!allShaders.TryAdd(shader.Name, shader))
                 {
                     var existing = allShaders[shader.Name];
+
+                    if (!shader.NeededInPk3 && !existing.NeededInPk3)
+                        continue;
 
                     if (shader.Equals(existing))
                     {

@@ -24,6 +24,13 @@ public sealed record Shader(
     /// <summary>Shader generates stylelights</summary>
     public bool HasLightStyles { get; set; }
 
+    /// <summary>Shader includes references to any files needed in pk3</summary>
+    public bool NeededInPk3 =>
+        Textures.Count > 0 ||
+        Files.Count > 0 ||
+        Shaders.Count > 0 ||
+        ImplicitMapping.HasValue;
+
     /// <summary>
     /// Shader name used to resolve the texture used, can be either a generic path without extension or shader name.
     /// </summary>
