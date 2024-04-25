@@ -1,12 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
+using Pack3r.Extensions;
 
 namespace Pack3r.Services;
 
-public interface IExceptionHandlerScope : IDisposable
-{
-}
-
-public sealed class ExceptionHandlerScope : IExceptionHandlerScope
+public sealed class ExceptionHandlerScope : IDisposable
 {
     private readonly ILogger<ExceptionHandlerScope> _logger;
     private readonly CancellationToken _cancellationToken;
@@ -25,7 +22,10 @@ public sealed class ExceptionHandlerScope : IExceptionHandlerScope
     {
         var ex = e.ExceptionObject;
 
-        if (ex is OperationCanceledException && _cancellationToken.IsCancellationRequested)
+        if (ex is ControlledException)
+        {
+        }
+        else if (ex is OperationCanceledException && _cancellationToken.IsCancellationRequested)
         {
             _logger.LogCritical("Operation was canceled by the user");
             return;

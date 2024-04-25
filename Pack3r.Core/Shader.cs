@@ -2,27 +2,42 @@
 
 namespace Pack3r;
 
+/// <summary>
+/// x
+/// </summary>
+/// <param name="Path">Location of the shader file</param>
+/// <param name="Name">Shader name, e.g. <c>textures/common/caulk</c></param>
 public sealed record Shader(
-    string FilePath,
+    ResourcePath Path,
     ReadOnlyMemory<char> Name)
     : IEquatable<Shader>
 {
+    /// <summary>References to texture files</summary>
     public List<ReadOnlyMemory<char>> Textures { get; } = [];
+
+    /// <summary>References to other files, such as models or videos</summary>
     public List<ReadOnlyMemory<char>> Files { get; } = [];
+
+    /// <summary>References to other shaders</summary>
     public List<ReadOnlyMemory<char>> Shaders { get; } = [];
+
+    /// <summary>Shader generates stylelights</summary>
     public bool HasLightStyles { get; set; }
+
+    /// <summary>
+    /// Shader name used to resolve the texture used, can be either a generic path without extension or shader name.
+    /// </summary>
+    public ReadOnlyMemory<char>? ImplicitMapping { get; set; }
 
     public bool Equals(Shader? other)
     {
         return other is not null
-            && FilePath.Equals(other.FilePath)
+            && Path.Equals(other.Path)
             && ROMCharComparer.Instance.Equals(Name, other.Name);
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(
-            FilePath,
-            ROMCharComparer.Instance.GetHashCode(Name));
+        return HashCode.Combine(Path, ROMCharComparer.Instance.GetHashCode(Name));
     }
 }

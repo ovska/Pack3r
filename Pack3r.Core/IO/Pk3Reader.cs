@@ -10,7 +10,7 @@ public readonly struct Pk3Contents(string path)
     public string Name => System.IO.Path.GetFileName(Path);
 
     public HashSet<ReadOnlyMemory<char>> Shaders { get; } = new(ROMCharComparer.Instance);
-    public HashSet<string> Resources { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<ReadOnlyMemory<char>> Resources { get; } = new(ROMCharComparer.Instance);
 }
 
 public interface IPk3Reader
@@ -54,7 +54,21 @@ public class Pk3Reader(
                 }
                 else
                 {
-                    contents.Resources.Add(entry.Name);
+                    var extension = GetExtension(entry);
+
+                    // allow using jpg/tga as shaderless tex
+                    if (extension != Extension.Other)
+                    {
+                        contents.Shaders.Add(entry.FullName.AsMemory(..^4));
+                    }
+
+                    // jpg textures can be referenced with tga paths in shaders
+                    if (extension == Extension.Jpg)
+                    {
+                        contents.Resources.Add(Path.ChangeExtension(entry.FullName, "tga").AsMemory());
+                    }
+
+                    contents.Resources.Add(entry.FullName.AsMemory());
                 }
             }
 
@@ -66,4 +80,19 @@ public class Pk3Reader(
             return new Pk3Contents(path);
         }
     }
+
+    private static Extension GetExtension(ZipArchiveEntry entry)
+    {
+        var extension = Path.GetExtension(entry.FullName.AsSpan());
+
+        if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+            return Extension.Tga;
+
+        if (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase))
+            return Extension.Jpg;
+
+        return Extension.Other;
+    }
+
+    private enum Extension {  Other, Tga, Jpg }
 }

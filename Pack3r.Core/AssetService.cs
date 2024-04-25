@@ -46,7 +46,7 @@ public class AssetService(
         }
 
         // start pak0 parse task in background
-        var pak0task = pk3Reader.ReadPk3(Path.Combine(etmainDirectory.FullName, "pak0.pk3"), cancellationToken);
+        var pak0task = GetBuiltinContents(etmainDirectory, cancellationToken);
 
         MapAssets assets = await mapFileParser.ParseMapAssets(path, cancellationToken).ConfigureAwait(false);
 
@@ -91,5 +91,35 @@ public class AssetService(
             Map = map,
             Pak0 = await pak0task.ConfigureAwait(false),
         };
+    }
+
+    private async Task<Pk3Contents> GetBuiltinContents(
+        DirectoryInfo etmain,
+        CancellationToken cancellationToken)
+    {
+        var pak0task = pk3Reader.ReadPk3(Path.Combine(etmain.FullName, "pak0.pk3"), cancellationToken);
+        Pk3Contents? mapObjects = null;
+
+        try
+        {
+            var sdMapObjects = Path.Combine(etmain.FullName, "sd-mapobjects.pk3");
+
+            if (File.Exists(sdMapObjects))
+            {
+                mapObjects = await pk3Reader.ReadPk3(sdMapObjects, cancellationToken);
+            }
+        }
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
+
+        var pak0 = await pak0task;
+
+        if (mapObjects is { Resources: var resources, Shaders: var shaders })
+        {
+            pak0.Shaders.UnionWith(shaders);
+            pak0.Resources.UnionWith(resources);
+        }
+
+        return pak0;
     }
 }

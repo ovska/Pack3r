@@ -1,4 +1,7 @@
-﻿namespace Pack3r;
+﻿using CommunityToolkit.Diagnostics;
+using PPath = System.IO.Path;
+
+namespace Pack3r;
 
 public class MapAssets
 {
@@ -35,5 +38,17 @@ public sealed class Map : MapAssets
     /// </summary>
     public required DirectoryInfo ETMain { get; init; }
 
-    public string RelativePath(string fullPath) => System.IO.Path.GetRelativePath(ETMain.FullName, fullPath);
+    public string RelativePath(string fullPath)
+    {
+        if (fullPath.StartsWith(ETMain.FullName))
+        {
+            return fullPath
+                .AsMemory(ETMain.FullName.Length)
+                .TrimStart([PPath.DirectorySeparatorChar, PPath.AltDirectorySeparatorChar])
+                .ToString();
+        }
+
+        // uri.makerelative? ensure etmain has / behind it
+        return ThrowHelper.ThrowInvalidOperationException<string>("Invalid fullPath: " + fullPath);
+    }
 }

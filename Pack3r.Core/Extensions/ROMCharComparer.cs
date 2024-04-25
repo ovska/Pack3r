@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using CommunityToolkit.HighPerformance.Buffers;
 using CommunityToolkit.HighPerformance.Helpers;
 
 namespace Pack3r.Extensions;
@@ -19,12 +20,18 @@ public sealed class ROMCharComparer : IEqualityComparer<ReadOnlyMemory<char>>
         if (obj.IsEmpty)
             return 0;
 
-        scoped Span<char> dst = obj.Length < 64
-            ? stackalloc char[64]
-            : new char[64];
+        if (obj.Length <= 64)
+        {
+            return CombineHashcode(stackalloc char[64], obj.Span);
+        }
 
-        int count = obj.Span.ToLowerInvariant(dst);
+        using var spanOwner = SpanOwner<char>.Allocate(obj.Length);
+        return CombineHashcode(spanOwner.Span, obj.Span);
 
-        return HashCode<char>.Combine(dst[..count]);
+        static int CombineHashcode(scoped Span<char> buffer, ReadOnlySpan<char> value)
+        {
+            int count = value.ToLowerInvariant(buffer);
+            return HashCode<char>.Combine(buffer[..count]);
+        }
     }
 }

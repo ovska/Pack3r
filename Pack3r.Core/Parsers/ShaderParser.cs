@@ -12,7 +12,7 @@ using Pack3r.IO;
 
 namespace Pack3r;
 
-public readonly struct ResourcePath
+public readonly struct ResourcePath : IEquatable<ResourcePath>
 {
     public string Path { get; }
     public ZipArchiveEntry? Entry { get; }
@@ -34,12 +34,18 @@ public readonly struct ResourcePath
 
     public static implicit operator ResourcePath(string path) => new(path);
     public static implicit operator string(ResourcePath resource) => resource.Path;
+
+    public bool Equals(ResourcePath other) => Path.Equals(other.Path);
+
+    public override bool Equals(object? obj) => obj is ResourcePath resourcePath && Equals(resourcePath);
+
+    public override int GetHashCode() => Path.GetHashCode();
 }
 
 public interface IShaderParser
 {
-    Task<ICollection<Shader>> GetReferencedShaders(
-        Map map,
+    Task<Dictionary<ReadOnlyMemory<char>, Shader>> GetReferencedShaders(
+        PackingData data,
         CancellationToken cancellationToken);
 
     IAsyncEnumerable<Shader> Parse(
@@ -55,14 +61,14 @@ public class ShaderParser(
 {
     private readonly bool _includeDevFiles = options.Value.DevFiles;
 
-    public async Task<ICollection<Shader>> GetReferencedShaders(
-        Map map,
+    public async Task<Dictionary<ReadOnlyMemory<char>, Shader>> GetReferencedShaders(
+        PackingData data,
         CancellationToken cancellationToken)
     {
-        var scriptsDir = map.ETMain
+        var scriptsDir = data.Map.ETMain
             .GetDirectories("scripts", new EnumerationOptions { MatchCasing = MatchCasing.CaseSensitive })
             .SingleOrDefault()
-            ?? throw new InvalidOperationException($"Could not find 'scripts'-folder in {map.ETMain.FullName}");
+            ?? throw new InvalidOperationException($"Could not find 'scripts'-folder in {data.Map.ETMain.FullName}");
 
         HashSet<string>? shaderlist = options.Value.ShaderlistOnly
             ? await ReadShaderlist(scriptsDir.FullName, cancellationToken)
@@ -80,7 +86,7 @@ public class ShaderParser(
                 return;
             }
 
-            if (file.Name.StartsWith("q3map_"))
+            if (file.Name.StartsWith("q3map_") || file.Name.Equals("q3shadersCopyForRadiant.shader"))
             {
                 logger.LogDebug(
                     "Skipping shader parsing from compiler generated file {fileName}",
@@ -90,13 +96,13 @@ public class ShaderParser(
 
             await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
             {
-                // TODO: check for built-in shaders
+                // TODO: check for built-in shaders ?
                 if (!allShaders.TryAdd(shader.Name, shader))
                 {
                     logger.LogWarning(
                         "Shader {name} found multiple times, including in file {file}",
                         shader.Name,
-                        shader.FilePath);
+                        shader.Path.Path);
                 }
             }
         }).ConfigureAwait(false);
@@ -104,16 +110,19 @@ public class ShaderParser(
         logger.LogInformation("Parsed {shaderCount} shaders total shaders", allShaders.Count);
 
         var included = new Dictionary<ReadOnlyMemory<char>, Shader>(ROMCharComparer.Instance);
+
         AddShaders(
-            map.Shaders.GetEnumerator(),
+            data,
+            data.Map.Shaders.GetEnumerator(),
             allShaders,
             included,
             cancellationToken);
 
-        return included.Values;
+        return included;
     }
 
     private void AddShaders<TEnumerator>(
+        PackingData data,
         TEnumerator enumerator,
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders,
         Dictionary<ReadOnlyMemory<char>, Shader> included,
@@ -126,23 +135,28 @@ public class ShaderParser(
         {
             ReadOnlyMemory<char> name = enumerator.Current;
 
-            ref Shader? dictRef = ref CollectionsMarshal.GetValueRefOrAddDefault(included, name, out bool exists);
+            if (data.Pak0.Shaders.Contains(name))
+                continue;
 
-            if (exists)
+            if (included.ContainsKey(name))
                 continue;
 
             if (!allShaders.TryGetValue(name, out Shader? shader))
             {
-                logger.ShaderNotFound(name);
                 included.Remove(name);
                 continue;
             }
 
-            dictRef = shader;
+            included.Add(name, shader);
 
             if (shader.Shaders.Count != 0)
             {
-                AddShaders(shader.Shaders.GetEnumerator(), allShaders, included, cancellationToken);
+                AddShaders(
+                    data,
+                    shader.Shaders.GetEnumerator(),
+                    allShaders,
+                    included,
+                    cancellationToken);
             }
         }
     }
@@ -277,7 +291,8 @@ public class ShaderParser(
                 {
                     if (line.MatchPrefix(prefix, out token))
                     {
-                        shader.Shaders.Add(token);
+                        if (!token.Span.StartsWith("$", StringComparison.Ordinal))
+                            shader.Shaders.Add(token);
                         found = true;
                         break;
                     }
@@ -289,7 +304,8 @@ public class ShaderParser(
                     {
                         if (line.MatchPrefix(prefix, out token))
                         {
-                            shader.Textures.Add(token);
+                            if (!token.Span.StartsWith("$", StringComparison.Ordinal))
+                                shader.Textures.Add(token);
                             found = true;
                             break;
                         }
@@ -313,12 +329,11 @@ public class ShaderParser(
                     {
                         if (token.Span.Equals("-", StringComparison.Ordinal))
                         {
-                            // implicitMap -
-                            shader.Textures.Add(shader.Name);
+                            shader.ImplicitMapping = shader.Name;
                         }
                         else
                         {
-                            shader.Textures.Add(token);
+                            shader.ImplicitMapping = token;
                         }
                     }
                 }

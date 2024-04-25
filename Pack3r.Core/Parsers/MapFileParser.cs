@@ -32,6 +32,7 @@ public class MapFileParser(
         char expect = default;
 
         Dictionary<ROMC, ROMC> entitydata = new(ROMCharComparer.Instance);
+        HashSet<ROMC> nonPrefixedShaders = new(ROMCharComparer.Instance);
         HashSet<ROMC> shaders = new(ROMCharComparer.Instance);
         HashSet<ROMC> resources = new(ROMCharComparer.Instance);
 
@@ -121,7 +122,13 @@ public class MapFileParser(
 
                     if (space > 1)
                     {
-                        shaders.Add(line.Raw.AsMemory(lastParen + 2, space));
+                        var withoutPrefix = line.Raw.AsMemory(lastParen + 2, space);
+
+                        if (nonPrefixedShaders.Add(withoutPrefix))
+                        {
+                            shaders.Add($"textures/{line.Raw.AsSpan(lastParen + 2, space)}".AsMemory());
+                        }
+
                     }
                     else
                     {
@@ -140,9 +147,12 @@ public class MapFileParser(
                 {
                     continue;
                 }
-
                 // only non-paren starting line in a patchDef should be the texture
-                shaders.Add(line.Value);
+
+                if (nonPrefixedShaders.Add(line.Value))
+                {
+                    shaders.Add($"textures/{line.Value}".AsMemory());
+                }
             }
         }
 
@@ -155,46 +165,46 @@ public class MapFileParser(
 
         void HandleKeysAndClear()
         {
-            foreach (var (key, value) in entitydata)
+            foreach (var (_key, value) in entitydata)
             {
-                var span = key.Span;
+                var key = _key.Span;
 
-                if (span.IsEmpty)
+                if (key.IsEmpty)
                     continue;
 
-                if (span[0] == '_' && span.Length >= 4 && span[1] != 's')
+                if (key[0] == '_' && key.Length >= 4 && key[1] != 's')
                 {
-                    if (span.StartsWith("_remap", cmp))
+                    if (key.StartsWith("_remap", cmp))
                     {
                         var ranges = value.Split(';');
 
                         if (ranges.Count >= 2)
                             shaders.Add(value[ranges[1]]);
                     }
-                    else if (span.Equals("_fog", cmp))
+                    else if (key.Equals("_fog", cmp))
                     {
                         shaders.Add(value);
                     }
-                    else if (span.Equals("_celshader", cmp))
+                    else if (key.Equals("_celshader", cmp))
                     {
                         shaders.Add($"textures/{value}".AsMemory());
                     }
                 }
-                else if (span.StartsWith("model", cmp))
+                else if (key.StartsWith("model", cmp))
                 {
-                    if (span.Length == 5)
+                    if (key.Length == 5)
                     {
                         if (_devFiles || !IsClassName("misc_model"))
                         {
                             resources.Add(value);
                         }
                     }
-                    else if (span.Length == 6 && span[5] == '2')
+                    else if (key.Length == 6 && key[5] == '2')
                     {
                         resources.Add(value);
                     }
                 }
-                else if (span.Equals("skin", cmp) || span.Equals("_skin", cmp))
+                else if (key.Equals("skin", cmp) || key.Equals("_skin", cmp))
                 {
                     logger.LogWarning(
                         "Entity {entity} has a skin {value}, please check the files required by the skin manually",
@@ -202,12 +212,13 @@ public class MapFileParser(
                         value);
                     resources.Add(value);
                 }
-                else if (span.Equals("noise", cmp)
-                    || (span.Equals("sound", cmp) && IsClassName("dlight")))
+                else if (key.Equals("noise", cmp)
+                    || (key.Equals("sound", cmp) && IsClassName("dlight")))
                 {
-                    resources.Add(value);
+                    if (!value.Span.Equals("NOSOUND", cmp))
+                        resources.Add(value);
                 }
-                else if (span.Equals("shader", cmp))
+                else if (key.Equals("shader", cmp))
                 {
                     // terrains require some extra trickery
                     ROMC val = value;
@@ -224,19 +235,19 @@ public class MapFileParser(
 
                     shaders.Add(val);
                 }
-                else if (span.StartsWith("targetShader", cmp))
+                else if (key.StartsWith("targetShader", cmp))
                 {
-                    if (span.Equals("targetShaderName", cmp) ||
-                        span.Equals("targetShaderNewName", cmp))
+                    if (key.Equals("targetShaderName", cmp) ||
+                        key.Equals("targetShaderNewName", cmp))
                     {
                         shaders.Add(value);
                     }
                 }
-                else if (span.Equals("sun", cmp))
+                else if (key.Equals("sun", cmp))
                 {
                     shaders.Add(value);
                 }
-                else if (!hasStyleLights && span.Equals("style", cmp) && IsClassName("light"))
+                else if (!hasStyleLights && key.Equals("style", cmp) && IsClassName("light"))
                 {
                     hasStyleLights = true;
                 }

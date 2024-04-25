@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Diagnostics;
+using CommunityToolkit.HighPerformance;
 using Pack3r.Extensions;
 
 namespace Pack3r.Extensions;

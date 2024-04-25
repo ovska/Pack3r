@@ -54,13 +54,6 @@ public static partial class LoggingExtensions
 
     [LoggerMessage(
         LogLevel.Warning,
-        "Shader '{name}' referenced by map but not found in .shader -files")]
-    public static partial void ShaderNotFound(
-        this ILogger logger,
-        ReadOnlyMemory<char> name);
-
-    [LoggerMessage(
-        LogLevel.Warning,
         "Shader '{name}' referenced by shader '{parent}' but not found in .shader -files")]
     public static partial void ShaderReferenceNotFound(
         this ILogger logger,
