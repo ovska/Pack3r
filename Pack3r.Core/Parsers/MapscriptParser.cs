@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using Microsoft.Extensions.Logging;
 using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -17,7 +16,7 @@ public class MapscriptParser(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        bool unsupportedPrinted = false;
+        HashSet<ReadOnlyMemory<char>> unsupported = new(ROMCharComparer.Instance);
 
         await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
         {
@@ -45,15 +44,16 @@ public class MapscriptParser(
                 foreach (var range in token.Split(' '))
                     yield return new Resource(token[range], IsShader: true);
             }
-            else if (!unsupportedPrinted && Tokens.UnsupportedMapscript().IsMatch(line.Value.Span))
+            else if (Tokens.UnsupportedMapscript().IsMatch(line.Value.Span))
             {
-                unsupportedPrinted = true;
-                logger.LogWarning(
-                    "One or more unsupported mapscript keyword(s) ({keyword}) on line {line} in file {path}",
-                    line.Path,
-                    line.Index,
-                    line.Value);
+                unsupported.Add(line.Value);
             }
+        }
+
+        if (unsupported.Count > 0)
+        {
+            var keywords = string.Join(", ", unsupported.Select(l => l));
+            logger.Warn($"Mapscript has keyword(s) ({keywords}) that can include undiscoverable resources, please manually ensure they are included");
         }
     }
 

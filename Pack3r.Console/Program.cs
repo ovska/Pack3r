@@ -1,79 +1,54 @@
-﻿using System.CommandLine;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Pack3r;
+﻿using Pack3r;
 using Pack3r.Core.Parsers;
-using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Services;
+using Pure.DI;
 
-//DI.Setup("Pack3rServices")
-//    .Bind<ILogger<TT>>().To((IContext ctx) => )
-//    .Root<ServiceRoot>("Root");
+DI.Setup("Composition")
+    .DefaultLifetime(Lifetime.Singleton)
+    .Bind<IResourceParser>(1).To<MapscriptParser>()
+    .Bind<IResourceParser>(2).To<SoundscriptParser>()
+    .Bind<IResourceParser>(3).To<SpeakerScriptParser>()
+    .Bind<IShaderParser>().To<ShaderParser>()
+    .Bind<IPk3Reader>().To<Pk3Reader>()
+    .Bind<IMapFileParser>().To<MapFileParser>()
+    .Bind<IAssetService>().To<AssetService>()
+    .Bind<ILogger<TT>>().To<Logger<TT>>()
+    .Bind<ILineReader>().To<FSLineReader>()
+    .Bind<AppLifetime>().To<AppLifetime>()
+    .Bind<PackOptions>().To(static _ => new PackOptions { RequireAllAssets = false })
+    .Root<ServiceRoot>("Application");
 
-//var cmd = new RootCommand();
+using (var composition = new Composition())
+{
+    var app = composition.Application;
 
-//await cmd.InvokeAsync(args);
+    const string path = @"C:\Temp\ET\map\ET\etmain\maps\sungilarity.map";
+    const string dest = @"C:\Temp\test.pk3";
 
-using var cts = CreateConsoleCancellationSource();
-using var sp = InitServices();
+    app.Logger.System($"Starting packaging map '{path}' to {dest}");
 
-using var exceptionHandler = new ExceptionHandlerScope(sp.Get<ILogger<ExceptionHandlerScope>>(), cts.Token);
+    var sw = System.Diagnostics.Stopwatch.StartNew();
 
-var path = @"C:\Temp\ET\map\ET\etmain\maps\sungilarity.map";
+    PackingData data = await app.AssetService.GetPackingData(path, app.CancellationToken);
 
-var logger = sp.Get<ILogger<Program>>();
-logger.LogInformation("Starting packaging from path '{path}'", path);
+    await using var destination = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
 
-var sw = System.Diagnostics.Stopwatch.StartNew();
+    await app.Packager.CreateZip(data, destination, app.CancellationToken);
 
-var assetService = sp.Get<IAssetService>();
-PackingData data = await assetService.GetPackingData(path, cts.Token);
+    sw.Stop();
+    app.Logger.System($"Packaging finished in {sw.ElapsedMilliseconds} ms, press Enter to exit");
+}
 
-await using var destination = new FileStream(@"C:\Temp\test.pk3", FileMode.Create, FileAccess.Write, FileShare.None);
-
-var packager = sp.Get<Packager>();
-await packager.CreateZip(data, destination, cts.Token);
-
-sw.Stop();
-logger.LogInformation("Packaging finished in {time} ms, press Enter to exit", sw.ElapsedMilliseconds);
 Console.ReadLine();
 
-static ServiceProvider InitServices()
+#pragma warning disable RCS1110 // Declare type inside namespace
+sealed record ServiceRoot(
+    ILogger<Program> Logger,
+    IAssetService AssetService,
+    Packager Packager,
+    AppLifetime Lifetime)
 {
-    var services = new ServiceCollection();
-
-    services.AddLogging(builder => builder.AddSimpleConsole(o =>
-    {
-        o.SingleLine = true;
-        o.IncludeScopes = false;
-        o.TimestampFormat = "HH:mm:ss ";
-    }));
-    services.AddSingleton<IResourceParser, MapscriptParser>();
-    services.AddSingleton<IResourceParser, SoundscriptParser>();
-    services.AddSingleton<IResourceParser, SpeakerScriptParser>();
-    services.AddSingleton<IShaderParser, ShaderParser>();
-    services.AddSingleton<IPk3Reader, Pk3Reader>();
-    services.AddSingleton<IMapFileParser, MapFileParser>();
-    services.AddSingleton<IAssetService, AssetService>();
-    services.AddSingleton<Packager>();
-
-    // IO
-    services.AddSingleton<ILineReader, FSLineReader>();
-
-    services.AddOptions<PackOptions>();
-    services.Configure<PackOptions>(o =>
-    {
-        o.DevFiles = false;
-        o.RequireAllAssets = false;
-    });
-
-    return services.BuildServiceProvider();
+    public CancellationToken CancellationToken => Lifetime.CancellationToken;
 }
-
-static CancellationTokenSource CreateConsoleCancellationSource()
-{
-    var cts = new CancellationTokenSource();
-    Console.CancelKeyPress += (_, _) => cts.Cancel();
-    return cts;
-}
+#pragma warning restore RCS1110 // Declare type inside namespace

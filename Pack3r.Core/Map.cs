@@ -1,5 +1,5 @@
-﻿using CommunityToolkit.Diagnostics;
-using PPath = System.IO.Path;
+﻿using System.Diagnostics;
+using IOPath = System.IO.Path;
 
 namespace Pack3r;
 
@@ -44,11 +44,10 @@ public sealed class Map : MapAssets
         {
             return fullPath
                 .AsMemory(ETMain.FullName.Length)
-                .TrimStart([PPath.DirectorySeparatorChar, PPath.AltDirectorySeparatorChar])
+                .TrimStart([IOPath.DirectorySeparatorChar, IOPath.AltDirectorySeparatorChar])
                 .ToString();
         }
 
-        // uri.makerelative? ensure etmain has / behind it
-        return ThrowHelper.ThrowInvalidOperationException<string>("Invalid fullPath: " + fullPath);
+        throw new UnreachableException($"Invalid fullPath: {fullPath}");
     }
 }

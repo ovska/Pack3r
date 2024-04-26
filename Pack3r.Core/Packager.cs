@@ -1,15 +1,12 @@
-﻿using System.IO.Compression;
-using CommunityToolkit.Diagnostics;
-using CommunityToolkit.HighPerformance;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+﻿using System.Diagnostics;
+using System.IO.Compression;
 using Pack3r.Extensions;
 
 namespace Pack3r;
 
 public sealed class Packager(
     ILogger<Packager> logger,
-    IOptions<PackOptions> options,
+    PackOptions options,
     IShaderParser shaderParser)
 {
     public async Task CreateZip(
@@ -28,7 +25,7 @@ public sealed class Packager(
 
         Map map = data.Map;
 
-        if (options.Value.DevFiles)
+        if (options.DevFiles)
             AddFileAbsolute(map.Path, required: true);
 
         var bsp = new FileInfo(Path.ChangeExtension(map.Path, "bsp"));
@@ -80,7 +77,9 @@ public sealed class Packager(
             styleLights = styleLights || shader.HasLightStyles;
 
             if (shader.Path.Entry is not null)
-                ThrowHelper.ThrowNotSupportedException($"Can't include file from pk3: {shader.Path.Entry}");
+            {
+                throw new UnreachableException($"Can't include file from pk3: {shader.Path.Entry}");
+            }
 
             if (!addedFiles.Contains(shader.Path.Path.AsMemory()))
                 AddFileAbsolute(shader.Path.Path);
@@ -119,9 +118,7 @@ public sealed class Packager(
             }
             else
             {
-                logger.LogError(
-                    "Map has style lights, but shader file {path} was not found",
-                    styleShader);
+                logger.Warn($"Map has style lights, but shader file {styleShader} was not found");
             }
         }
 
@@ -151,14 +148,14 @@ public sealed class Packager(
             {
             }
 
-            if (!required && options.Value.RequireAllAssets)
+            if (!required && options.RequireAllAssets)
             {
-                logger.LogCritical("File {file} not found", relative);
+                logger.Fatal($"File {relative} not found");
                 throw new ControlledException();
             }
             else
             {
-                logger.LogError("File {file} not found", relative);
+                logger.Error($"File {relative} not found");
                 // not added
             }
         }
@@ -229,11 +226,10 @@ public sealed class Packager(
 
             Fail:
             logger.Log(
-                options.Value.RequireAllAssets ? LogLevel.Critical : LogLevel.Error,
-                "Shader/texture {name} not found",
-                name);
+                options.RequireAllAssets ? LogLevel.Fatal : LogLevel.Error,
+                $"Shader/texture {name} not found");
 
-            if (options.Value.RequireAllAssets)
+            if (options.RequireAllAssets)
             {
                 throw new ControlledException();
             }
@@ -245,21 +241,21 @@ public sealed class Packager(
         if (destination is null)
         {
             destination = Path.ChangeExtension(map.Path, "pk3");
-            logger.LogDebug("No destination file supplied, defaulting to {path}", destination);
+            logger.Debug($"No destination file supplied, defaulting to: {destination}");
         }
 
         // is a directory?
         if (Path.GetExtension(destination.AsSpan()).IsEmpty)
         {
             destination = Path.ChangeExtension(Path.Combine(destination, map.Name), "pk3");
-            logger.LogDebug("Destination path is a directory, using path: {path}", destination);
+            logger.Debug($"Destination path is a directory, using path: {destination}");
         }
 
         // relative path?
         if (!Path.IsPathRooted(destination))
         {
             destination = Path.GetFullPath(new Uri(destination).LocalPath);
-            logger.LogDebug("Destination resolved to full path {path}", destination);
+            logger.Debug($"Destination resolved to full path: {destination}");
         }
 
         if (!string.IsNullOrEmpty(rename))

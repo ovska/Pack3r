@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
-using System.Globalization;
-using Microsoft.Extensions.Logging;
 using Pack3r.Core.Parsers;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r;
@@ -35,14 +34,16 @@ public class AssetService(
         var bspPath = Path.ChangeExtension(path, "bsp");
 
         if (!File.Exists(bspPath))
-            throw new InvalidOperationException($"Compiled bsp-file '{bspPath}' not found for map!");
+        {
+            throw new EnvironmentException($"Compiled bsp-file '{bspPath}' not found for map!");
+        }
 
         var mapsDirectory = Directory.GetParent(path);
         var etmainDirectory = mapsDirectory is null ? null : Directory.GetParent(mapsDirectory.FullName);
 
         if (mapsDirectory is not { Name: "maps" } || etmainDirectory is not { Name: "etmain" })
         {
-            throw new InvalidOperationException($".map file not in etmain/maps: '{path}'");
+            throw new EnvironmentException($".map file not in etmain/maps: '{path}'");
         }
 
         // start pak0 parse task in background
@@ -69,9 +70,7 @@ public class AssetService(
 
             if (!File.Exists(path))
             {
-                logger.LogInformation("{description} file '{path}' not found, skipping...",
-                    CultureInfo.InvariantCulture.TextInfo.ToTitleCase(parser.Description),
-                    map.RelativePath(path));
+                logger.Info($"{parser.Description} file '{map.RelativePath(path)}' not found, skipping...");
                 return;
             }
 

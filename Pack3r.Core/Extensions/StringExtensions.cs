@@ -1,6 +1,4 @@
-﻿using CommunityToolkit.Diagnostics;
-using CommunityToolkit.HighPerformance;
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 
 namespace Pack3r.Extensions;
 
@@ -85,7 +83,6 @@ public static class StringExtensions
 
     private static void ThrowForInvalidKVP(in Line line)
     {
-        ThrowHelper.ThrowInvalidDataException(
-            $"Invalid key/value pair in {line.Path} on line {line.Index}: {line.Raw}");
+        throw new InvalidDataException($"Invalid key/value pair in {line.Path} on line {line.Index}: {line.Raw}");
     }
 }

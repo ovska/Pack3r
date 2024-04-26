@@ -29,7 +29,6 @@ public static class MemoryTests
     [InlineData("test arg ", (string[])["test", "arg"])]
     public static void Should_Split_By_Whitespace(string input, string[] expected)
     {
-
         Assert.Equal(expected, input.AsMemory().Split(' ').Select(r => input.AsMemory(r).ToString()));
     }
 

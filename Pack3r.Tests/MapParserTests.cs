@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Logging.Abstractions;
-using Pack3r.Core.Parsers;
+﻿using Pack3r.Core.Parsers;
 using Pack3r.IO;
 
 namespace Pack3r.Tests;

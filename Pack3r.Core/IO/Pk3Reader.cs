@@ -1,5 +1,4 @@
 ﻿using System.IO.Compression;
-using Microsoft.Extensions.Logging;
 using Pack3r.Extensions;
 
 namespace Pack3r.IO;
@@ -76,7 +75,7 @@ public class Pk3Reader(
         }
         catch (FileNotFoundException)
         {
-            logger.LogWarning("File {path} not found, skipping built-in asset discovery!", path);
+            logger.Warn($"File {path} not found, skipping built-in asset discovery!");
             return new Pk3Contents(path);
         }
     }

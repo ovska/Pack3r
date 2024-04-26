@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
-
 namespace Pack3r.Tests;
 
 public class ShaderParserTests

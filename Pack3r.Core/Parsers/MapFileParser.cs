@@ -1,8 +1,4 @@
-﻿using CommunityToolkit.Diagnostics;
-using CommunityToolkit.HighPerformance;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.IO;
 using ROMC = System.ReadOnlyMemory<char>;
 
@@ -18,11 +14,11 @@ public interface IMapFileParser
 public class MapFileParser(
     ILogger<MapFileParser> logger,
     ILineReader reader,
-    IOptions<PackOptions> options)
+    PackOptions options)
     : IMapFileParser
 {
     private const StringComparison cmp = StringComparison.OrdinalIgnoreCase;
-    private readonly bool _devFiles = options.Value.DevFiles;
+    private readonly bool _devFiles = options.DevFiles;
 
     public async Task<MapAssets> ParseMapAssets(
         string path,
@@ -39,6 +35,9 @@ public class MapFileParser(
         ROMC currentEntity = default;
         bool hasStyleLights = false;
 
+        List<ROMC> unsupSkins = [];
+        List<ROMC> unsupTerrains = [];
+
         await foreach (var line in reader.ReadLines(path, new LineOptions(KeepRaw: true), cancellationToken))
         {
             if (expect != default)
@@ -49,8 +48,8 @@ public class MapFileParser(
                     continue;
                 }
 
-                ThrowHelper.ThrowInvalidDataException(
-                    $"Expected '{expect}' on line {line.Index}, actual value: {line.Raw}");
+                logger.Fatal($"Expected '{expect}' on line {line.Index}, actual value: {line.Raw}");
+                throw new ControlledException();
             }
 
             if (line.FirstChar == '}')
@@ -61,9 +60,14 @@ public class MapFileParser(
                     State.AfterDef => State.Entity,
                     State.BrushDef => State.AfterDef,
                     State.PatchDef => State.AfterDef,
-                    _ => ThrowHelper.ThrowInvalidOperationException<State>(
-                        $"Invalid .map file, dangling closing bracket on line {line.Index}!")
+                    _ => (State)(byte.MaxValue),
                 };
+
+                if (state == (State)byte.MaxValue)
+                {
+                    logger.Fatal($"Invalid .map file, dangling closing bracket on line {line.Index}!");
+                    throw new ControlledException();
+                }
 
                 if (state == State.None)
                 {
@@ -75,7 +79,13 @@ public class MapFileParser(
 
             if (state == State.None)
             {
-                Expect("// entity ", in line, out currentEntity);
+                if (!line.Value.Span.StartsWith("// entity ", StringComparison.Ordinal))
+                {
+                    logger.Fatal($"Expected line {line.Index} in file '{path}' to contain entity ID, actual value: {line.Raw}");
+                    throw new ControlledException();
+                }
+
+                currentEntity = line.Value["// entity ".Length..];
                 state = State.Entity;
                 expect = '{';
                 continue;
@@ -128,12 +138,11 @@ public class MapFileParser(
                         {
                             shaders.Add($"textures/{line.Raw.AsSpan(lastParen + 2, space)}".AsMemory());
                         }
-
                     }
                     else
                     {
-                        ThrowHelper.ThrowInvalidOperationException(
-                            $"Malformed brush face definition on line {line.Index}: {line.Raw}");
+                        logger.Fatal($"Malformed brush face definition in file '{path}' on line {line.Index}: {line.Raw}");
+                        throw new ControlledException();
                     }
                 }
 
@@ -154,6 +163,18 @@ public class MapFileParser(
                     shaders.Add($"textures/{line.Value}".AsMemory());
                 }
             }
+        }
+
+        if (unsupSkins.Count > 0)
+        {
+            string entities = string.Join(", ", unsupSkins);
+            logger.Warn($"Resources referenced by skins are not supported, please include manually (on entities: {entities})");
+        }
+
+        if (unsupTerrains.Count > 0)
+        {
+            string entities = string.Join(", ", unsupTerrains);
+            logger.Warn($"Shaders referenced by terrains are not supported, please include manually (on entities: {entities})");
         }
 
         return new MapAssets
@@ -206,10 +227,7 @@ public class MapFileParser(
                 }
                 else if (key.Equals("skin", cmp) || key.Equals("_skin", cmp))
                 {
-                    logger.LogWarning(
-                        "Entity {entity} has a skin {value}, please check the files required by the skin manually",
-                        currentEntity,
-                        value);
+                    unsupSkins.Add(currentEntity);
                     resources.Add(value);
                 }
                 else if (key.Equals("noise", cmp)
@@ -226,11 +244,7 @@ public class MapFileParser(
                         !value.Span.StartsWith("textures/", cmp))
                     {
                         val = $"textures/{value}".AsMemory();
-
-                        logger.LogWarning(
-                            "Entity {id} has a terrain shader '{value}', please manually ensure the shaders are included",
-                            currentEntity,
-                            value);
+                        unsupTerrains.Add(currentEntity);
                     }
 
                     shaders.Add(val);
@@ -277,13 +291,13 @@ public class MapFileParser(
         const string trigger = "trigger ";
 
         if (span.Length > 12 &&
-            span.DangerousGetReference() == 'c' &&
-            span.DangerousGetReferenceAt(6) == '/' &&
+            span[0] == 'c' &&
+            span[6] == '/' &&
             span.StartsWith("common/"))
         {
             span = span[common.Length..];
 
-            return span.DangerousGetReference() switch
+            return span[0] switch
             {
                 'c' when span.StartsWith(caulk) => true,
                 'n' when span.StartsWith(nodraw) => true,
@@ -293,17 +307,6 @@ public class MapFileParser(
         }
 
         return false;
-    }
-
-    private static void Expect(string prefix, in Line line, out ROMC entityId)
-    {
-        if (!line.Value.Span.StartsWith(prefix))
-        {
-            ThrowHelper.ThrowInvalidDataException(
-                $"Expected line {line.Index} to start with \"{prefix}\", actual value: {line.Raw}");
-        }
-
-        entityId = line.Value[prefix.Length..];
     }
 
     private enum State : byte

@@ -3,14 +3,12 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using CommunityToolkit.HighPerformance;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r;
+
+#pragma warning disable CA2231 // Overload operator equals on overriding value type Equals
 
 public readonly struct ResourcePath : IEquatable<ResourcePath>
 {
@@ -55,12 +53,10 @@ public interface IShaderParser
 
 public class ShaderParser(
     ILineReader reader,
-    IOptions<PackOptions> options,
+    PackOptions options,
     ILogger<ShaderParser> logger)
     : IShaderParser
 {
-    private readonly bool _includeDevFiles = options.Value.DevFiles;
-
     public async Task<Dictionary<ReadOnlyMemory<char>, Shader>> GetReferencedShaders(
         PackingData data,
         CancellationToken cancellationToken)
@@ -70,35 +66,31 @@ public class ShaderParser(
             .SingleOrDefault();
 
         if (scriptsDir is not { Exists: true })
-            throw new InvalidOperationException($"Could not find 'scripts'-folder in {data.Map.ETMain.FullName}");
+            throw new EnvironmentException($"Could not find 'scripts'-folder in {data.Map.ETMain.FullName}");
 
-        HashSet<string>? shaderlist = options.Value.ShaderlistOnly
+        HashSet<string>? shaderlist = options.ShaderlistOnly
             ? await ReadShaderlist(scriptsDir.FullName, cancellationToken)
             : null;
 
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders = new(ROMCharComparer.Instance);
 
-        int counter = 0;
+        int shaderFileCount = 0;
 
         await Parallel.ForEachAsync(scriptsDir.GetFiles("*.shader"), cancellationToken, async (file, ct) =>
         {
             if (shaderlist?.Contains(Path.GetFileNameWithoutExtension(file.Name)) == false)
             {
-                logger.LogDebug(
-                    "Skipping shader parsing from file {fileName} (not in shaderlist)",
-                    file.Name);
+                logger.Debug($"Skipping shader parsing from file {file.Name} (not in shaderlist)");
                 return;
             }
 
             if (file.Name.StartsWith("q3map_") || file.Name.Equals("q3shadersCopyForRadiant.shader"))
             {
-                logger.LogDebug(
-                    "Skipping shader parsing from compiler generated file {fileName}",
-                    file.Name);
+                logger.Debug($"Skipping shader parsing from compiler generated file {file.Name}");
                 return;
             }
 
-            Interlocked.Increment(ref counter);
+            Interlocked.Increment(ref shaderFileCount);
 
             await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
             {
@@ -111,24 +103,19 @@ public class ShaderParser(
 
                     if (shader.Equals(existing))
                     {
-                        logger.LogWarning(
-                            "Shader {name} found multiple times in file '{file}'",
-                            shader.Name,
-                            data.Map.RelativePath(shader.Path.Path));
+                        logger.Warn($"Shader {shader.Name} found multiple times in file '{data.Map.RelativePath(shader.Path.Path)}'");
                     }
                     else
                     {
-                        logger.LogWarning(
-                            "Shader {name} both in file '{existing}' and '{current}'",
-                            shader.Name,
-                            data.Map.RelativePath(shader.Path.Path),
-                            data.Map.RelativePath(existing.Path.Path));
+                        logger.Warn(
+                            $"Shader {shader.Name} both in file '{data.Map.RelativePath(shader.Path.Path)}'" +
+                            $" and '{data.Map.RelativePath(existing.Path.Path)}'");
                     }
                 }
             }
         }).ConfigureAwait(false);
 
-        logger.LogInformation("Parsed {shaders} shaders from {files} .shader-files", allShaders.Count, counter);
+        logger.Info($"Parsed {allShaders.Count} shaders from {shaderFileCount} .shader-files");
 
         var included = new Dictionary<ReadOnlyMemory<char>, Shader>(ROMCharComparer.Instance);
 
@@ -213,8 +200,8 @@ public class ShaderParser(
             {
                 if (!line.IsOpeningBrace)
                 {
-                    logger.ExpectedOpeningBrace(path, line.Index, line.Raw);
-                    throw new InvalidDataException();
+                    throw new InvalidDataException(
+                        $"Expected {{ on line {line.Index} in file '{path}', but line was: {line.Raw}");
                 }
 
                 state = State.Shader;
@@ -225,8 +212,8 @@ public class ShaderParser(
             {
                 if (line.Value.Span.ContainsAny(Tokens.Braces))
                 {
-                    logger.ExpectedShader(path, line.Index, line.Raw);
-                    throw new InvalidDataException();
+                    throw new InvalidDataException(
+                        $"Expected shader name on line {line.Index} in file '{path}', got: '{line.Raw}'");
                 }
 
                 shader = new Shader(path, line.Value);
@@ -240,8 +227,8 @@ public class ShaderParser(
             {
                 if (line.IsOpeningBrace)
                 {
-                    logger.InvalidToken(path, line.Index, line.Raw);
-                    throw new InvalidDataException();
+                    throw new InvalidDataException(
+                        $"Invalid token '{line.Raw}' on line {line.Index} in file {path}");
                 }
 
                 if (line.IsClosingBrace)
@@ -319,7 +306,7 @@ public class ShaderParser(
                     }
                 }
 
-                if (!found && _includeDevFiles)
+                if (!found && options.DevFiles)
                 {
                     foreach (var prefix in _devTexturePrefixes)
                     {
@@ -340,11 +327,7 @@ public class ShaderParser(
                 {
                     if (!token.TryReadPastWhitespace(out token))
                     {
-                        logger.LogError(
-                            "Missing implicit mapping path on line {line} in shader '{shader}' in file '{path}'",
-                            line.Index,
-                            shader.Name,
-                            path);
+                        logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{path}'");
                     }
                     else
                     {
@@ -400,11 +383,8 @@ public class ShaderParser(
 
         if (state != State.None)
         {
-            logger.LogCritical(
-                "Shader '{path}' ended in an invalid state: {state}",
-                path,
-                state);
-            throw new InvalidDataException();
+            logger.Fatal($"Shader '{path}' ended in an invalid state: {state}");
+            throw new ControlledException();
         }
     }
 
@@ -422,8 +402,8 @@ public class ShaderParser(
         }
         catch (Exception e)
         {
-            logger.LogCritical(e, "Could not read shaderlist.txt in {scripts}", scriptsDirectory);
-            throw;
+            logger.Exception(e, $"Could not read shaderlist.txt in {scriptsDirectory}");
+            throw new ControlledException();
         }
     }
 
@@ -455,7 +435,7 @@ public class ShaderParser(
 
         return (line[0] | 0x20) switch
         {
-            'q' => !_includeDevFiles && line.StartsWith("qer_"),
+            'q' => !options.DevFiles && line.StartsWith("qer_"),
             's' => line.StartsWith("surfaceparm "),
             'c' => line.StartsWith("cull "),
             'n' => line.StartsWith("nopicmip") || line.StartsWith("nomipmaps"),
