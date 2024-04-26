@@ -66,9 +66,11 @@ public class ShaderParser(
         CancellationToken cancellationToken)
     {
         var scriptsDir = data.Map.ETMain
-            .GetDirectories("scripts", new EnumerationOptions { MatchCasing = MatchCasing.CaseSensitive })
-            .SingleOrDefault()
-            ?? throw new InvalidOperationException($"Could not find 'scripts'-folder in {data.Map.ETMain.FullName}");
+            .GetDirectories("scripts")
+            .SingleOrDefault();
+
+        if (scriptsDir is not { Exists: true })
+            throw new InvalidOperationException($"Could not find 'scripts'-folder in {data.Map.ETMain.FullName}");
 
         HashSet<string>? shaderlist = options.Value.ShaderlistOnly
             ? await ReadShaderlist(scriptsDir.FullName, cancellationToken)
