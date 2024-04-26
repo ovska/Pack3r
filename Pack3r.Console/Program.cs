@@ -31,7 +31,7 @@ DI.Setup("Composition")
 
 await Commandline.Run(args, Execute);
 
-static async Task Execute(PackOptions options)
+static async Task<int> Execute(PackOptions options)
 {
     int retval = 0;
 
@@ -41,21 +41,18 @@ static async Task Execute(PackOptions options)
 
         bool fileCreated = false;
 
-        const string path = @"C:\Temp\ET\map\ET\etmain\maps\sungilarity.map";
-        const string dest = @"C:\Temp\test.pk3";
-
         try
         {
-            var mapName = Path.GetFileName(path);
-            var mapsDir = Path.GetDirectoryName(path);
+            var mapName = options.MapFile.Name;
+            var mapsDir = Path.GetDirectoryName(options.MapFile.FullName);
 
-            app.Logger.System($"Packaging from '{mapName}' in '{mapsDir}' to '{dest}'");
+            app.Logger.System($"Packaging from '{mapName}' in '{mapsDir}' to '{options.Pk3File.FullName}'");
 
             var timer = Stopwatch.StartNew();
 
-            PackingData data = await app.AssetService.GetPackingData(path, app.CancellationToken);
+            PackingData data = await app.AssetService.GetPackingData(app.CancellationToken);
 
-            await using (var destination = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None))
+            await using (var destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 fileCreated = true;
                 await app.Packager.CreateZip(data, destination, app.CancellationToken);
@@ -68,8 +65,8 @@ static async Task Execute(PackOptions options)
         }
         catch (Exception e)
         {
-            if (fileCreated)
-                File.Delete(dest);
+            if (fileCreated && options.Overwrite)
+                File.Delete(options.Pk3File.FullName);
 
             app.Lifetime.HandleException(e);
             retval = 1;
@@ -77,7 +74,7 @@ static async Task Execute(PackOptions options)
     }
 
     Console.ReadLine();
-    Environment.Exit(retval);
+    return retval;
 }
 
 #pragma warning disable RCS1110 // Declare type inside namespace
@@ -96,4 +93,3 @@ sealed class PackOptionsWrapper([Tag("options")] PackOptions value)
 {
     public PackOptions Value => value;
 }
-

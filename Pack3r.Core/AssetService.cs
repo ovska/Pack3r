@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.IO;
 using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -14,48 +15,33 @@ public sealed class PackingData
 
 public interface IAssetService
 {
-    Task<PackingData> GetPackingData(string path, CancellationToken cancellationToken);
+    Task<PackingData> GetPackingData(CancellationToken cancellationToken);
 }
 
 public class AssetService(
+    PackOptions options,
     ILogger<AssetService> logger,
     IPk3Reader pk3Reader,
     IMapFileParser mapFileParser,
     IEnumerable<IResourceParser> resourceParsers)
     : IAssetService
 {
-    public async Task<PackingData> GetPackingData(string path, CancellationToken cancellationToken)
+    public async Task<PackingData> GetPackingData(CancellationToken cancellationToken)
     {
-        // normalize
-        path = Path.GetFullPath(new Uri(path).LocalPath);
-
-        if (Path.GetExtension(path) != ".map")
-            throw new ArgumentException($"Path not to a .map file: {path}", nameof(path));
-
-        var bspPath = Path.ChangeExtension(path, "bsp");
-
-        if (!File.Exists(bspPath))
+        if (options.MapFile.Directory is not { Name: "maps", Parent: { Name: "etmain" } etmainDirectory })
         {
-            throw new EnvironmentException($"Compiled bsp-file '{bspPath}' not found for map!");
-        }
-
-        var mapsDirectory = Directory.GetParent(path);
-        var etmainDirectory = mapsDirectory is null ? null : Directory.GetParent(mapsDirectory.FullName);
-
-        if (mapsDirectory is not { Name: "maps" } || etmainDirectory is not { Name: "etmain" })
-        {
-            throw new EnvironmentException($".map file not in etmain/maps: '{path}'");
+            throw new EnvironmentException($".map file not in etmain/maps: '{options.MapFile.FullName}'");
         }
 
         // start pak0 parse task in background
         var pak0task = GetBuiltinContents(etmainDirectory, cancellationToken);
 
-        MapAssets assets = await mapFileParser.ParseMapAssets(path, cancellationToken).ConfigureAwait(false);
+        MapAssets assets = await mapFileParser.ParseMapAssets(options.MapFile.FullName, cancellationToken).ConfigureAwait(false);
 
         Map map = new()
         {
-            Name = Path.GetFileNameWithoutExtension(path),
-            Path = path,
+            Name = Path.GetFileNameWithoutExtension(options.MapFile.FullName),
+            Path = options.MapFile.FullName,
             ETMain = etmainDirectory,
             Resources = assets.Resources,
             Shaders = assets.Shaders,

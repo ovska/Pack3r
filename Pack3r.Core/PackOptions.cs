@@ -2,6 +2,9 @@
 
 public class PackOptions
 {
+    public FileInfo MapFile { get; set; } = null!;
+    public FileInfo Pk3File { get; set; } = null!;
+
     public bool ShaderlistOnly { get; set; }
     public bool DevFiles { get; set; }
     public bool RequireAllAssets { get; set; }

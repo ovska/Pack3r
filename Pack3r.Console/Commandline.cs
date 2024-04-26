@@ -1,4 +1,5 @@
 ﻿using System.CommandLine;
+using System.CommandLine.Parsing;
 
 namespace Pack3r.Console;
 
@@ -6,80 +7,176 @@ internal static class Commandline
 {
     public static Task Run(
         string[] args,
-        Func<PackOptions, Task> task)
+        Func<PackOptions, Task<int>> task)
     {
-        var allowpartial = new Option<bool>(
+        var mapArgument = new Argument<FileInfo?>(
+           name: "map",
+           getDefaultValue: () => null,
+           description: ".map file to create the pk3 from (NetRadiant format)");
+
+        var pk3Option = new Option<FileInfo?>(
+           ["--pk3"],
+           getDefaultValue: () => null,
+           description: "Destination to write the pk3 to, defaults to etmain")
+        {
+            Arity = ArgumentArity.ZeroOrOne,
+        };
+
+        var looseOption = new Option<bool>(
             ["--loose", "--allowpartial"],
             () => false,
             "Pack the pk3 even if some assets are missing")
         {
-            Arity = new ArgumentArity(0, 1),
+            Arity = ArgumentArity.ZeroOrOne,
         };
 
-        var includeSource = new Option<bool>(
+        var includeSourceOption = new Option<bool>(
             ["--src", "--includesource"],
             () => false,
             "Include source (.map, editorimages etc.) in pk3")
         {
-            Arity = new ArgumentArity(0, 1),
+            Arity = ArgumentArity.ZeroOrOne,
         };
 
-        var shaderlistOnly = new Option<bool>(
+        var shaderlistOption = new Option<bool>(
             ["--sl", "--shaderlist"],
             () => false,
             "Only consider shaders included in shaderlist.txt")
         {
-            Arity = new ArgumentArity(0, 1),
+            Arity = ArgumentArity.ZeroOrOne,
         };
 
-        var overwrite = new Option<bool>(
+        var overwriteOption = new Option<bool>(
             ["--force", "--overwrite"],
             () => false,
             "Overwrites an existing output pk3 file if one exists")
         {
-            Arity = new ArgumentArity(0, 1),
+            Arity = ArgumentArity.ZeroOrOne,
         };
 
-        var loglevel = new Option<LogLevel>(
-            ["--log", "--loglevel"],
+        var loglevelOption = new Option<LogLevel>(
+            ["-v", "--verbosity"],
             () => LogLevel.Debug,
             "Output log level")
         {
-            Arity = new ArgumentArity(1, 1),
+            Arity = ArgumentArity.ZeroOrOne,
         };
 
-        var rootCommand = new RootCommand("Pack3r, tool to create release-ready pk3s from NetRadiant maps");
-        rootCommand.AddOption(allowpartial);
-        rootCommand.AddOption(includeSource);
-        rootCommand.AddOption(shaderlistOnly);
-        rootCommand.AddOption(overwrite);
-        rootCommand.AddOption(loglevel);
+        mapArgument.AddValidator(ValidateMapPath);
+        pk3Option.AddValidator(ValidatePk3Path);
 
-        rootCommand.SetHandler(
-            (
-                allowpartial,
-                includeSource,
-                shaderlistOnly,
-                overwrite,
-                loglevel) =>
+        var rootCommand = new RootCommand("Pack3r, tool to create release-ready pk3s from NetRadiant maps")
+        {
+            mapArgument,
+            pk3Option,
+            looseOption,
+            includeSourceOption,
+            shaderlistOption,
+            overwriteOption,
+            loglevelOption,
+        };
+
+        rootCommand.SetHandler(async context =>
+        {
+            var options = new PackOptions
             {
-                var options = new PackOptions
-                {
-                    RequireAllAssets = !allowpartial,
-                    DevFiles = includeSource,
-                    ShaderlistOnly = shaderlistOnly,
-                    Overwrite = overwrite,
-                    LogLevel = loglevel,
-                };
+                MapFile = context.ParseResult.GetValueForArgument(mapArgument)!,
+                Pk3File = context.ParseResult.GetValueForOption(pk3Option)!,
+                RequireAllAssets = !context.ParseResult.GetValueForOption(looseOption),
+                DevFiles = context.ParseResult.GetValueForOption(includeSourceOption),
+                ShaderlistOnly = context.ParseResult.GetValueForOption(shaderlistOption),
+                Overwrite = context.ParseResult.GetValueForOption(overwriteOption),
+                LogLevel = context.ParseResult.GetValueForOption(loglevelOption),
+            };
 
-                return task(options);
-            },
-            allowpartial,
-            includeSource,
-            shaderlistOnly,
-            overwrite,
-            loglevel);
+            context.ExitCode = await task(options);
+        });
 
         return rootCommand.InvokeAsync(args);
+
+        void ValidateMapPath(ArgumentResult result)
+        {
+            var file = result.GetValueForArgument(mapArgument);
+
+            if (file is null)
+            {
+                result.ErrorMessage = "No .map file argument provided";
+                return;
+            }
+
+            var extension = Path.GetExtension(file.FullName.AsSpan());
+
+            if (extension.IsEmpty)
+            {
+                if (Directory.Exists(file.FullName))
+                {
+                    result.ErrorMessage = $"Map path points to a directory: {file.FullName}";
+                    return;
+                }
+
+                file = new FileInfo(Path.ChangeExtension(file.FullName, ".map"));
+            }
+            else if (!extension.Equals(".map", StringComparison.OrdinalIgnoreCase))
+            {
+                result.ErrorMessage = "File is not a .map-file";
+                return;
+            }
+
+            if (!file.Exists)
+            {
+                result.ErrorMessage = $"File does not exist: {file.FullName}";
+                return;
+            }
+
+            var bspPath = Path.ChangeExtension(file.FullName, "bsp");
+
+            if (!File.Exists(bspPath))
+            {
+                result.ErrorMessage = $"Compiled bsp-file with the .map name not found: {bspPath}";
+            }
+        }
+
+        void ValidatePk3Path(OptionResult result)
+        {
+            var file = result.GetValueForOption(pk3Option);
+
+            // TODO dryrun
+            if (file is null)
+            {
+                if (result.GetValueForArgument(mapArgument) is not
+                    { Directory.Parent: { Exists: true } etmain } mapInfo)
+                {
+                    result.ErrorMessage = "Could not determine output pk3 location";
+                    return;
+                }
+
+                var pk3Name = Path.GetFileNameWithoutExtension(mapInfo.FullName);
+                file = new FileInfo(Path.Combine(etmain.FullName, Path.ChangeExtension(pk3Name, ".pk3")));
+            }
+
+            var extension = Path.GetExtension(file.FullName.AsSpan());
+
+            if (extension.IsEmpty)
+            {
+                if (Directory.Exists(file.FullName))
+                {
+                    result.ErrorMessage = $"Output path points to a directory: {file.FullName}";
+                    return;
+                }
+
+                file = new FileInfo(Path.ChangeExtension(file.FullName, ".pk3"));
+            }
+            else if (!extension.Equals(".pk3", StringComparison.OrdinalIgnoreCase)
+                && !extension.Equals(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                result.ErrorMessage = "Output file is not a .pk3 or .zip-file";
+                return;
+            }
+
+            if (!result.GetValueForOption(overwriteOption) && file.Exists)
+            {
+                result.ErrorMessage = $"Output file already exists, use the overwrite-option to overwrite it: {file.FullName}";
+            }
+        }
     }
 }

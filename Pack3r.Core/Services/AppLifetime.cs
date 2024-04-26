@@ -60,7 +60,9 @@ public sealed class AppLifetime : IDisposable
         if (!dontDrain)
             _logger.Drain();
 
+#pragma warning disable RCS1214 // Unnecessary interpolated string
         _logger.System($"Press Enter to exit");
+#pragma warning restore RCS1214 // Unnecessary interpolated string
     }
 
     public void Dispose()
