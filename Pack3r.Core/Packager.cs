@@ -23,6 +23,7 @@ public sealed class Packager(
         // contains both actual and alternate files added
         HashSet<ReadOnlyMemory<char>> addedFiles = new(ROMCharComparer.Instance);
         HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
+        List<string> includedFiles = [];
 
         Map map = data.Map;
 
@@ -142,6 +143,18 @@ public sealed class Packager(
             }
         }
 
+        if (includedFiles.Count > 0)
+        {
+            includedFiles.Sort();
+
+            foreach (var file in includedFiles)
+            {
+                logger.Debug($"File included: {file.Replace('\\', '/')}");
+            }
+        }
+
+        // end
+
         void AddFileRelative(ReadOnlyMemory<char> relativePath, bool required = false)
         {
             var asString = relativePath.ToString();
@@ -164,6 +177,9 @@ public sealed class Packager(
             {
                 archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
                 addedFiles.Add(absolute.AsMemory());
+
+                if (options.LogLevel == LogLevel.Debug)
+                    includedFiles.Add(relative);
                 return;
             }
             catch (FileNotFoundException)
@@ -191,6 +207,10 @@ public sealed class Packager(
                 var absolute = Path.Combine(map.ETMain.FullName, relative);
                 archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
                 addedFiles.Add(absolute.AsMemory());
+
+                if (options.LogLevel == LogLevel.Debug)
+                    includedFiles.Add(relative);
+
                 return true;
             }
             catch (DirectoryNotFoundException) { return false; }

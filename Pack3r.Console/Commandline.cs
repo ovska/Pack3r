@@ -17,7 +17,15 @@ internal static class Commandline
         var pk3Option = new Option<FileInfo?>(
            ["--pk3"],
            getDefaultValue: () => null,
-           description: "Destination to write the pk3 to, defaults to etmain")
+           description: "Destination to write the pk3 to, defaults to etmain (ignored on dry runs)")
+        {
+            Arity = ArgumentArity.ZeroOrOne,
+        };
+
+        var dryrunOption = new Option<bool>(
+            ["-d", "--dry-run"],
+            () => false,
+            "Print files that would be packed without creating the pk3")
         {
             Arity = ArgumentArity.ZeroOrOne,
         };
@@ -25,7 +33,7 @@ internal static class Commandline
         var looseOption = new Option<bool>(
             ["--loose", "--allowpartial"],
             () => false,
-            "Pack the pk3 even if some assets are missing")
+            "Pack the pk3 even if some assets are missing  (ignored on dry runs)")
         {
             Arity = ArgumentArity.ZeroOrOne,
         };
@@ -54,10 +62,10 @@ internal static class Commandline
             Arity = ArgumentArity.ZeroOrOne,
         };
 
-        var loglevelOption = new Option<LogLevel>(
+        var loglevelOption = new Option<LogLevel?>(
             ["-v", "--verbosity"],
-            () => LogLevel.Debug,
-            "Output log level")
+            () => LogLevel.Info,
+            "Output log level, use without parameter to view all output")
         {
             Arity = ArgumentArity.ZeroOrOne,
         };
@@ -69,6 +77,7 @@ internal static class Commandline
         {
             mapArgument,
             pk3Option,
+            dryrunOption,
             looseOption,
             includeSourceOption,
             shaderlistOption,
@@ -82,11 +91,12 @@ internal static class Commandline
             {
                 MapFile = context.ParseResult.GetValueForArgument(mapArgument)!,
                 Pk3File = context.ParseResult.GetValueForOption(pk3Option)!,
+                DryRun = context.ParseResult.GetValueForOption(dryrunOption),
                 RequireAllAssets = !context.ParseResult.GetValueForOption(looseOption),
                 DevFiles = context.ParseResult.GetValueForOption(includeSourceOption),
                 ShaderlistOnly = context.ParseResult.GetValueForOption(shaderlistOption),
                 Overwrite = context.ParseResult.GetValueForOption(overwriteOption),
-                LogLevel = context.ParseResult.GetValueForOption(loglevelOption),
+                LogLevel = context.ParseResult.GetValueForOption(loglevelOption) ?? LogLevel.Debug,
             };
 
             context.ExitCode = await task(options);
@@ -138,6 +148,10 @@ internal static class Commandline
 
         void ValidatePk3Path(OptionResult result)
         {
+            // ignored
+            if (result.GetValueForOption(dryrunOption))
+                return;
+
             var file = result.GetValueForOption(pk3Option);
 
             // TODO dryrun

@@ -1,7 +1,9 @@
 ﻿using System.Diagnostics;
+using System.Text.Json.Serialization.Metadata;
 using Pack3r;
 using Pack3r.Console;
 using Pack3r.Core.Parsers;
+using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Services;
 using Pure.DI;
@@ -20,11 +22,7 @@ DI.Setup("Composition")
     .Bind<ILineReader>().To<FSLineReader>()
     .Bind<IProgressManager>().To<ConsoleProgressManager>()
     .Bind<AppLifetime>().To<AppLifetime>()
-    .Bind().To(ctx =>
-    {
-        ctx.Inject<PackOptionsWrapper>(out var q);
-        return q.Value;
-    })
+    .Bind().To(ctx => { ctx.Inject<PackOptionsWrapper>(out var wrapper); return wrapper.Value; })
     .Root<App>("Application")
     .Arg<PackOptions>("options", "options")
     ;
@@ -46,27 +44,56 @@ static async Task<int> Execute(PackOptions options)
             var mapName = options.MapFile.Name;
             var mapsDir = Path.GetDirectoryName(options.MapFile.FullName);
 
-            app.Logger.System($"Packaging from '{mapName}' in '{mapsDir}' to '{options.Pk3File.FullName}'");
+            if (!options.DryRun)
+            {
+                app.Logger.System($"Packaging from '{mapName}' in '{mapsDir}' to '{options.Pk3File.FullName}'");
+            }
+            else
+            {
+                app.Logger.System($"Running asset discovery for '{mapName}' in '{mapsDir}' without creating a pk3");
+            }
 
             var timer = Stopwatch.StartNew();
 
             PackingData data = await app.AssetService.GetPackingData(app.CancellationToken);
 
-            await using (var destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None))
+            Stream destination;
+
+            if (!options.DryRun)
             {
                 fileCreated = true;
+                destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
+            }
+            else
+            {
+                options.Pk3File = null!;
+                destination = new CountingStream();
+            }
+
+            await using (destination)
+            {
                 await app.Packager.CreateZip(data, destination, app.CancellationToken);
             }
 
             timer.Stop();
 
             app.Logger.Drain();
-            app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
+
+            if (options.DryRun)
+            {
+                long written = ((CountingStream)destination).Position;
+                app.Logger.System($"Pk3 size: {(double)written / 1024:N} KB ({written} bytes)");
+                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
+            }
+            else
+            {
+                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
+            }
         }
         catch (Exception e)
         {
-            if (fileCreated && options.Overwrite)
-                File.Delete(options.Pk3File.FullName);
+            if (fileCreated)
+                File.Delete(options.Pk3File!.FullName);
 
             app.Lifetime.HandleException(e);
             retval = 1;
@@ -84,7 +111,7 @@ sealed record App(
     IAssetService AssetService,
     Packager Packager,
     AppLifetime Lifetime,
-    [Tag("options")] PackOptionsWrapper Options)
+    [Tag("options")] PackOptionsWrapper Options) // <- required for DI to generate it
 {
     public CancellationToken CancellationToken => Lifetime.CancellationToken;
 }
