@@ -1,11 +1,13 @@
-﻿using Pack3r;
+﻿using System.Diagnostics;
+using Pack3r;
+using Pack3r.Console;
 using Pack3r.Core.Parsers;
 using Pack3r.IO;
 using Pack3r.Services;
 using Pure.DI;
 
 DI.Setup("Composition")
-    .DefaultLifetime(Lifetime.Singleton)
+    .DefaultLifetime(Lifetime.Scoped)
     .Bind<IResourceParser>(1).To<MapscriptParser>()
     .Bind<IResourceParser>(2).To<SoundscriptParser>()
     .Bind<IResourceParser>(3).To<SpeakerScriptParser>()
@@ -18,55 +20,80 @@ DI.Setup("Composition")
     .Bind<ILineReader>().To<FSLineReader>()
     .Bind<IProgressManager>().To<ConsoleProgressManager>()
     .Bind<AppLifetime>().To<AppLifetime>()
-    .Bind<PackOptions>().To(static _ => new PackOptions { RequireAllAssets = false })
-    .Root<ServiceRoot>("Application");
-
-int retval = 0;
-
-using (var composition = new Composition())
-{
-    var app = composition.Application;
-
-    try
+    .Bind().To(ctx =>
     {
+        ctx.Inject<PackOptionsWrapper>(out var q);
+        return q.Value;
+    })
+    .Root<App>("Application")
+    .Arg<PackOptions>("options", "options")
+    ;
+
+await Commandline.Run(args, Execute);
+
+static async Task Execute(PackOptions options)
+{
+    int retval = 0;
+
+    using (var composition = new Composition(options))
+    {
+        var app = composition.Application;
+
+        bool fileCreated = false;
+
         const string path = @"C:\Temp\ET\map\ET\etmain\maps\sungilarity.map";
         const string dest = @"C:\Temp\test.pk3";
 
-        var mapName = Path.GetFileName(path);
-        var mapsDir = Path.GetDirectoryName(path);
+        try
+        {
+            var mapName = Path.GetFileName(path);
+            var mapsDir = Path.GetDirectoryName(path);
 
-        app.Logger.System($"Packaging from '{mapName}' in '{mapsDir}' to '{dest}'");
+            app.Logger.System($"Packaging from '{mapName}' in '{mapsDir}' to '{dest}'");
 
-        var sw = System.Diagnostics.Stopwatch.StartNew();
+            var timer = Stopwatch.StartNew();
 
-        PackingData data = await app.AssetService.GetPackingData(path, app.CancellationToken);
+            PackingData data = await app.AssetService.GetPackingData(path, app.CancellationToken);
 
-        await using var destination = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
+            await using (var destination = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                fileCreated = true;
+                await app.Packager.CreateZip(data, destination, app.CancellationToken);
+            }
 
-        await app.Packager.CreateZip(data, destination, app.CancellationToken);
+            timer.Stop();
 
-        sw.Stop();
+            app.Logger.Drain();
+            app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
+        }
+        catch (Exception e)
+        {
+            if (fileCreated)
+                File.Delete(dest);
 
-        app.Logger.Drain();
-        app.Logger.System($"Packaging finished in {sw.ElapsedMilliseconds} ms, press Enter to exit");
+            app.Lifetime.HandleException(e);
+            retval = 1;
+        }
     }
-    catch (Exception e)
-    {
-        app.Lifetime.HandleException(e);
-        retval = 1;
-    }
+
+    Console.ReadLine();
+    Environment.Exit(retval);
 }
 
-Console.ReadLine();
-Environment.Exit(retval);
-
 #pragma warning disable RCS1110 // Declare type inside namespace
-sealed record ServiceRoot(
+
+sealed record App(
     ILogger<Program> Logger,
     IAssetService AssetService,
     Packager Packager,
-    AppLifetime Lifetime)
+    AppLifetime Lifetime,
+    [Tag("options")] PackOptionsWrapper Options)
 {
     public CancellationToken CancellationToken => Lifetime.CancellationToken;
 }
-#pragma warning restore RCS1110 // Declare type inside namespace
+
+sealed class PackOptionsWrapper([Tag("options")] PackOptions value)
+{
+    public PackOptions Value => value;
+}
+

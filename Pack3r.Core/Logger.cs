@@ -5,7 +5,7 @@ using Pack3r.Extensions;
 
 namespace Pack3r;
 
-public enum LogLevel { Debug, Info, Warn, Error, Fatal, System = int.MaxValue }
+public enum LogLevel { Debug, Info, Warn, Error, Fatal }
 
 public interface ILogger
 {
@@ -18,7 +18,7 @@ public interface ILogger
     public void Warn(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Warn, ref handler);
     public void Error(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Error, ref handler);
     public void Fatal(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Fatal, ref handler);
-    public void System(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.System, ref handler);
+    public void System(ref DefaultInterpolatedStringHandler handler) => Log((LogLevel)byte.MaxValue, ref handler);
 }
 
 public interface ILogger<out T> : ILogger;
@@ -54,7 +54,7 @@ public sealed class LoggerBase : ILogger
             return;
         }
 
-        if (level == LogLevel.System)
+        if (level == (LogLevel)byte.MaxValue)
         {
             LogInternal(level, handler.ToStringAndClear());
         }
@@ -73,7 +73,7 @@ public sealed class LoggerBase : ILogger
             return;
         }
 
-        if (level == LogLevel.System)
+        if (level == (LogLevel)byte.MaxValue)
         {
             lock (typeof(Console))
             {
@@ -169,7 +169,7 @@ public sealed class LoggerBase : ILogger
                 prefixColor = ConsoleColor.Magenta;
                 backgroundColor = ConsoleColor.DarkMagenta;
                 break;
-            case LogLevel.System:
+            case (LogLevel)byte.MaxValue:
                 msg = default;
                 prefixColor = default;
                 messageColor = ConsoleColor.Cyan;
