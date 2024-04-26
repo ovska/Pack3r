@@ -38,6 +38,8 @@ public readonly struct ResourcePath : IEquatable<ResourcePath>
     public override bool Equals(object? obj) => obj is ResourcePath resourcePath && Equals(resourcePath);
 
     public override int GetHashCode() => Path.GetHashCode();
+
+    public override string ToString() => Path;
 }
 
 public interface IShaderParser
