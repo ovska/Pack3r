@@ -224,14 +224,27 @@ public class ShaderParser(
 
             if (state == State.None)
             {
-                if (line.Value.Span.ContainsAny(Tokens.Braces))
+                ReadOnlyMemory<char> shaderName = line.Value;
+                State next = State.AfterShaderName;
+
+                if (shaderName.Span.ContainsAny(Tokens.Braces))
                 {
-                    throw new InvalidDataException(
-                        $"Expected shader name on line {line.Index} in file '{path}', got: '{line.Raw}'");
+                    // handle opening brace left on the wrong line
+                    if (shaderName.Span[^1] == '{')
+                    {
+                        shaderName = shaderName[..^1];
+                        next = State.Shader;
+                    }
+
+                    if (shaderName.Span.ContainsAny(Tokens.Braces))
+                    {
+                        throw new InvalidDataException(
+                            $"Expected shader name on line {line.Index} in file '{path}', got: '{line.Raw}'");
+                    }
                 }
 
-                shader = new Shader(path, line.Value);
-                state = State.AfterShaderName;
+                shader = new Shader(path, shaderName);
+                state = next;
                 continue;
             }
 

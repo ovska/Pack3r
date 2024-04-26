@@ -243,4 +243,38 @@ public class ShaderParserTests
             ],
             shader.Files.AsStrings());
     }
+
+    [Fact]
+    public async Task Should_Handle_Dangling_Brace()
+    {
+        var shader = await ParseSingle("""
+                models/powerups/holdable/binoc {
+
+                {
+                    map textures/effects/envmap_slate.tga
+                    blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+                    rgbGen lightingdiffuse
+                    alphaGen normalzfade 1.0 -200 200
+                    tcGen environment
+                    depthWrite
+                }
+                {
+                    map models/powerups/holdable/binoc.jpg
+                    blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+                    rgbGen lightingdiffuse
+                    alphaGen normalzfade 1.0 -200 200
+                    depthWrite
+                }
+
+            }
+            """);
+
+        Assert.Empty(shader.Files);
+        Assert.Empty(shader.Shaders);
+
+        Assert.Equal(2, shader.Textures.Count);
+        Assert.Equal(
+            ["textures/effects/envmap_slate.tga", "models/powerups/holdable/binoc.jpg"],
+            shader.Textures.Select(t => t.ToString()));
+    }
 }
