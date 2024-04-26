@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.IO.Compression;
 using Pack3r.Extensions;
 
@@ -7,6 +8,7 @@ namespace Pack3r;
 public sealed class Packager(
     ILogger<Packager> logger,
     PackOptions options,
+    IProgressManager progressManager,
     IShaderParser shaderParser)
 {
     public async Task CreateZip(
@@ -14,10 +16,9 @@ public sealed class Packager(
         Stream destination,
         CancellationToken cancellationToken)
     {
-        // start parsing shaders in the background
-        var shaderParseTask = shaderParser.GetReferencedShaders(data, cancellationToken);
-
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
+
+        var shadersByName = await shaderParser.GetReferencedShaders(data, cancellationToken);
 
         // contains both actual and alternate files added
         HashSet<ReadOnlyMemory<char>> addedFiles = new(ROMCharComparer.Instance);
@@ -26,7 +27,9 @@ public sealed class Packager(
         Map map = data.Map;
 
         if (options.DevFiles)
+        {
             AddFileAbsolute(map.Path, required: true);
+        }
 
         var bsp = new FileInfo(Path.ChangeExtension(map.Path, "bsp"));
         AddFileAbsolute(bsp.FullName, required: true);
@@ -37,72 +40,89 @@ public sealed class Packager(
         {
             bool timestampWarned = false;
 
-            foreach (var file in lightmapDir.GetFiles("lm_????.tga"))
+            var files = lightmapDir.GetFiles("lm_????.tga");
+            using var progress = progressManager.Create("Packing lightmaps", files.Length);
+
+            for (int i = 0; i < files.Length; i++)
             {
+                FileInfo? file = files[i];
                 timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
                 AddFileAbsolute(file.FullName, required: true);
+                progress.Report(i + 1);
             }
         }
 
-        foreach (var resource in data.Map.Resources)
+        using (var progress = progressManager.Create("Packing resources", data.Map.Resources.Count))
         {
-            if (data.Pak0.Resources.Contains(resource))
-                continue;
+            int count = 1;
 
-            if (addedFiles.Contains(resource))
-                continue;
+            foreach (var resource in data.Map.Resources)
+            {
+                progress.Report(count++);
 
-            AddFileRelative(resource);
+                if (data.Pak0.Resources.Contains(resource) || addedFiles.Contains(resource))
+                {
+                    continue;
+                }
+
+                AddFileRelative(resource);
+            }
         }
 
         bool styleLights = map.HasStyleLights;
-        var shadersByName = await shaderParseTask;
 
-        foreach (var shaderName in data.Map.Shaders)
+        using (var progress = progressManager.Create("Packing files referenced by shaders", data.Map.Shaders.Count))
         {
-            if (data.Pak0.Shaders.Contains(shaderName))
-                continue;
+            int count = 1;
 
-            // already handled
-            if (!handledShaders.Add(shaderName))
-                continue;
-
-            if (!shadersByName.TryGetValue(shaderName, out Shader? shader))
+            foreach (var shaderName in data.Map.Shaders)
             {
-                // might just be a texture without a shader
-                AddTexture(shaderName.ToString());
-                continue;
-            }
+                progress.Report(count++);
 
-            styleLights = styleLights || shader.HasLightStyles;
-
-            if (shader.Path.Entry is not null)
-            {
-                throw new UnreachableException($"Can't include file from pk3: {shader.Path.Entry}");
-            }
-
-            if (!addedFiles.Contains(shader.Path.Path.AsMemory()))
-                AddFileAbsolute(shader.Path.Path);
-
-            if (shader.ImplicitMapping is { } implicitMapping)
-            {
-                AddTexture(implicitMapping.ToString());
-            }
-
-            foreach (var file in shader.Files)
-            {
-                if (data.Pak0.Resources.Contains(file) || addedFiles.Contains(file))
+                if (data.Pak0.Shaders.Contains(shaderName))
                     continue;
 
-                AddFileRelative(file);
-            }
-
-            foreach (var file in shader.Textures)
-            {
-                if (data.Pak0.Resources.Contains(file) || addedFiles.Contains(file))
+                // already handled
+                if (!handledShaders.Add(shaderName))
                     continue;
 
-                AddTexture(file.ToString());
+                if (!shadersByName.TryGetValue(shaderName, out Shader? shader))
+                {
+                    // might just be a texture without a shader
+                    AddTexture(shaderName.ToString());
+                    continue;
+                }
+
+                styleLights = styleLights || shader.HasLightStyles;
+
+                if (shader.Path.Entry is not null)
+                {
+                    throw new UnreachableException($"Can't include file from pk3: {shader.Path.Entry}");
+                }
+
+                if (!addedFiles.Contains(shader.Path.Path.AsMemory()))
+                    AddFileAbsolute(shader.Path.Path);
+
+                if (shader.ImplicitMapping is { } implicitMapping)
+                {
+                    AddTexture(implicitMapping.ToString());
+                }
+
+                foreach (var file in shader.Files)
+                {
+                    if (data.Pak0.Resources.Contains(file) || addedFiles.Contains(file))
+                        continue;
+
+                    AddFileRelative(file);
+                }
+
+                foreach (var file in shader.Textures)
+                {
+                    if (data.Pak0.Resources.Contains(file) || addedFiles.Contains(file))
+                        continue;
+
+                    AddTexture(file.ToString());
+                }
             }
         }
 
@@ -138,6 +158,8 @@ public sealed class Packager(
             string relative,
             bool required = false)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
                 archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
@@ -162,6 +184,8 @@ public sealed class Packager(
 
         bool TryAddRelative(string relative)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
                 var absolute = Path.Combine(map.ETMain.FullName, relative);
@@ -225,9 +249,10 @@ public sealed class Packager(
             }
 
             Fail:
+            string type = extension.IsEmpty ? "shader or texture" : "texture";
             logger.Log(
                 options.RequireAllAssets ? LogLevel.Fatal : LogLevel.Error,
-                $"Shader/texture {name} not found");
+                $"Missing {type}: {name}");
 
             if (options.RequireAllAssets)
             {

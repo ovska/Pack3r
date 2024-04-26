@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+﻿using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Pack3r.Extensions;
@@ -11,6 +11,7 @@ public interface ILogger
 {
     void Log(LogLevel level, ref DefaultInterpolatedStringHandler handler);
     void Exception(Exception? e, string message);
+    void Drain();
 
     public void Debug(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Debug, ref handler);
     public void Info(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Info, ref handler);
@@ -27,86 +28,115 @@ public sealed class NullLogger<T> : ILogger<T>
     public static readonly NullLogger<T> Instance = new();
     public void Log(LogLevel level, ref DefaultInterpolatedStringHandler handler) => handler.Clear();
     public void Exception(Exception? e, string message) { }
+    public void Drain() { }
 }
 
-public sealed class Logger<T> : ILogger<T>, IAsyncDisposable
+public sealed class LoggerBase : ILogger
 {
     private readonly LogLevel _minimumLogLevel;
-    private readonly object _lock = new();
 
-    public Logger(PackOptions options)
+    private readonly ConcurrentQueue<(LogLevel level, string value, Type? caller)> _messages = [];
+
+    public LoggerBase(PackOptions options)
     {
         Console.InputEncoding = Encoding.UTF8;
         Console.OutputEncoding = Encoding.UTF8;
         _minimumLogLevel = options.LogLevel;
     }
 
-    public void Log(
+    internal void Log(
+        LogLevel level,
+        ref DefaultInterpolatedStringHandler handler,
+        Type caller)
+    {
+        if (level < _minimumLogLevel)
+        {
+            return;
+        }
+
+        if (level == LogLevel.System)
+        {
+            LogInternal(level, handler.ToStringAndClear());
+        }
+        else
+        {
+            _messages.Enqueue((level, handler.ToStringAndClear(), caller));
+        }
+    }
+
+    void ILogger.Log(
         LogLevel level,
         ref DefaultInterpolatedStringHandler handler)
     {
         if (level < _minimumLogLevel)
         {
-            //return;
+            return;
         }
 
-        bool lockTaken = false;
-        Monitor.Enter(_lock, ref lockTaken);
-
-        try
+        if (level == LogLevel.System)
         {
-            var defaultForeground = Console.ForegroundColor;
-            var defaultBackground = Console.BackgroundColor;
+            lock (typeof(Console))
+            {
+                LogInternal(level, handler.ToStringAndClear());
+            }
+        }
+        else
+        {
+            _messages.Enqueue((level, handler.ToStringAndClear(), null));
+        }
+    }
 
-            TextWriter output = Console.Out;
+    public void Drain()
+    {
+        lock (typeof(Console))
+        {
+            foreach (var grouping in _messages.OrderBy(x => x.level).GroupBy(x => x.caller))
+            {
+                foreach (var (level, value, _) in grouping)
+                    LogInternal(level, value);
+            }
+        }
+    }
 
-            GetPrefix(
-                level,
-                out var prefix,
-                out ConsoleColor prefixColor,
-                out ConsoleColor? backgroundColor,
-                out ConsoleColor? messageColor);
+    private static void LogInternal(LogLevel level, string message)
+    {
+        var defaultForeground = Console.ForegroundColor;
+        var defaultBackground = Console.BackgroundColor;
 
+        TextWriter output = Console.Out;
+
+        GetPrefix(
+            level,
+            out var prefix,
+            out ConsoleColor prefixColor,
+            out ConsoleColor? backgroundColor,
+            out ConsoleColor? messageColor);
+
+        if (!prefix.IsEmpty)
+        {
             Console.BackgroundColor = backgroundColor ?? defaultBackground;
             output.Write(' ');
             Console.BackgroundColor = defaultBackground;
 
             Console.ForegroundColor = prefixColor;
             output.Write(prefix);
-
-            Console.ForegroundColor = ConsoleColor.White;
-            output.Write('[');
-
-            var time = DateTime.Now;
-            Span<char> buffer = stackalloc char[16];
-            bool success = time.TryFormat(buffer, out int written, "HH:mm:ss", CultureInfo.InvariantCulture);
-            System.Diagnostics.Debug.Assert(success);
-
-            output.Write(buffer[..written]);
-
-            output.Write(']');
-
-            Console.ForegroundColor = messageColor ?? defaultForeground;
-            output.Write(' ');
-            output.Write(handler.GetInternalBuffer());
-
-            output.Write(Environment.NewLine);
-            
-            Console.ForegroundColor = defaultForeground;
         }
-        finally
+        else
         {
-            if (lockTaken)
-                Monitor.Exit(_lock);
-
-            handler.Clear();
+            output.Write("        ");
         }
+
+        Console.ForegroundColor = messageColor ?? defaultForeground;
+        output.Write(message);
+
+        output.Write(Environment.NewLine);
+        Console.ForegroundColor = defaultForeground;
     }
 
     private static void GetPrefix(
         LogLevel level,
         out ReadOnlySpan<char> msg,
-        out ConsoleColor prefixColor, 
+        out ConsoleColor prefixColor,
         out ConsoleColor? backgroundColor,
         out ConsoleColor? messageColor)
     {
@@ -116,8 +146,8 @@ public sealed class Logger<T> : ILogger<T>, IAsyncDisposable
         {
             case LogLevel.Debug:
                 msg = " debug ";
-                prefixColor = ConsoleColor.Cyan;
-                backgroundColor = ConsoleColor.DarkCyan;
+                prefixColor = ConsoleColor.Gray;
+                backgroundColor = ConsoleColor.DarkGray;
                 break;
             case LogLevel.Info:
                 msg = "  info ";
@@ -140,7 +170,7 @@ public sealed class Logger<T> : ILogger<T>, IAsyncDisposable
                 backgroundColor = ConsoleColor.DarkMagenta;
                 break;
             case LogLevel.System:
-                msg = "       ";
+                msg = default;
                 prefixColor = default;
                 messageColor = ConsoleColor.Cyan;
                 backgroundColor = null;
@@ -155,14 +185,23 @@ public sealed class Logger<T> : ILogger<T>, IAsyncDisposable
 
     public void Exception(Exception? e, string message)
     {
-        if (e is null)
-            Log(LogLevel.Fatal, $"{message}");
-        else
-            Log(LogLevel.Fatal, $"{message}{Environment.NewLine}{Environment.NewLine}Exception:{Environment.NewLine}{e}");
+        lock (typeof(Console))
+        {
+            if (e is null)
+            {
+                LogInternal(LogLevel.Fatal, $"{message}");
+            }
+            else
+            {
+                LogInternal(LogLevel.Fatal, $"{message}{Environment.NewLine}{Environment.NewLine}Exception:{Environment.NewLine}{e}");
+            }
+        }
     }
+}
 
-    public ValueTask DisposeAsync()
-    {
-        throw new NotImplementedException();
-    }
+public sealed class Logger<T>(LoggerBase logger) : ILogger<T>
+{
+    public void Drain() => logger.Drain();
+    public void Exception(Exception? e, string message) => logger.Exception(e, message);
+    public void Log(LogLevel level, ref DefaultInterpolatedStringHandler handler) => logger.Log(level, ref handler, typeof(T));
 }

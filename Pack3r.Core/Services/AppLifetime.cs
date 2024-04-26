@@ -15,19 +15,26 @@ public sealed class AppLifetime : IDisposable
         _logger = logger;
         _cts = new CancellationTokenSource();
 
-        AppDomain.CurrentDomain.UnhandledException += HandleException;
+        Console.CancelKeyPress += CancelToken;
     }
 
-    private void HandleException(object sender, UnhandledExceptionEventArgs e)
+    private void CancelToken(object? sender, ConsoleCancelEventArgs e)
     {
-        var ex = e.ExceptionObject as Exception;
+        _cts.Cancel();
+        e.Cancel = true;
+    }
 
-        if (ex is ControlledException)
-        {
-        }
-        else if (ex is OperationCanceledException && _cts.IsCancellationRequested)
+    public void HandleException(Exception? ex)
+    {
+        bool dontDrain = false;
+
+        if (ex is OperationCanceledException && _cts.IsCancellationRequested)
         {
             _logger.Exception(null, "Operation was canceled by the user");
+            dontDrain = true;
+        }
+        else if (ex is ControlledException)
+        {
         }
         else if (ex is EnvironmentException or InvalidDataException)
         {
@@ -50,14 +57,15 @@ public sealed class AppLifetime : IDisposable
             _logger.Exception(ex, "Unhandled exception, aborting");
         }
 
-        Console.WriteLine("Press Enter to exit");
-        Console.ReadLine();
-        Environment.Exit(1);
+        if (!dontDrain)
+            _logger.Drain();
+
+        _logger.System($"Press Enter to exit");
     }
 
     public void Dispose()
     {
-        AppDomain.CurrentDomain.UnhandledException -= HandleException;
+        Console.CancelKeyPress -= CancelToken;
         _cts.Dispose();
     }
 }

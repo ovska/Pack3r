@@ -54,7 +54,8 @@ public interface IShaderParser
 public class ShaderParser(
     ILineReader reader,
     PackOptions options,
-    ILogger<ShaderParser> logger)
+    ILogger<ShaderParser> logger,
+    IProgressManager progressManager)
     : IShaderParser
 {
     public async Task<Dictionary<ReadOnlyMemory<char>, Shader>> GetReferencedShaders(
@@ -76,46 +77,57 @@ public class ShaderParser(
 
         int shaderFileCount = 0;
 
-        await Parallel.ForEachAsync(scriptsDir.GetFiles("*.shader"), cancellationToken, async (file, ct) =>
+        var files = scriptsDir
+            .GetFiles("*.shader")
+            .Where(f => shaderlist?.Contains(Path.GetFileNameWithoutExtension(f.FullName)) != false)
+            .ToList();
+
+        string progressMessage = shaderlist is null
+            ? "Processing shaders in scripts-folder"
+            : "Processing shaders in shaderlist.txt";
+
+        using (var progress = progressManager.Create(progressMessage, files.Count))
         {
-            if (shaderlist?.Contains(Path.GetFileNameWithoutExtension(file.Name)) == false)
+            await Parallel.ForEachAsync(files, cancellationToken, async (file, ct) =>
             {
-                logger.Debug($"Skipping shader parsing from file {file.Name} (not in shaderlist)");
-                return;
-            }
+                int currentCount = Interlocked.Increment(ref shaderFileCount);
+                progress.Report(currentCount);
 
-            if (file.Name.StartsWith("q3map_") || file.Name.Equals("q3shadersCopyForRadiant.shader"))
-            {
-                logger.Debug($"Skipping shader parsing from compiler generated file {file.Name}");
-                return;
-            }
-
-            Interlocked.Increment(ref shaderFileCount);
-
-            await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
-            {
-                if (!allShaders.TryAdd(shader.Name, shader))
+                if (shaderlist?.Contains(Path.GetFileNameWithoutExtension(file.Name)) == false)
                 {
-                    var existing = allShaders[shader.Name];
+                    logger.Debug($"Skipping shader parsing from file {file.Name} (not in shaderlist)");
+                    return;
+                }
 
-                    if (!shader.NeededInPk3 && !existing.NeededInPk3)
-                        continue;
+                if (file.Name.StartsWith("q3map_") || file.Name.Equals("q3shadersCopyForRadiant.shader"))
+                {
+                    logger.Debug($"Skipping shader parsing from compiler generated file {file.Name}");
+                    return;
+                }
 
-                    if (shader.Equals(existing))
+                await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
+                {
+                    if (!allShaders.TryAdd(shader.Name, shader))
                     {
-                        logger.Warn($"Shader {shader.Name} found multiple times in file '{data.Map.RelativePath(shader.Path.Path)}'");
-                    }
-                    else
-                    {
-                        logger.Warn(
-                            $"Shader {shader.Name} both in file '{data.Map.RelativePath(shader.Path.Path)}'" +
-                            $" and '{data.Map.RelativePath(existing.Path.Path)}'");
+                        var existing = allShaders[shader.Name];
+
+                        if (!shader.NeededInPk3 && !existing.NeededInPk3)
+                            continue;
+
+                        if (shader.Equals(existing))
+                        {
+                            logger.Warn($"Shader {shader.Name} found multiple times in file '{data.Map.RelativePath(shader.Path.Path)}'");
+                        }
+                        else
+                        {
+                            logger.Warn(
+                                $"Shader {shader.Name} both in file '{data.Map.RelativePath(shader.Path.Path)}'" +
+                                $" and '{data.Map.RelativePath(existing.Path.Path)}'");
+                        }
                     }
                 }
-            }
-        }).ConfigureAwait(false);
-
-        logger.Info($"Parsed {allShaders.Count} shaders from {shaderFileCount} .shader-files");
+            }).ConfigureAwait(false);
+        }
 
         var included = new Dictionary<ReadOnlyMemory<char>, Shader>(ROMCharComparer.Instance);
 
@@ -392,7 +404,7 @@ public class ShaderParser(
     {
         try
         {
-            var shaderlist = new HashSet<string>();
+            var shaderlist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var shaderlistPath = Path.Combine(scriptsDirectory, "shaderlist.txt");
             await foreach (var line in reader.ReadLines(shaderlistPath, default, cancellationToken))
             {

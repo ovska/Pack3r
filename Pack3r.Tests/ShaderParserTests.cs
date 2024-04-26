@@ -19,7 +19,8 @@ public class ShaderParserTests
         return new ShaderParser(
             reader,
             new PackOptions { DevFiles = includeDevFiles },
-            NullLogger<ShaderParser>.Instance);
+            NullLogger<ShaderParser>.Instance,
+            new NoOpProgressManager());
     }
 
     [Fact]
@@ -49,11 +50,11 @@ public class ShaderParserTests
 
         foreach (var shader in results)
         {
-            Assert.Single(shader.Textures);
-            Assert.Equal(Path.ChangeExtension(shader.Name.ToString(), "tga"), shader.Textures[0].ToString());
-
             Assert.Empty(shader.Files);
             Assert.Empty(shader.Shaders);
+            Assert.Empty(shader.Textures);
+
+            Assert.Equal(Path.ChangeExtension(shader.Name.ToString(), "tga"), shader.ImplicitMapping?.ToString());
         }
     }
 
@@ -75,9 +76,9 @@ public class ShaderParserTests
         Assert.Equal("textures/pgm/light_rec_blu_5000", shader.Name.ToString());
         Assert.Empty(shader.Shaders);
         Assert.Empty(shader.Files);
+        Assert.Empty(shader.Textures);
 
-        Assert.Single(shader.Textures);
-        Assert.Equal("textures/pgm/abal2.tga", shader.Textures[0].ToString());
+        Assert.Equal("textures/pgm/abal2.tga", shader.ImplicitMapping?.ToString());
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -96,29 +97,53 @@ public class AssetService(
         DirectoryInfo etmain,
         CancellationToken cancellationToken)
     {
+        var timer = Stopwatch.StartNew();
+
         var pak0task = pk3Reader.ReadPk3(Path.Combine(etmain.FullName, "pak0.pk3"), cancellationToken);
-        Pk3Contents? mapObjects = null;
 
-        try
+        List<Task<Pk3Contents?>> auxiliary =
+        [
+            TryLoadPk3(Path.Combine(etmain.FullName, "sd-mapobjects.pk3"))
+        ];
+
+        if (etmain.Parent is { } etfolder &&
+            etfolder.GetDirectories("etjump") is { Length: 1 } etjumpdirs &&
+            etjumpdirs[0].GetFiles("etjump-*.pk3").OrderByDescending(f => f.Name).FirstOrDefault() is { } etjumpPk3)
         {
-            var sdMapObjects = Path.Combine(etmain.FullName, "sd-mapobjects.pk3");
-
-            if (File.Exists(sdMapObjects))
-            {
-                mapObjects = await pk3Reader.ReadPk3(sdMapObjects, cancellationToken);
-            }
+            auxiliary.Add(TryLoadPk3(etjumpPk3.FullName));
         }
-        catch (FileNotFoundException) { }
-        catch (DirectoryNotFoundException) { }
 
         var pak0 = await pak0task;
 
-        if (mapObjects is { Resources: var resources, Shaders: var shaders })
+        List<string> pakNames = [pak0.Name];
+
+        foreach (var auxTask in auxiliary)
         {
-            pak0.Shaders.UnionWith(shaders);
-            pak0.Resources.UnionWith(resources);
+            if (await auxTask is { } pk3)
+            {
+                pakNames.Add(pk3.Name);
+                pak0.Shaders.UnionWith(pk3.Shaders);
+                pak0.Resources.UnionWith(pk3.Resources);
+            }
         }
 
+        logger.System($"{string.Join(", ", pakNames)} processed successfully in {timer.ElapsedMilliseconds} ms");
+
         return pak0;
+
+        async Task<Pk3Contents?> TryLoadPk3(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    return await pk3Reader.ReadPk3(path, cancellationToken);
+                }
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+
+            return null;
+        }
     }
 }

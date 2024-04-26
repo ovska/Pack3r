@@ -6,5 +6,5 @@ public sealed class PackOptions
     public bool DevFiles { get; set; }
     public bool RequireAllAssets { get; set; }
     public bool Overwrite { get; set; }
-    public LogLevel LogLevel { get; set; } = LogLevel.Info;
+    public LogLevel LogLevel { get; set; } = LogLevel.Debug;
 }

@@ -1,4 +1,5 @@
-﻿using Pack3r.Extensions;
+﻿using System.Diagnostics;
+using Pack3r.Extensions;
 using Pack3r.IO;
 using ROMC = System.ReadOnlyMemory<char>;
 
@@ -38,8 +39,13 @@ public class MapFileParser(
         List<ROMC> unsupSkins = [];
         List<ROMC> unsupTerrains = [];
 
+        int lineCount = 0;
+        var timer = Stopwatch.StartNew();
+
         await foreach (var line in reader.ReadLines(path, new LineOptions(KeepRaw: true), cancellationToken))
         {
+            lineCount = line.Index;
+
             if (expect != default)
             {
                 if (line.FirstChar == expect)
@@ -60,7 +66,7 @@ public class MapFileParser(
                     State.AfterDef => State.Entity,
                     State.BrushDef => State.AfterDef,
                     State.PatchDef => State.AfterDef,
-                    _ => (State)(byte.MaxValue),
+                    _ => (State)byte.MaxValue,
                 };
 
                 if (state == (State)byte.MaxValue)
@@ -176,6 +182,8 @@ public class MapFileParser(
             string entities = string.Join(", ", unsupTerrains);
             logger.Warn($"Shaders referenced by terrains are not supported, please include manually (on entities: {entities})");
         }
+
+        logger.System($".map file ({lineCount} lines) parsed successfully in {timer.ElapsedMilliseconds} ms");
 
         return new MapAssets
         {

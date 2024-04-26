@@ -69,7 +69,7 @@ public static class MapParserTests
         var map = await parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         Assert.Single(map.Shaders);
-        Assert.Equal("pgm_props/crate_01", map.Shaders.First().ToString());
+        Assert.Equal("textures/pgm_props/crate_01", map.Shaders.First().ToString());
     }
 
     [Fact]
@@ -462,6 +462,6 @@ public static class MapParserTests
         var map = await parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         Assert.Single(map.Shaders);
-        Assert.Equal("pgm/holo", map.Shaders.First().ToString());
+        Assert.Equal("textures/pgm/holo", map.Shaders.First().ToString());
     }
 }

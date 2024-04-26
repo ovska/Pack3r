@@ -13,34 +13,52 @@ DI.Setup("Composition")
     .Bind<IPk3Reader>().To<Pk3Reader>()
     .Bind<IMapFileParser>().To<MapFileParser>()
     .Bind<IAssetService>().To<AssetService>()
+    .Bind<LoggerBase>().To<LoggerBase>()
     .Bind<ILogger<TT>>().To<Logger<TT>>()
     .Bind<ILineReader>().To<FSLineReader>()
+    .Bind<IProgressManager>().To<ConsoleProgressManager>()
     .Bind<AppLifetime>().To<AppLifetime>()
     .Bind<PackOptions>().To(static _ => new PackOptions { RequireAllAssets = false })
     .Root<ServiceRoot>("Application");
+
+int retval = 0;
 
 using (var composition = new Composition())
 {
     var app = composition.Application;
 
-    const string path = @"C:\Temp\ET\map\ET\etmain\maps\sungilarity.map";
-    const string dest = @"C:\Temp\test.pk3";
+    try
+    {
+        const string path = @"C:\Temp\ET\map\ET\etmain\maps\sungilarity.map";
+        const string dest = @"C:\Temp\test.pk3";
 
-    app.Logger.System($"Starting packaging map '{path}' to {dest}");
+        var mapName = Path.GetFileName(path);
+        var mapsDir = Path.GetDirectoryName(path);
 
-    var sw = System.Diagnostics.Stopwatch.StartNew();
+        app.Logger.System($"Packaging from '{mapName}' in '{mapsDir}' to '{dest}'");
 
-    PackingData data = await app.AssetService.GetPackingData(path, app.CancellationToken);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
-    await using var destination = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
+        PackingData data = await app.AssetService.GetPackingData(path, app.CancellationToken);
 
-    await app.Packager.CreateZip(data, destination, app.CancellationToken);
+        await using var destination = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None);
 
-    sw.Stop();
-    app.Logger.System($"Packaging finished in {sw.ElapsedMilliseconds} ms, press Enter to exit");
+        await app.Packager.CreateZip(data, destination, app.CancellationToken);
+
+        sw.Stop();
+
+        app.Logger.Drain();
+        app.Logger.System($"Packaging finished in {sw.ElapsedMilliseconds} ms, press Enter to exit");
+    }
+    catch (Exception e)
+    {
+        app.Lifetime.HandleException(e);
+        retval = 1;
+    }
 }
 
 Console.ReadLine();
+Environment.Exit(retval);
 
 #pragma warning disable RCS1110 // Declare type inside namespace
 sealed record ServiceRoot(
