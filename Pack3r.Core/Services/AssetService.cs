@@ -30,13 +30,29 @@ public class AssetService(
 {
     public async Task<PackingData> GetPackingData(CancellationToken cancellationToken)
     {
-        if (options.MapFile.Directory is not { Name: "maps", Parent: { Name: "etmain" } etmainDirectory })
+        if (options.MapFile.Directory is not { Name: "maps", Parent: DirectoryInfo mapsParent })
         {
-            throw new EnvironmentException($".map file not in etmain/maps: '{options.MapFile.FullName}'");
+            throw new EnvironmentException($".map file not in maps-directory: '{options.MapFile.FullName}'");
+        }
+
+        DirectoryInfo etmainDirectory;
+
+        if (mapsParent.Name is "etmain")
+        {
+            etmainDirectory = mapsParent;
+        }
+        else if (mapsParent.Name.EndsWith(".pk3dir", StringComparison.OrdinalIgnoreCase)
+            && mapsParent.Parent is { Name: "etmain" } pk3dirParent)
+        {
+            etmainDirectory = pk3dirParent;
+        }
+        else
+        {
+            throw new EnvironmentException($"maps-directory should be in etmain or a pk3dir in etmain: '{options.MapFile.FullName}'");
         }
 
         // start pak0 parse task in background
-        var pak0task = GetBuiltinContents(etmainDirectory, cancellationToken);
+        var pk3task = GetBuiltinContents(etmainDirectory, cancellationToken);
 
         MapAssets assets = await mapFileParser.ParseMapAssets(options.MapFile.FullName, cancellationToken).ConfigureAwait(false);
 
@@ -59,7 +75,7 @@ public class AssetService(
 
             if (!File.Exists(path))
             {
-                logger.Info($"Skipped {parser.Description}, file '{map.RelativePath(path)}' not found");
+                logger.Info($"Skipped {parser.Description}, file '{map.GetRelativePath(path)}' not found");
                 return;
             }
 
@@ -77,7 +93,7 @@ public class AssetService(
         return new PackingData
         {
             Map = map,
-            Pak0 = await pak0task.ConfigureAwait(false),
+            Pak0 = await pk3task.ConfigureAwait(false),
         };
     }
 
@@ -114,6 +130,8 @@ public class AssetService(
                 pak0.Resources.UnionWith(pk3.Resources);
             }
         }
+
+        timer.Stop();
 
         logger.System($"{string.Join(", ", pakNames)} processed successfully in {timer.ElapsedMilliseconds} ms");
 

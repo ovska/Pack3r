@@ -61,6 +61,9 @@ public class MapscriptParser(
 
     public string GetPath(Map map, string? rename = null)
     {
-        return Path.Combine(map.ETMain.FullName, "maps", $"{rename ?? map.Name}.script");
+        return Path.Combine(
+            map.GetMapRoot(),
+            "maps",
+            $"{rename ?? map.Name}.script");
     }
 }

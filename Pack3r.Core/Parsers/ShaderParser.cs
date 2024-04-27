@@ -126,13 +126,13 @@ public class ShaderParser(
 
                         if (shader.Equals(existing))
                         {
-                            logger.Warn($"Shader {shader.Name} found multiple times in file '{data.Map.RelativePath(shader.Path.Path)}'");
+                            logger.Warn($"Shader {shader.Name} found multiple times in file '{data.Map.GetRelativePath(shader.Path.Path)}'");
                         }
                         else
                         {
                             logger.Warn(
-                                $"Shader {shader.Name} both in file '{data.Map.RelativePath(shader.Path.Path)}'" +
-                                $" and '{data.Map.RelativePath(existing.Path.Path)}'");
+                                $"Shader {shader.Name} both in file '{data.Map.GetRelativePath(shader.Path.Path)}'" +
+                                $" and '{data.Map.GetRelativePath(existing.Path.Path)}'");
                         }
                     }
                 }

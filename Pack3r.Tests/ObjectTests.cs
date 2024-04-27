@@ -28,6 +28,6 @@ public static class ObjectTests
 
         Assert.Equal(
             expected,
-            map.RelativePath(full));
+            map.GetRelativePath(full));
     }
 }

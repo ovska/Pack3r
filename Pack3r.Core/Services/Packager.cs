@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.Logging;
 using Pack3r.Models;
@@ -20,6 +22,10 @@ public sealed class Packager(
         Stream destination,
         CancellationToken cancellationToken)
     {
+        Map map = data.Map;
+
+        string[] assetSources = GetAssetDirectories(map).ToArray();
+
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
 
         var shadersByName = await shaderParser.GetReferencedShaders(data, cancellationToken);
@@ -29,15 +35,13 @@ public sealed class Packager(
         HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
         List<string> includedFiles = [];
 
-        Map map = data.Map;
+        var bsp = new FileInfo(Path.ChangeExtension(map.Path, "bsp"));
+        AddFileAbsolute(bsp.FullName, required: true);
 
         if (options.DevFiles)
         {
             AddFileAbsolute(map.Path, required: true);
         }
-
-        var bsp = new FileInfo(Path.ChangeExtension(map.Path, "bsp"));
-        AddFileAbsolute(bsp.FullName, required: true);
 
         var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
         var includedLightmaps = false;
@@ -58,7 +62,7 @@ public sealed class Packager(
         }
         else
         {
-            logger.Debug($"Lightmaps skipped, files not found in '{map.RelativePath(lightmapDir.FullName)}'");
+            logger.Debug($"Lightmaps skipped, files not found in '{map.GetRelativePath(lightmapDir.FullName)}'");
         }
 
         using (var progress = progressManager.Create("Packing resources", data.Map.Resources.Count))
@@ -74,7 +78,7 @@ public sealed class Packager(
                     continue;
                 }
 
-                AddFileRelative(resource);
+                AddFileRelative(resource.ToString());
             }
         }
 
@@ -122,7 +126,7 @@ public sealed class Packager(
                     if (data.Pak0.Resources.Contains(file) || addedFiles.Contains(file))
                         continue;
 
-                    AddFileRelative(file);
+                    AddFileRelative(file.ToString());
                 }
 
                 foreach (var file in shader.Textures)
@@ -144,7 +148,7 @@ public sealed class Packager(
             if (file.Exists)
             {
                 logger.CheckAndLogTimestampWarning("Stylelight shader", bsp, file);
-                AddFileRelative(styleShader.AsMemory());
+                AddFileRelative(styleShader);
             }
             else
             {
@@ -165,69 +169,89 @@ public sealed class Packager(
         // end
         logger.Info($"{includedFiles.Count} files included in pk3");
 
-        void AddFileRelative(ReadOnlyMemory<char> relativePath, bool required = false)
-        {
-            var asString = relativePath.ToString();
-            AddFile(absolute: Path.Combine(map.ETMain.FullName, asString), relative: asString, required: required);
-        }
-
         void AddFileAbsolute(string absolutePath, bool required = false)
         {
-            AddFile(absolutePath, map.RelativePath(absolutePath), required);
+            if (!TryAddFileCore(
+                map.GetRelativePath(absolutePath),
+                absolutePath))
+            {
+                OnFailedAddFile(required, $"File '{absolutePath}' not found");
+            }
         }
 
-        void AddFile(
-            string absolute,
-            string relative,
-            bool required = false)
+        void AddFileRelative(string relative)
+        {
+            foreach (var dir in assetSources)
+            {
+                if (TryAddFileCore(relative, Path.Combine(dir, relative)))
+                    return;
+            }
+
+            OnFailedAddFile(false, $"File '{relative}' not found in etmain or pk3dirs");
+        }
+
+        bool TryAddFileCore(
+            string relativePath,
+            string absolutePath)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            try
+            if (File.Exists(absolutePath))
             {
-                archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
-                addedFiles.Add(absolute.AsMemory());
-                includedFiles.Add(relative);
-                return;
-            }
-            catch (DirectoryNotFoundException) { }
-            catch (FileNotFoundException) { }
+                Exception ex;
 
-            if (required || options.RequireAllAssets)
-            {
-                logger.Fatal($"File '{relative}' not found in path: {absolute}");
-                throw new ControlledException();
+                try
+                {
+                    archive.CreateEntryFromFile(sourceFileName: absolutePath, entryName: relativePath);
+                    addedFiles.Add(relativePath.AsMemory());
+                    includedFiles.Add(relativePath);
+                    return true;
+                }
+                catch (IOException ioex) { ex = ioex; }
+
+                if (options.LogLevel == LogLevel.Trace)
+                {
+                    logger.Exception(ex, "Failed to copy an existing file");
+                }
+                else
+                {
+                    // should be rare
+                    logger.Error($"Failed to pack file '{absolutePath}':{Environment.NewLine}{ex.Message}");
+                }
             }
-            else
-            {
-                logger.Error($"File {relative} not found");
-            }
+
+            return false;
         }
 
         bool TryAddRelative(string relative)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            Exception e;
             var absolute = Path.Combine(map.ETMain.FullName, relative);
 
-            try
+            if (File.Exists(absolute))
             {
-                archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
-                addedFiles.Add(absolute.AsMemory());
-                includedFiles.Add(relative);
-                return true;
+                Exception e;
+
+                try
+                {
+                    archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
+                    addedFiles.Add(absolute.AsMemory());
+                    includedFiles.Add(relative);
+                    return true;
+                }
+                catch (IOException ioex)
+                {
+                    e = ioex;
+                }
+
+                logger.Trace($"Could not add file from relative path '{relative}' (absolute: {absolute}) {Environment.NewLine}{e}");
             }
-            catch (DirectoryNotFoundException dnfe)
+            else
             {
-                e = dnfe;
-            }
-            catch (FileNotFoundException fnfe)
-            {
-                e = fnfe;
+                logger.Trace($"Could not add file from relative path '{relative}', file does not exist");
             }
 
-            logger.Trace($"Could not add file from relative path '{relative}' (absolute: {absolute}) {Environment.NewLine}{e}");
             return false;
         }
 
@@ -281,14 +305,56 @@ public sealed class Packager(
 
             Fail:
             string detail = tgaAttempted ? " (no .tga or .jpg found)" : "";
-            logger.Log(
-                options.MissingAssetLoglevel,
-                $"Missing texture reference{detail}: {name}");
-
-            if (options.RequireAllAssets)
-            {
-                throw new ControlledException();
-            }
+            OnFailedAddFile(false, $"Missing texture reference{detail}: {name}");
         }
+    }
+
+    private void OnFailedAddFile(bool required, ref DefaultInterpolatedStringHandler handler)
+    {
+        if (required || options.RequireAllAssets)
+        {
+            logger.Fatal(ref handler);
+            throw new ControlledException();
+        }
+        else
+        {
+            logger.Error(ref handler);
+        }
+    }
+
+    private static IEnumerable<string> GetAssetDirectories(Map map)
+    {
+        HashSet<string> unique = [];
+
+        unique.Add(map.GetMapRoot());
+        yield return map.GetMapRoot();
+
+        if (unique.Add(map.ETMain.FullName))
+            yield return map.ETMain.FullName;
+
+        foreach (var pk3dir in map.ETMain.EnumerateDirectories("*.pk3dir", SearchOption.TopDirectoryOnly))
+        {
+            if (unique.Add(pk3dir.FullName))
+                yield return pk3dir.FullName;
+        }
+    }
+
+    private readonly struct PackingPath
+    {
+        public static PackingPath CreateAbsolute(string value) => new(value, null);
+        public static PackingPath CreateRelative(string value) => new(null, value);
+
+        public string? Absolute { get; }
+        public string? Relative { get; }
+
+        private PackingPath(string? absolute, string? relative)
+        {
+            Absolute = absolute;
+            Relative = relative;
+        }
+
+        [MemberNotNullWhen(true, nameof(Relative))]
+        [MemberNotNullWhen(false, nameof(Absolute))]
+        public bool IsRelative => Relative is not null;
     }
 }

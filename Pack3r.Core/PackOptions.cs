@@ -16,6 +16,4 @@ public class PackOptions
     public bool Overwrite { get; set; }
     public string? ETJumpDir { get; set; }
     public LogLevel LogLevel { get; set; } = LogLevel.Debug;
-
-    internal LogLevel MissingAssetLoglevel => RequireAllAssets ? LogLevel.Fatal : LogLevel.Error;
 }

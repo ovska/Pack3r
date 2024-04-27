@@ -26,6 +26,10 @@ public class SoundscriptParser(
 
     public string GetPath(Map map, string? rename = null)
     {
-        return Path.Combine(map.ETMain.FullName, "sound", "scripts", $"{rename ?? map.Name}.sounds");
+        return Path.Combine(
+            map.GetMapRoot(),
+            "sound",
+            "scripts",
+            $"{rename ?? map.Name}.sounds");
     }
 }
