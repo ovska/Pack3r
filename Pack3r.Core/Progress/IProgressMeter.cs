@@ -28,7 +28,7 @@ public sealed class ConsoleProgressMeter : IProgressMeter
 
     public void Report(int value)
     {
-        Debug.Assert(value <= _max, $"Invalid value: {value} vs max {_max}");
+        Debug.Assert(_max is null || value <= _max, $"Invalid value: {value} vs max {_max}");
 
         if (value < _max &&
             Stopwatch.GetElapsedTime(_lastPrint) < _frequency)
