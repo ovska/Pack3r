@@ -12,13 +12,17 @@ public class FSLineReader() : ILineReader
     {
         int index = 0;
 
+        int bufferSize = Path.GetExtension(path.Path.AsSpan()).Equals(".map", StringComparison.OrdinalIgnoreCase)
+            ? 4096 * 16
+            : 4096;
+
         using var reader = new StreamReader(
                  path.Entry?.Open() ?? new FileStream(
                     path.Path,
                     FileMode.Open,
                     FileAccess.Read,
                     FileShare.Read,
-                    bufferSize: 4096,
+                    bufferSize: bufferSize,
                     FileOptions.Asynchronous | FileOptions.SequentialScan),
                 Encoding.UTF8,
                 detectEncodingFromByteOrderMarks: true);
