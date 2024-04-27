@@ -208,29 +208,40 @@ public sealed class Packager(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            Exception e;
+            var absolute = Path.Combine(map.ETMain.FullName, relative);
+
             try
             {
-                var absolute = Path.Combine(map.ETMain.FullName, relative);
                 archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
                 addedFiles.Add(absolute.AsMemory());
                 includedFiles.Add(relative);
                 return true;
             }
-            catch (DirectoryNotFoundException) { return false; }
-            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException dnfe)
+            {
+                e = dnfe;
+            }
+            catch (FileNotFoundException fnfe)
+            {
+                e = fnfe;
+            }
+
+            logger.Trace($"Could not add file from relative path '{relative}' (absolute: {absolute}) {Environment.NewLine}{e}");
+            return false;
         }
 
         void AddTexture(string name)
         {
             bool tgaAttempted = false;
-            ReadOnlySpan<char> extension = Path.GetExtension(name.AsSpan());
 
-            if (extension.IsEmpty ||
-                extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+            TextureExtension extension = name.GetTextureExtension();
+
+            if (extension is TextureExtension.Empty or TextureExtension.Tga)
             {
                 goto TryAddTga;
             }
-            else if (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase))
+            else if (extension is TextureExtension.Jpg)
             {
                 goto TryAddJpeg;
             }
@@ -272,7 +283,7 @@ public sealed class Packager(
             string detail = tgaAttempted ? " (no .tga or .jpg found)" : "";
             logger.Log(
                 options.MissingAssetLoglevel,
-                $"Missing rexture reference{detail}: {name}");
+                $"Missing texture reference{detail}: {name}");
 
             if (options.RequireAllAssets)
             {

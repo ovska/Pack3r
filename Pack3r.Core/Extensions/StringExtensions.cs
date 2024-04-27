@@ -2,8 +2,28 @@
 
 namespace Pack3r.Extensions;
 
+public enum TextureExtension { Empty = 0, Other, Tga, Jpg }
+
 public static class StringExtensions
 {
+    public static TextureExtension GetTextureExtension(this ReadOnlyMemory<char> path) => GetTextureExtension(path.Span);
+    public static TextureExtension GetTextureExtension(this string path) => GetTextureExtension(path.AsSpan());
+    public static TextureExtension GetTextureExtension(this ReadOnlySpan<char> path)
+    {
+        ReadOnlySpan<char> extension = Path.GetExtension(path);
+
+        if (extension.IsEmpty)
+            return TextureExtension.Empty;
+
+        if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+            return TextureExtension.Tga;
+
+        if (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase))
+            return TextureExtension.Jpg;
+
+        return TextureExtension.Other;
+    }
+
     public static ArraySegment<Range> Split(
         this ReadOnlyMemory<char> value,
         char separator,

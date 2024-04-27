@@ -10,6 +10,7 @@ public interface ILogger
     void Exception(Exception? e, string message);
     void Drain();
 
+    public void Trace(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Trace, ref handler);
     public void Debug(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Debug, ref handler);
     public void Info(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Info, ref handler);
     public void Warn(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Warn, ref handler);
