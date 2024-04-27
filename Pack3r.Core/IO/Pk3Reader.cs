@@ -1,5 +1,6 @@
 ﻿using System.IO.Compression;
 using Pack3r.Extensions;
+using Pack3r.Logging;
 
 namespace Pack3r.IO;
 

@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using System.CommandLine.Parsing;
+using Pack3r.Logging;
 
 namespace Pack3r.Console;
 
@@ -33,7 +34,7 @@ internal static class Commandline
         var looseOption = new Option<bool>(
             ["--loose", "--allowpartial"],
             () => false,
-            "Pack the pk3 even if some assets are missing  (ignored on dry runs)")
+            "Pack the pk3 even if some assets are missing (ignored on dry runs)")
         {
             Arity = ArgumentArity.ZeroOrOne,
         };

@@ -1,4 +1,6 @@
-﻿namespace Pack3r.Tests;
+﻿using Pack3r.Progress;
+
+namespace Pack3r.Tests;
 
 public sealed class NoOpProgressMeter : IProgressMeter
 {

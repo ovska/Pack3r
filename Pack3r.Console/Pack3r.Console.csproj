@@ -7,6 +7,11 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <PublishAot>true</PublishAot>
     <PublishTrimmed>true</PublishTrimmed>
+    <Title>Pack3r</Title>
+    <Authors>ovska</Authors>
+    <Product>Pack3r</Product>
+    <PackageProjectUrl>https://github.com/ovska/Pack3r</PackageProjectUrl>
+    <PackageId>Pack3r</PackageId>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">

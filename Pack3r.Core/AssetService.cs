@@ -4,6 +4,7 @@ using System.IO;
 using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
+using Pack3r.Logging;
 
 namespace Pack3r;
 
@@ -57,7 +58,7 @@ public class AssetService(
 
             if (!File.Exists(path))
             {
-                logger.Info($"{parser.Description} file '{map.RelativePath(path)}' not found, skipping...");
+                logger.Info($"Skipped {parser.Description}, file '{map.RelativePath(path)}' not found");
                 return;
             }
 
@@ -93,7 +94,7 @@ public class AssetService(
         ];
 
         if (etmain.Parent is { } etfolder &&
-            etfolder.GetDirectories("etjump") is { Length: 1 } etjumpdirs &&
+            etfolder.GetDirectories("etjump_stable") is { Length: 1 } etjumpdirs &&
             etjumpdirs[0].GetFiles("etjump-*.pk3").OrderByDescending(f => f.Name).FirstOrDefault() is { } etjumpPk3)
         {
             auxiliary.Add(TryLoadPk3(etjumpPk3.FullName));

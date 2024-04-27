@@ -2,6 +2,8 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using Pack3r.Extensions;
+using Pack3r.Logging;
+using Pack3r.Progress;
 
 namespace Pack3r;
 
@@ -37,20 +39,22 @@ public sealed class Packager(
 
         var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
 
-        if (lightmapDir.Exists)
+        if (lightmapDir.Exists && lightmapDir.GetFiles("lm_????.tga") is { Length: > 0 } lmFiles)
         {
             bool timestampWarned = false;
+            using var progress = progressManager.Create("Packing lightmaps", lmFiles.Length);
 
-            var files = lightmapDir.GetFiles("lm_????.tga");
-            using var progress = progressManager.Create("Packing lightmaps", files.Length);
-
-            for (int i = 0; i < files.Length; i++)
+            for (int i = 0; i < lmFiles.Length; i++)
             {
-                FileInfo? file = files[i];
+                FileInfo? file = lmFiles[i];
                 timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
                 AddFileAbsolute(file.FullName, required: true);
                 progress.Report(i + 1);
             }
+        }
+        else
+        {
+            logger.Debug($"Lightmaps skipped, files not found in '{map.RelativePath(lightmapDir.FullName)}'");
         }
 
         using (var progress = progressManager.Create("Packing resources", data.Map.Resources.Count))
@@ -143,7 +147,7 @@ public sealed class Packager(
             }
         }
 
-        if (includedFiles.Count > 0)
+        if (options.LogLevel == LogLevel.Debug)
         {
             includedFiles.Sort();
 
@@ -154,6 +158,7 @@ public sealed class Packager(
         }
 
         // end
+        logger.Info($"{includedFiles.Count} files included in pk3");
 
         void AddFileRelative(ReadOnlyMemory<char> relativePath, bool required = false)
         {
@@ -177,24 +182,20 @@ public sealed class Packager(
             {
                 archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
                 addedFiles.Add(absolute.AsMemory());
-
-                if (options.LogLevel == LogLevel.Debug)
-                    includedFiles.Add(relative);
+                includedFiles.Add(relative);
                 return;
             }
-            catch (FileNotFoundException)
-            {
-            }
+            catch (DirectoryNotFoundException) { }
+            catch (FileNotFoundException) { }
 
-            if (!required && options.RequireAllAssets)
+            if (required || options.RequireAllAssets)
             {
-                logger.Fatal($"File {relative} not found");
+                logger.Fatal($"File '{relative}' not found in path: {absolute}");
                 throw new ControlledException();
             }
             else
             {
                 logger.Error($"File {relative} not found");
-                // not added
             }
         }
 
@@ -207,10 +208,7 @@ public sealed class Packager(
                 var absolute = Path.Combine(map.ETMain.FullName, relative);
                 archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
                 addedFiles.Add(absolute.AsMemory());
-
-                if (options.LogLevel == LogLevel.Debug)
-                    includedFiles.Add(relative);
-
+                includedFiles.Add(relative);
                 return true;
             }
             catch (DirectoryNotFoundException) { return false; }
@@ -219,19 +217,15 @@ public sealed class Packager(
 
         void AddTexture(string name)
         {
+            bool tgaAttempted = false;
             ReadOnlySpan<char> extension = Path.GetExtension(name.AsSpan());
 
-            if (extension.IsEmpty)
+            if (extension.IsEmpty ||
+                extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
             {
                 goto TryAddTga;
             }
-
-            if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
-            {
-                goto TryAddTga;
-            }
-
-            if (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase))
+            else if (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase))
             {
                 goto TryAddJpeg;
             }
@@ -239,7 +233,8 @@ public sealed class Packager(
             goto Fail;
 
             TryAddTga:
-            var tga = Path.ChangeExtension(name, ".tga");
+            string tga = Path.ChangeExtension(name, ".tga");
+            tgaAttempted = true;
 
             if (data.Pak0.Resources.Contains(tga.AsMemory()) || addedFiles.Contains(tga.AsMemory()))
             {
@@ -248,13 +243,13 @@ public sealed class Packager(
 
             if (TryAddRelative(tga))
             {
-                // consider the original texture added
+                // consider the original texture added as well
                 addedFiles.Add(name.AsMemory());
                 return;
             }
 
             TryAddJpeg:
-            var jpg = Path.ChangeExtension(name, ".jpg");
+            string jpg = Path.ChangeExtension(name, ".jpg");
 
             if (data.Pak0.Resources.Contains(jpg.AsMemory()) || addedFiles.Contains(jpg.AsMemory()))
             {
@@ -263,16 +258,16 @@ public sealed class Packager(
 
             if (TryAddRelative(jpg))
             {
-                // consider the texture added
+                // consider the original texture added as well
                 addedFiles.Add(name.AsMemory());
                 return;
             }
 
             Fail:
-            string type = extension.IsEmpty ? "shader or texture" : "texture";
+            string detail = tgaAttempted ? " (no .tga or .jpg found)" : "";
             logger.Log(
-                options.RequireAllAssets ? LogLevel.Fatal : LogLevel.Error,
-                $"Missing {type}: {name}");
+                options.MissingAssetLoglevel,
+                $"Missing rexture reference{detail}: {name}");
 
             if (options.RequireAllAssets)
             {
@@ -280,37 +275,4 @@ public sealed class Packager(
             }
         }
     }
-
-    public string ResolveDestinationPath(Map map, string? destination, string? rename)
-    {
-        if (destination is null)
-        {
-            destination = Path.ChangeExtension(map.Path, "pk3");
-            logger.Debug($"No destination file supplied, defaulting to: {destination}");
-        }
-
-        // is a directory?
-        if (Path.GetExtension(destination.AsSpan()).IsEmpty)
-        {
-            destination = Path.ChangeExtension(Path.Combine(destination, map.Name), "pk3");
-            logger.Debug($"Destination path is a directory, using path: {destination}");
-        }
-
-        // relative path?
-        if (!Path.IsPathRooted(destination))
-        {
-            destination = Path.GetFullPath(new Uri(destination).LocalPath);
-            logger.Debug($"Destination resolved to full path: {destination}");
-        }
-
-        if (!string.IsNullOrEmpty(rename))
-        {
-            // TODO
-            throw new NotSupportedException();
-        }
-
-        return destination;
-    }
-
-    private enum AddResult : byte { NotAdded, Exact, Alternate }
 }

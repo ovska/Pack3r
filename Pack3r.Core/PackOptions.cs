@@ -1,4 +1,6 @@
-﻿namespace Pack3r;
+﻿using Pack3r.Logging;
+
+namespace Pack3r;
 
 public class PackOptions
 {
@@ -11,4 +13,6 @@ public class PackOptions
     public bool RequireAllAssets { get; set; }
     public bool Overwrite { get; set; }
     public LogLevel LogLevel { get; set; } = LogLevel.Debug;
+
+    internal LogLevel MissingAssetLoglevel => RequireAllAssets ? LogLevel.Fatal : LogLevel.Error;
 }

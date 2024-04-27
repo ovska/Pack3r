@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Pack3r.Extensions;
 using Pack3r.IO;
+using Pack3r.Logging;
 using ROMC = System.ReadOnlyMemory<char>;
 
 namespace Pack3r.Core.Parsers;

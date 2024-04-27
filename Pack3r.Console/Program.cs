@@ -5,6 +5,8 @@ using Pack3r.Console;
 using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
+using Pack3r.Logging;
+using Pack3r.Progress;
 using Pack3r.Services;
 using Pure.DI;
 
@@ -116,6 +118,7 @@ sealed record App(
     public CancellationToken CancellationToken => Lifetime.CancellationToken;
 }
 
+// pureDI hack
 sealed class PackOptionsWrapper([Tag("options")] PackOptions value)
 {
     public PackOptions Value => value;

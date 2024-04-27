@@ -5,6 +5,8 @@ using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
+using Pack3r.Logging;
+using Pack3r.Progress;
 
 namespace Pack3r;
 
@@ -97,13 +99,19 @@ public class ShaderParser(
 
                 if (shaderlist?.Contains(Path.GetFileNameWithoutExtension(file.Name)) == false)
                 {
-                    logger.Debug($"Skipping shader parsing from file {file.Name} (not in shaderlist)");
+                    logger.Debug($"Skipped shader parsing from file {file.Name} (not in shaderlist)");
                     return;
                 }
 
-                if (file.Name.StartsWith("q3map_") || file.Name.Equals("q3shadersCopyForRadiant.shader"))
+                if (file.Name.Equals("q3shadersCopyForRadiant.shader"))
                 {
-                    logger.Debug($"Skipping shader parsing from compiler generated file {file.Name}");
+                    logger.Debug($"Skipped parsing Radiant specific file {file.Name}");
+                    return;
+                }
+
+                if (file.Name.StartsWith("q3map_"))
+                {
+                    logger.Debug($"Skipped shader parsing from compiler generated file {file.Name}");
                     return;
                 }
 

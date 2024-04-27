@@ -1,41 +1,28 @@
 ﻿using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Pack3r.Extensions;
 
-namespace Pack3r;
+namespace Pack3r.Logging;
 
-public enum LogLevel { Debug, Info, Warn, Error, Fatal }
-
-public interface ILogger
+public sealed class Logger<T>(LoggerBase logger) : ILogger<T>
 {
-    void Log(LogLevel level, ref DefaultInterpolatedStringHandler handler);
-    void Exception(Exception? e, string message);
-    void Drain();
+    private static readonly string _typeName = typeof(T).Name;
 
-    public void Debug(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Debug, ref handler);
-    public void Info(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Info, ref handler);
-    public void Warn(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Warn, ref handler);
-    public void Error(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Error, ref handler);
-    public void Fatal(ref DefaultInterpolatedStringHandler handler) => Log(LogLevel.Fatal, ref handler);
-    public void System(ref DefaultInterpolatedStringHandler handler) => Log((LogLevel)byte.MaxValue, ref handler);
-}
-
-public interface ILogger<out T> : ILogger;
-
-public sealed class NullLogger<T> : ILogger<T>
-{
-    public static readonly NullLogger<T> Instance = new();
-    public void Log(LogLevel level, ref DefaultInterpolatedStringHandler handler) => handler.Clear();
-    public void Exception(Exception? e, string message) { }
-    public void Drain() { }
+    public void Drain() => logger.Drain();
+    public void Exception(Exception? e, string message) => logger.Exception(e, message);
+    public void Log(LogLevel level, ref DefaultInterpolatedStringHandler handler) => logger.Log(level, ref handler, _typeName);
 }
 
 public sealed class LoggerBase : ILogger
 {
+    private readonly record struct LogMessage(
+        LogLevel Level,
+        string Message,
+        string? Context);
+
     private readonly LogLevel _minimumLogLevel;
 
-    private readonly ConcurrentQueue<(LogLevel level, string value, Type? caller)> _messages = [];
+    private readonly ConcurrentBag<LogMessage> _messages = [];
 
     public LoggerBase(PackOptions options)
     {
@@ -47,7 +34,7 @@ public sealed class LoggerBase : ILogger
     internal void Log(
         LogLevel level,
         ref DefaultInterpolatedStringHandler handler,
-        Type caller)
+        string? caller)
     {
         if (level < _minimumLogLevel)
         {
@@ -56,11 +43,14 @@ public sealed class LoggerBase : ILogger
 
         if (level == (LogLevel)byte.MaxValue)
         {
-            LogInternal(level, handler.ToStringAndClear());
+            lock (Global.ConsoleLock)
+            {
+                LogInternalNoLock(level, handler.ToStringAndClear(), caller);
+            }
         }
         else
         {
-            _messages.Enqueue((level, handler.ToStringAndClear(), caller));
+            _messages.Add(new(level, handler.ToStringAndClear(), caller));
         }
     }
 
@@ -68,37 +58,23 @@ public sealed class LoggerBase : ILogger
         LogLevel level,
         ref DefaultInterpolatedStringHandler handler)
     {
-        if (level < _minimumLogLevel)
-        {
-            return;
-        }
-
-        if (level == (LogLevel)byte.MaxValue)
-        {
-            lock (typeof(Console))
-            {
-                LogInternal(level, handler.ToStringAndClear());
-            }
-        }
-        else
-        {
-            _messages.Enqueue((level, handler.ToStringAndClear(), null));
-        }
+        Log(level, ref handler, null);
     }
 
     public void Drain()
     {
-        lock (typeof(Console))
+        lock (Global.ConsoleLock)
         {
-            foreach (var grouping in _messages.OrderBy(x => x.level).GroupBy(x => x.caller))
+            var messages = _messages.ToArray();
+
+            foreach (var message in _messages.OrderBy(m => (int)m.Level).ThenBy(x => x.Context))
             {
-                foreach (var (level, value, _) in grouping)
-                    LogInternal(level, value);
+                LogInternalNoLock(message.Level, message.Message, message.Context);
             }
         }
     }
 
-    private static void LogInternal(LogLevel level, string message)
+    private static void LogInternalNoLock(LogLevel level, string message, string? context)
     {
         var defaultForeground = Console.ForegroundColor;
         var defaultBackground = Console.BackgroundColor;
@@ -124,6 +100,14 @@ public sealed class LoggerBase : ILogger
         else
         {
             output.Write("        ");
+        }
+
+        if (!string.IsNullOrEmpty(context))
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            output.Write('[');
+            output.Write(context);
+            output.Write("] ");
         }
 
         Console.ForegroundColor = messageColor ?? defaultForeground;
@@ -185,23 +169,14 @@ public sealed class LoggerBase : ILogger
 
     public void Exception(Exception? e, string message)
     {
-        lock (typeof(Console))
+        lock (Global.ConsoleLock)
         {
-            if (e is null)
-            {
-                LogInternal(LogLevel.Fatal, $"{message}");
-            }
-            else
-            {
-                LogInternal(LogLevel.Fatal, $"{message}{Environment.NewLine}{Environment.NewLine}Exception:{Environment.NewLine}{e}");
-            }
+            LogInternalNoLock(
+                LogLevel.Fatal,
+                e is null
+                    ? $"{message}"
+                    : $"{message}{Environment.NewLine}{Environment.NewLine}Exception:{Environment.NewLine}{e}",
+                null);
         }
     }
-}
-
-public sealed class Logger<T>(LoggerBase logger) : ILogger<T>
-{
-    public void Drain() => logger.Drain();
-    public void Exception(Exception? e, string message) => logger.Exception(e, message);
-    public void Log(LogLevel level, ref DefaultInterpolatedStringHandler handler) => logger.Log(level, ref handler, typeof(T));
 }

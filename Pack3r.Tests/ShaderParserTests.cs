@@ -1,3 +1,5 @@
+using Pack3r.Logging;
+
 namespace Pack3r.Tests;
 
 public class ShaderParserTests

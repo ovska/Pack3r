@@ -1,5 +1,6 @@
 ﻿using Pack3r.Core.Parsers;
 using Pack3r.IO;
+using Pack3r.Logging;
 
 namespace Pack3r.Tests;
 

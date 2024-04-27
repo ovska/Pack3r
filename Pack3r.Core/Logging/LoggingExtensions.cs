@@ -1,4 +1,4 @@
-﻿namespace Pack3r;
+﻿namespace Pack3r.Logging;
 
 public static class LoggingExtensions
 {
