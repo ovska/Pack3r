@@ -223,33 +223,13 @@ public sealed class Packager(
 
         bool TryAddRelative(string relative)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var absolute = Path.Combine(map.ETMain.FullName, relative);
-
-            if (File.Exists(absolute))
+            foreach (var dir in map.AssetDirectories)
             {
-                Exception e;
-
-                try
-                {
-                    archive.CreateEntryFromFile(sourceFileName: absolute, entryName: relative);
-                    addedFiles.Add(absolute.AsMemory());
-                    includedFiles.Add(relative);
+                if (TryAddFileCore(relativePath: relative, absolutePath: Path.Combine(dir.FullName, relative)))
                     return true;
-                }
-                catch (IOException ioex)
-                {
-                    e = ioex;
-                }
-
-                logger.Trace($"Could not add file from relative path '{relative}' (absolute: {absolute}) {Environment.NewLine}{e}");
-            }
-            else
-            {
-                logger.Trace($"Could not add file from relative path '{relative}', file does not exist");
             }
 
+            logger.Trace($"Could not resolve file from relative path '{relative}'");
             return false;
         }
 
