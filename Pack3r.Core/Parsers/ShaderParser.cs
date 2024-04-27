@@ -12,8 +12,6 @@ using Pack3r.Services;
 
 namespace Pack3r;
 
-#pragma warning disable CA2231 // Overload operator equals on overriding value type Equals
-
 public readonly struct ResourcePath : IEquatable<ResourcePath>
 {
     public string Path { get; }

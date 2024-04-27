@@ -31,13 +31,16 @@ DI.Setup("Composition")
 
 await Commandline.Run(args, Execute);
 
-static async Task<int> Execute(PackOptions options)
+static async Task<int> Execute(PackOptions options, CancellationToken systemToken)
 {
     int retval = 0;
 
     using (var composition = new Composition(options))
     {
         var app = composition.Application;
+
+        using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(systemToken, app.CancellationToken);
+        CancellationToken cancellationToken = linkedTokenSource.Token;
 
         try
         {
@@ -55,7 +58,7 @@ static async Task<int> Execute(PackOptions options)
 
             var timer = Stopwatch.StartNew();
 
-            PackingData data = await app.AssetService.GetPackingData(app.CancellationToken);
+            PackingData data = await app.AssetService.GetPackingData(cancellationToken);
 
             Stream destination;
 
@@ -71,7 +74,7 @@ static async Task<int> Execute(PackOptions options)
 
             await using (destination)
             {
-                await app.Packager.CreateZip(data, destination, app.CancellationToken);
+                await app.Packager.CreateZip(data, destination, cancellationToken);
             }
 
             timer.Stop();

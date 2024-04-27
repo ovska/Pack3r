@@ -9,7 +9,7 @@ internal static class Commandline
 {
     public static Task Run(
         string[] args,
-        Func<PackOptions, Task<int>> task)
+        Func<PackOptions, CancellationToken, Task<int>> task)
     {
         var mapArgument = new Argument<FileInfo?>(
            name: "map",
@@ -114,7 +114,7 @@ internal static class Commandline
 
             Debug.Assert(options.Pk3File != null || options.DryRun, "Pk3 is required on non-dry runs");
 
-            context.ExitCode = await task(options);
+            context.ExitCode = await task(options, context.GetCancellationToken());
         });
 
         return rootCommand.InvokeAsync(args);
@@ -205,6 +205,9 @@ internal static class Commandline
             {
                 result.ErrorMessage = $"Output file already exists, use the overwrite-option to overwrite it: {file.FullName}";
             }
+
+            // How to set pk3 here?
+            //result.
         }
     }
 }
