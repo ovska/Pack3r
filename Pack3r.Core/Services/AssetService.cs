@@ -66,10 +66,7 @@ public class AssetService(
             HasStyleLights = assets.HasStyleLights,
         };
 
-        var dirDisplays = map.AssetDirectories
-            .Select(d => Path.Combine("etmain", map.GetRelativePath(d.FullName)));
-
-        logger.System($"Using directories for discovery: {string.Join(", ", dirDisplays)}");
+        logger.System($"Using directories for discovery: {string.Join(", ", map.AssetDirectories.Select(d => d.FullName))}");
 
         // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
         ConcurrentDictionary<Resource, object?> referencedResources = [];
@@ -80,7 +77,7 @@ public class AssetService(
 
             if (!File.Exists(path))
             {
-                logger.Info($"Skipped {parser.Description}, file '{map.GetRelativePath(path)}' not found");
+                logger.Info($"Skipped {parser.Description}, file '{path}' not found");
                 return;
             }
 

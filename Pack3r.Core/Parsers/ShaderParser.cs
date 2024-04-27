@@ -111,24 +111,37 @@ public class ShaderParser(
 
                 await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
                 {
-                    if (!allShaders.TryAdd(shader.Name, shader))
-                    {
-                        var existing = allShaders[shader.Name];
-
-                        if (!shader.NeededInPk3 && !existing.NeededInPk3)
-                            continue;
-
-                        if (shader.Equals(existing))
+                    allShaders.AddOrUpdate(
+                        shader.Name,
+                        static (_, tuple) => tuple.shader,
+                        static (_, existing, tuple) =>
                         {
-                            logger.Warn($"Shader {shader.Name} found multiple times in file '{data.Map.GetRelativePath(shader.Path.Path)}'");
-                        }
-                        else
-                        {
-                            logger.Warn(
-                                $"Shader {shader.Name} both in file '{data.Map.GetRelativePath(shader.Path.Path)}'" +
-                                $" and '{data.Map.GetRelativePath(existing.Path.Path)}'");
-                        }
-                    }
+                            var (shader, logger, map) = tuple;
+
+                            // compile time shader, ignore
+                            if (!shader.NeededInPk3 && !existing.NeededInPk3)
+                                return existing;
+
+                            if (shader.Equals(existing))
+                            {
+                                logger.Warn($"Shader {shader.Name} found multiple times in file '{shader.Path.Path}' + {existing.Path.Path}");
+                                return existing;
+                            }
+
+                            var defaultDir = map.AssetDirectories[0].Name;
+                            var matchA = shader.AssetDirectory.Equals(defaultDir, StringComparison.OrdinalIgnoreCase);
+                            var matchB = existing.AssetDirectory.Equals(defaultDir, StringComparison.OrdinalIgnoreCase);
+
+                            if (matchA == matchB)
+                            {
+                                logger.Warn(
+                                    $"Shader {shader.Name} both in file '{shader.Path.Path}'" +
+                                    $" and '{existing.Path.Path}'");
+                            }
+
+                            return matchA ? shader : existing;
+                        },
+                        (shader, logger, data.Map));
                 }
             }).ConfigureAwait(false);
         }

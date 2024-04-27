@@ -31,14 +31,14 @@ public sealed class Packager(
         // contains both actual and alternate files added
         HashSet<ReadOnlyMemory<char>> addedFiles = new(ROMCharComparer.Instance);
         HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
-        List<string> includedFiles = [];
+        List<(string absolute, string archive)> includedFiles = [];
 
-        var bsp = new FileInfo(Path.ChangeExtension(map.Path, "bsp"));
-        AddFileAbsolute(bsp.FullName, required: true);
+        FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
+        AddCompileFile(bsp.FullName);
 
         if (options.DevFiles)
         {
-            AddFileAbsolute(map.Path, required: true);
+            AddCompileFile(map.Path);
         }
 
         var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
@@ -53,14 +53,14 @@ public sealed class Packager(
             {
                 FileInfo? file = lmFiles[i];
                 timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
-                AddFileAbsolute(file.FullName, required: true);
+                AddCompileFile(file.FullName);
                 progress.Report(i + 1);
                 includedLightmaps = true;
             }
         }
         else
         {
-            logger.Debug($"Lightmaps skipped, files not found in '{map.GetRelativePath(lightmapDir.FullName)}'");
+            logger.Debug($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
         }
 
         using (var progress = progressManager.Create("Packing resources", data.Map.Resources.Count))
@@ -111,8 +111,11 @@ public sealed class Packager(
                     throw new UnreachableException($"Can't include file from pk3: {shader.Path.Entry}");
                 }
 
-                if (!addedFiles.Contains(shader.Path.Path.AsMemory()))
-                    AddFileAbsolute(shader.Path.Path);
+                if (!shader.NeededInPk3)
+                    continue;
+
+                if (!addedFiles.Contains(shader.ArchivePath.AsMemory()))
+                    AddShaderFile(shader);
 
                 if (shader.ImplicitMapping is { } implicitMapping)
                 {
@@ -140,40 +143,47 @@ public sealed class Packager(
         // most likely no recent light compile if there are no lightmaps
         if (styleLights && includedLightmaps)
         {
-            var styleShader = Path.Combine("scripts", $"q3map_{map.Name}.shader");
-            var file = new FileInfo(styleShader);
+            var styleShader = new FileInfo(Path.Combine(map.AssetDirectories[0].FullName, "scripts", $"q3map2_{map.Name}.shader"));
 
-            if (file.Exists)
+            if (styleShader.Exists)
             {
-                logger.CheckAndLogTimestampWarning("Stylelight shader", bsp, file);
-                AddFileRelative(styleShader);
+                logger.CheckAndLogTimestampWarning("Stylelight shader", bsp, styleShader);
+                AddCompileFile(styleShader.FullName);
             }
             else
             {
-                logger.Warn($"Map has style lights, but shader file {styleShader} was not found");
+                logger.Warn($"Map has style lights, but shader file '{styleShader.FullName}' was not found");
             }
         }
 
         if (options.LogLevel == LogLevel.Debug)
         {
-            includedFiles.Sort();
-
-            foreach (var file in includedFiles)
+            foreach (var (abs, arch) in includedFiles.Order())
             {
-                logger.Debug($"File included: {file.Replace('\\', '/')}");
+                logger.Debug($"File packed: '{arch}' (from: {abs})");
             }
         }
 
         // end
         logger.Info($"{includedFiles.Count} files included in pk3");
 
-        void AddFileAbsolute(string absolutePath, bool required = false)
+        void AddCompileFile(string absolutePath)
         {
             if (!TryAddFileCore(
-                map.GetRelativePath(absolutePath),
+                archivePath: map.GetArchivePath(absolutePath),
                 absolutePath))
             {
-                OnFailedAddFile(required, $"File '{absolutePath}' not found");
+                OnFailedAddFile(required: true, $"File '{absolutePath}' not found");
+            }
+        }
+
+        void AddShaderFile(Shader shader)
+        {
+            if (!TryAddFileCore(
+                archivePath: shader.ArchivePath,
+                absolutePath: shader.Path.Path))
+            {
+                OnFailedAddFile(false, $"Shader file '{shader.Path}' not found");
             }
         }
 
@@ -189,7 +199,7 @@ public sealed class Packager(
         }
 
         bool TryAddFileCore(
-            string relativePath,
+            string archivePath,
             string absolutePath)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -200,9 +210,9 @@ public sealed class Packager(
 
                 try
                 {
-                    archive.CreateEntryFromFile(sourceFileName: absolutePath, entryName: relativePath);
-                    addedFiles.Add(relativePath.AsMemory());
-                    includedFiles.Add(relativePath);
+                    archive.CreateEntryFromFile(sourceFileName: absolutePath, entryName: archivePath);
+                    addedFiles.Add(archivePath.AsMemory());
+                    includedFiles.Add((absolutePath, archivePath));
                     return true;
                 }
                 catch (IOException ioex) { ex = ioex; }
@@ -225,8 +235,12 @@ public sealed class Packager(
         {
             foreach (var dir in map.AssetDirectories)
             {
-                if (TryAddFileCore(relativePath: relative, absolutePath: Path.Combine(dir.FullName, relative)))
+                if (TryAddFileCore(
+                    archivePath: relative,
+                    absolutePath: Path.Combine(dir.FullName, relative)))
+                {
                     return true;
+                }
             }
 
             logger.Trace($"Could not resolve file from relative path '{relative}'");

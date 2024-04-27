@@ -54,4 +54,15 @@ public static class MemoryTests
     {
         Assert.Equal(expected, Tokens.ShaderPath().IsMatch(input));
     }
+
+    [Theory]
+    [InlineData("test", false)]
+    [InlineData("textures/test.pk3dir/test", false)]
+    [InlineData("test.pk3dir/test", true)]
+    [InlineData("textures\\test.pk3dir\\test", false)]
+    [InlineData("test.pk3dir\\test", true)]
+    public static void Should_Check_For_Pk3Dir(string input, bool expected)
+    {
+        Assert.Equal(expected, Tokens.Pk3Dir().IsMatch(input));
+    }
 }

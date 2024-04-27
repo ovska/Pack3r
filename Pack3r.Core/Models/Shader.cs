@@ -1,4 +1,5 @@
 ﻿using Pack3r.Extensions;
+using IOPath = System.IO.Path;
 
 namespace Pack3r.Models;
 
@@ -35,6 +36,22 @@ public sealed record Shader(
     /// Shader name used to resolve the texture used, can be either a generic path without extension or shader name.
     /// </summary>
     public ReadOnlyMemory<char>? ImplicitMapping { get; set; }
+
+    public ReadOnlySpan<char> AssetDirectory
+    {
+        get
+        {
+            var scripts = IOPath.GetDirectoryName(Path.Path.AsSpan());
+            var etmainOrPk3dir = IOPath.GetDirectoryName(scripts);
+            return IOPath.GetFileName(etmainOrPk3dir);
+        }
+    }
+
+    public string ArchivePath => _archivePath ??= IOPath.GetRelativePath(
+        IOPath.GetDirectoryName(IOPath.GetDirectoryName(Path.Path.AsSpan())).ToString(),
+        Path.Path);
+
+    private string? _archivePath;
 
     public bool Equals(Shader? other)
     {

@@ -75,19 +75,9 @@ public sealed class Map : MapAssets
     /// <summary>
     /// Returns path <strong>relative to ETMain</strong>.
     /// </summary>
-    public string GetRelativePath(string fullPath)
+    public string GetArchivePath(string fullPath)
     {
-        if (fullPath.StartsWith(ETMain.FullName))
-        {
-            // TODO: pk3dir trimming
-
-            return fullPath
-                .AsMemory(ETMain.FullName.Length)
-                .TrimStart([IOPath.DirectorySeparatorChar, IOPath.AltDirectorySeparatorChar])
-                .ToString();
-        }
-
-        throw new UnreachableException($"Invalid fullPath: {fullPath}");
+        return IOPath.GetRelativePath(AssetDirectories[0].FullName, fullPath);
     }
 
     private IEnumerable<DirectoryInfo> InitAssetDirectories()
