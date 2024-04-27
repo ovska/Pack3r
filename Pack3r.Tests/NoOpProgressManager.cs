@@ -15,5 +15,5 @@ public sealed class NoOpProgressMeter : IProgressMeter
 
 public sealed class NoOpProgressManager : IProgressManager
 {
-    public IProgressMeter Create(string name, int max) => new NoOpProgressMeter();
+    public IProgressMeter Create(string name, int? max) => new NoOpProgressMeter();
 }

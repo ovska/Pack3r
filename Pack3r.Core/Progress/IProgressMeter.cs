@@ -10,7 +10,7 @@ public interface IProgressMeter : IDisposable
 public sealed class ConsoleProgressMeter : IProgressMeter
 {
     private readonly string _name;
-    private readonly int _max;
+    private readonly int? _max;
     private long _lastPrint;
     private uint _lastSpin;
 
@@ -19,7 +19,7 @@ public sealed class ConsoleProgressMeter : IProgressMeter
 
     private char Spin => _spinner[_lastSpin++ % _spinner.Length];
 
-    public ConsoleProgressMeter(string name, int max)
+    public ConsoleProgressMeter(string name, int? max)
     {
         _name = name;
         _max = max;
@@ -63,14 +63,11 @@ public sealed class ConsoleProgressMeter : IProgressMeter
             Console.Out.Write(_name);
             Console.Out.Write(' ');
             Console.Out.Write(value);
-            Console.Out.Write(" / ");
-            Console.Out.Write(_max);
 
-            if (value >= _max)
+            if (_max.HasValue)
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.Out.Write("\r   DONE ");
-                Console.ForegroundColor = foreground;
+                Console.Out.Write(" / ");
+                Console.Out.Write(_max.Value);
             }
         }
     }
@@ -79,6 +76,10 @@ public sealed class ConsoleProgressMeter : IProgressMeter
     {
         lock (Global.ConsoleLock)
         {
+            var foreground = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Out.Write("\r   DONE ");
+            Console.ForegroundColor = foreground;
             Console.WriteLine();
         }
     }

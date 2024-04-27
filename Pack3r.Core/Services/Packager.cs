@@ -24,8 +24,6 @@ public sealed class Packager(
     {
         Map map = data.Map;
 
-        string[] assetSources = GetAssetDirectories(map).ToArray();
-
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
 
         var shadersByName = await shaderParser.GetReferencedShaders(data, cancellationToken);
@@ -181,9 +179,9 @@ public sealed class Packager(
 
         void AddFileRelative(string relative)
         {
-            foreach (var dir in assetSources)
+            foreach (var dir in map.AssetDirectories)
             {
-                if (TryAddFileCore(relative, Path.Combine(dir, relative)))
+                if (TryAddFileCore(relative, Path.Combine(dir.FullName, relative)))
                     return;
             }
 
@@ -319,23 +317,6 @@ public sealed class Packager(
         else
         {
             logger.Error(ref handler);
-        }
-    }
-
-    private static IEnumerable<string> GetAssetDirectories(Map map)
-    {
-        HashSet<string> unique = [];
-
-        unique.Add(map.GetMapRoot());
-        yield return map.GetMapRoot();
-
-        if (unique.Add(map.ETMain.FullName))
-            yield return map.ETMain.FullName;
-
-        foreach (var pk3dir in map.ETMain.EnumerateDirectories("*.pk3dir", SearchOption.TopDirectoryOnly))
-        {
-            if (unique.Add(pk3dir.FullName))
-                yield return pk3dir.FullName;
         }
     }
 

@@ -66,6 +66,11 @@ public class AssetService(
             HasStyleLights = assets.HasStyleLights,
         };
 
+        var dirDisplays = map.AssetDirectories
+            .Select(d => Path.Combine("etmain", map.GetRelativePath(d.FullName)));
+
+        logger.System($"Using directories for discovery: {string.Join(", ", dirDisplays)}");
+
         // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
         ConcurrentDictionary<Resource, object?> referencedResources = [];
 

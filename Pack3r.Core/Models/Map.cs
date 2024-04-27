@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Immutable;
+using System.Diagnostics;
 using IOPath = System.IO.Path;
 
 namespace Pack3r.Models;
@@ -38,7 +39,13 @@ public sealed class Map : MapAssets
     /// </summary>
     public required DirectoryInfo ETMain { get; init; }
 
+    public ImmutableArray<DirectoryInfo> AssetDirectories
+    {
+        get => _assetDirs.IsDefault ? (_assetDirs = InitAssetDirectories().ToImmutableArray()) : _assetDirs;
+    }
+
     private string? _root;
+    private ImmutableArray<DirectoryInfo> _assetDirs;
 
     /// <summary>
     /// Gets the relative etmain of the map.<br/>
@@ -81,5 +88,22 @@ public sealed class Map : MapAssets
         }
 
         throw new UnreachableException($"Invalid fullPath: {fullPath}");
+    }
+
+    private IEnumerable<DirectoryInfo> InitAssetDirectories()
+    {
+        HashSet<string> unique = [];
+
+        unique.Add(GetMapRoot());
+        yield return new DirectoryInfo(GetMapRoot());
+
+        if (unique.Add(ETMain.FullName))
+            yield return ETMain;
+
+        foreach (var pk3dir in ETMain.EnumerateDirectories("*.pk3dir", SearchOption.TopDirectoryOnly))
+        {
+            if (unique.Add(pk3dir.FullName))
+                yield return pk3dir;
+        }
     }
 }

@@ -2,10 +2,10 @@
 
 public interface IProgressManager
 {
-    IProgressMeter Create(string name, int max);
+    IProgressMeter Create(string name, int? max);
 }
 
 public sealed class ConsoleProgressManager : IProgressManager
 {
-    public IProgressMeter Create(string name, int max) => new ConsoleProgressMeter(name, max);
+    public IProgressMeter Create(string name, int? max) => new ConsoleProgressMeter(name, max);
 }
