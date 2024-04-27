@@ -39,8 +39,6 @@ static async Task<int> Execute(PackOptions options)
     {
         var app = composition.Application;
 
-        bool fileCreated = false;
-
         try
         {
             var mapName = options.MapFile.Name;
@@ -63,7 +61,6 @@ static async Task<int> Execute(PackOptions options)
 
             if (!options.DryRun)
             {
-                fileCreated = true;
                 destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
             }
             else
@@ -94,8 +91,8 @@ static async Task<int> Execute(PackOptions options)
         }
         catch (Exception e)
         {
-            if (fileCreated)
-                File.Delete(options.Pk3File!.FullName);
+            if (!options.DryRun)
+                File.Delete(options.Pk3File.FullName);
 
             app.Lifetime.HandleException(e);
             retval = 1;

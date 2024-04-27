@@ -1,4 +1,6 @@
-﻿namespace Pack3r.Tests;
+﻿using Pack3r.Models;
+
+namespace Pack3r.Tests;
 
 public static class ObjectTests
 {

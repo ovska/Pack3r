@@ -6,7 +6,9 @@ using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
+using Pack3r.Models;
 using Pack3r.Progress;
+using Pack3r.Services;
 
 namespace Pack3r;
 

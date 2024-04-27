@@ -1,6 +1,6 @@
 ﻿using Pack3r.Extensions;
 
-namespace Pack3r;
+namespace Pack3r.Models;
 
 /// <summary>
 /// x

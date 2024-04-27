@@ -3,7 +3,9 @@ using System.Diagnostics;
 using System.IO.Compression;
 using Pack3r.Extensions;
 using Pack3r.Logging;
+using Pack3r.Models;
 using Pack3r.Progress;
+using Pack3r.Services;
 
 namespace Pack3r;
 
@@ -38,6 +40,7 @@ public sealed class Packager(
         AddFileAbsolute(bsp.FullName, required: true);
 
         var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
+        var includedLightmaps = false;
 
         if (lightmapDir.Exists && lightmapDir.GetFiles("lm_????.tga") is { Length: > 0 } lmFiles)
         {
@@ -50,6 +53,7 @@ public sealed class Packager(
                 timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
                 AddFileAbsolute(file.FullName, required: true);
                 progress.Report(i + 1);
+                includedLightmaps = true;
             }
         }
         else
@@ -131,7 +135,8 @@ public sealed class Packager(
             }
         }
 
-        if (styleLights)
+        // most likely no recent light compile if there are no lightmaps
+        if (styleLights && includedLightmaps)
         {
             var styleShader = Path.Combine("scripts", $"q3map_{map.Name}.shader");
             var file = new FileInfo(styleShader);

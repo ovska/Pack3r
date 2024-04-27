@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using IOPath = System.IO.Path;
 
-namespace Pack3r;
+namespace Pack3r.Models;
 
 public class MapAssets
 {

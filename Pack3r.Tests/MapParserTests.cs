@@ -8,7 +8,7 @@ public static class MapParserTests
 {
     private static MapFileParser CreateParser(ILineReader reader, PackOptions? options = null)
     {
-        return new MapFileParser(NullLogger<MapFileParser>.Instance, reader, options ?? new());
+        return new MapFileParser(NullLogger<MapFileParser>.Instance, reader, options ?? new() { MapFile = null! });
     }
 
     [Theory, InlineData(true), InlineData(false)]
@@ -28,7 +28,7 @@ public static class MapParserTests
             }
             """);
 
-        var map = await CreateParser(reader, new PackOptions { DevFiles = include })
+        var map = await CreateParser(reader, new PackOptions { DevFiles = include, MapFile = null! })
             .ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         if (include)

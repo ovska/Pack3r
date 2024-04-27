@@ -1,4 +1,5 @@
 ﻿using Pack3r.Core.Parsers;
+using Pack3r.Models;
 
 namespace Pack3r.Parsers;
 

@@ -1,4 +1,5 @@
 using Pack3r.Logging;
+using Pack3r.Models;
 
 namespace Pack3r.Tests;
 
@@ -20,7 +21,7 @@ public class ShaderParserTests
         var reader = new StringLineReader(data);
         return new ShaderParser(
             reader,
-            new PackOptions { DevFiles = includeDevFiles },
+            new PackOptions { DevFiles = includeDevFiles, MapFile = null! },
             NullLogger<ShaderParser>.Instance,
             new NoOpProgressManager());
     }
