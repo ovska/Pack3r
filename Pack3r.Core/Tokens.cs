@@ -11,7 +11,7 @@ public static partial class Tokens
     [GeneratedRegex("""^"([^"]+)" "([^"]+)"$""", RegexOptions.Singleline, 1000)]
     public static partial Regex KeyValuePair();
 
-    [GeneratedRegex("""^scripts/[^\.]+.shader$""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
+    [GeneratedRegex("""^scripts[/\\][^\.]+.shader$""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
     public static partial Regex ShaderPath();
 
     public static readonly SearchValues<char> Braces = SearchValues.Create("{}");

@@ -54,6 +54,7 @@ public sealed class ConsoleProgressMeter : IProgressMeter
             }
             else
             {
+                Console.Out.WriteLine(Span<char>.Empty);
                 Console.Out.Write(_spinner[_lastSpin++ % _spinner.Length]);
                 Console.Out.Write(" ");
             }
