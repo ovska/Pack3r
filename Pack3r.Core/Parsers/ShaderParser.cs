@@ -77,67 +77,60 @@ public class ShaderParser(
                 $"Could not find 'scripts'-folder(s) in: {string.Join(", ", data.Map.AssetDirectories.Select(d => d.FullName))}");
         }
 
-        var shaderlistTasks = scriptsDirs.ToDictionary(
-            dir => dir.FullName,
-            dir => ReadShaderlist(dir.FullName, cancellationToken));
-
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders = new(ROMCharComparer.Instance);
 
+        var whitelist = await ParseShaderLists(scriptsDirs, cancellationToken);
         int shaderFileCount = 0;
 
         using (var progress = progressManager.Create("Processing shader files", max: null))
         {
-            foreach (var scriptsDir in scriptsDirs)
+            var allShaderFiles = scriptsDirs.SelectMany(dir => dir.EnumerateFiles("*.shader", SearchOption.AllDirectories));
+
+            await Parallel.ForEachAsync(allShaderFiles, cancellationToken, async (file, ct) =>
             {
-                var files = scriptsDir.EnumerateFiles("*.shader", SearchOption.AllDirectories);
-                var shaderlist = await shaderlistTasks[scriptsDir.FullName];
+                int currentCount = Interlocked.Increment(ref shaderFileCount);
+                progress.Report(currentCount);
 
-                await Parallel.ForEachAsync(files, cancellationToken, async (file, ct) =>
+                if (whitelist?.Contains(file.FullName) == false)
                 {
-                    int currentCount = Interlocked.Increment(ref shaderFileCount);
-                    progress.Report(currentCount);
+                    logger.Debug($"Skipped shader parsing from file {file.Name} (not in shaderlist)");
+                    return;
+                }
 
-                    if (shaderlist?.Contains(Path.GetFileNameWithoutExtension(file.Name)) == false)
-                    {
-                        logger.Debug($"Skipped shader parsing from file {file.Name} (not in shaderlist)");
-                        return;
-                    }
+                if (file.Name.Equals("q3shadersCopyForRadiant.shader"))
+                {
+                    logger.Debug($"Skipped parsing Radiant specific file {file.Name}");
+                    return;
+                }
 
-                    if (file.Name.Equals("q3shadersCopyForRadiant.shader"))
-                    {
-                        logger.Debug($"Skipped parsing Radiant specific file {file.Name}");
-                        return;
-                    }
+                if (file.Name.StartsWith("q3map_"))
+                {
+                    logger.Debug($"Skipped shader parsing from compiler generated file {file.Name}");
+                    return;
+                }
 
-                    if (file.Name.StartsWith("q3map_"))
+                await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
+                {
+                    if (!allShaders.TryAdd(shader.Name, shader))
                     {
-                        logger.Debug($"Skipped shader parsing from compiler generated file {file.Name}");
-                        return;
-                    }
+                        var existing = allShaders[shader.Name];
 
-                    await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
-                    {
-                        if (!allShaders.TryAdd(shader.Name, shader))
+                        if (!shader.NeededInPk3 && !existing.NeededInPk3)
+                            continue;
+
+                        if (shader.Equals(existing))
                         {
-                            var existing = allShaders[shader.Name];
-
-                            if (!shader.NeededInPk3 && !existing.NeededInPk3)
-                                continue;
-
-                            if (shader.Equals(existing))
-                            {
-                                logger.Warn($"Shader {shader.Name} found multiple times in file '{data.Map.GetRelativePath(shader.Path.Path)}'");
-                            }
-                            else
-                            {
-                                logger.Warn(
-                                    $"Shader {shader.Name} both in file '{data.Map.GetRelativePath(shader.Path.Path)}'" +
-                                    $" and '{data.Map.GetRelativePath(existing.Path.Path)}'");
-                            }
+                            logger.Warn($"Shader {shader.Name} found multiple times in file '{data.Map.GetRelativePath(shader.Path.Path)}'");
+                        }
+                        else
+                        {
+                            logger.Warn(
+                                $"Shader {shader.Name} both in file '{data.Map.GetRelativePath(shader.Path.Path)}'" +
+                                $" and '{data.Map.GetRelativePath(existing.Path.Path)}'");
                         }
                     }
-                }).ConfigureAwait(false);
-            }
+                }
+            }).ConfigureAwait(false);
         }
 
         var included = new Dictionary<ReadOnlyMemory<char>, Shader>(ROMCharComparer.Instance);
@@ -424,33 +417,42 @@ public class ShaderParser(
         }
     }
 
-    private async Task<HashSet<string>?> ReadShaderlist(string scriptsDirectory, CancellationToken cancellationToken)
+    private async Task<HashSet<string>?> ParseShaderLists(
+        IEnumerable<DirectoryInfo> scriptsDirs,
+        CancellationToken cancellationToken)
     {
         if (!options.ShaderlistOnly)
             return null;
 
-        try
-        {
-            var shaderlist = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var shaderlistPath = Path.Combine(scriptsDirectory, "shaderlist.txt");
+        var allowedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            if (!File.Exists(shaderlistPath))
-            {
-                logger.Debug($"Shaderlist skipped, does not exist in {scriptsDirectory}");
-                return null;
-            }
-
-            await foreach (var line in reader.ReadLines(shaderlistPath, default, cancellationToken))
-            {
-                shaderlist.Add(line.Value.ToString());
-            }
-            return shaderlist;
-        }
-        catch (Exception e)
+        foreach (var dir in scriptsDirs)
         {
-            logger.Exception(e, $"Could not read shaderlist.txt in {scriptsDirectory}");
-            throw new ControlledException();
+            try
+            {
+                var shaderlistPath = Path.Combine(dir.FullName, "shaderlist.txt");
+
+                if (!File.Exists(shaderlistPath))
+                {
+                    logger.Debug($"Shaderlist skipped, does not exist in {dir.FullName}");
+                    continue;
+                }
+
+                await foreach (var line in reader.ReadLines(shaderlistPath, default, cancellationToken))
+                {
+                    allowedFiles.Add(Path.Combine(dir.FullName, $"{line}.shader"));
+                }
+
+                return allowedFiles;
+            }
+            catch (Exception e)
+            {
+                logger.Exception(e, $"Could not read shaderlist.txt in {dir.FullName}");
+                throw new ControlledException();
+            }
         }
+
+        return allowedFiles;
     }
 
     private static readonly ImmutableArray<string> _skySuffixes =
