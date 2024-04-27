@@ -77,7 +77,7 @@ public class AssetService(
 
             if (!File.Exists(path))
             {
-                logger.Info($"Skipped {parser.Description}, file '{path}' not found");
+                logger.Debug($"Skipped {parser.Description}, file '{path}' not found");
                 return;
             }
 

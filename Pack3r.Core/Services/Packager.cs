@@ -210,7 +210,7 @@ public sealed class Packager(
 
                 try
                 {
-                    archive.CreateEntryFromFile(sourceFileName: absolutePath, entryName: archivePath);
+                    archive!.CreateEntryFromFile(sourceFileName: absolutePath, entryName: archivePath);
                     addedFiles.Add(archivePath.AsMemory());
                     includedFiles.Add((absolutePath, archivePath));
                     return true;
@@ -226,6 +226,10 @@ public sealed class Packager(
                     // should be rare
                     logger.Error($"Failed to pack file '{absolutePath}':{Environment.NewLine}{ex.Message}");
                 }
+            }
+            else
+            {
+                logger.Trace($"File not found: '{absolutePath}' (pk3 path: '{archivePath}')");
             }
 
             return false;
@@ -243,7 +247,6 @@ public sealed class Packager(
                 }
             }
 
-            logger.Trace($"Could not resolve file from relative path '{relative}'");
             return false;
         }
 

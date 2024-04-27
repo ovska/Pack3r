@@ -14,9 +14,6 @@ public static partial class Tokens
     [GeneratedRegex("""^scripts[/\\][^\.]+.shader$""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
     public static partial Regex ShaderPath();
 
-    [GeneratedRegex("""[A-Za-z0-9_-]+\.pk3dir[/\\]""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
-    public static partial Regex Pk3Dir();
-
     public static readonly SearchValues<char> Braces = SearchValues.Create("{}");
     public static readonly SearchValues<char> SpaceOrTab = SearchValues.Create(" \t");
 }
