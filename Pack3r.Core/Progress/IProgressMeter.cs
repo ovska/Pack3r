@@ -17,6 +17,8 @@ public sealed class ConsoleProgressMeter : IProgressMeter
     private static readonly char[] _spinner = ['-', '\\', '|', '/'];
     private static readonly TimeSpan _frequency = TimeSpan.FromMilliseconds(50);
 
+    private char Spin => _spinner[_lastSpin++ % _spinner.Length];
+
     public ConsoleProgressMeter(string name, int max)
     {
         _name = name;
@@ -46,17 +48,14 @@ public sealed class ConsoleProgressMeter : IProgressMeter
             var foreground = Console.ForegroundColor;
 
             Console.ForegroundColor = ConsoleColor.Gray;
-            Console.Out.Write("      ");
 
             if (value >= _max)
             {
-                Console.Out.Write("  ");
+                Console.Out.Write("        ");
             }
             else
             {
-                Console.Out.WriteLine(Span<char>.Empty);
-                Console.Out.Write(_spinner[_lastSpin++ % _spinner.Length]);
-                Console.Out.Write(" ");
+                Console.Out.Write([' ', ' ', ' ', ' ', ' ', ' ', Spin, ' ']);
             }
 
             Console.ForegroundColor = foreground;
@@ -71,8 +70,6 @@ public sealed class ConsoleProgressMeter : IProgressMeter
             {
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.Out.Write("\r   DONE ");
-                //Console.Out.Write(' ');
-                //Console.Out.Write("DONE");
                 Console.ForegroundColor = foreground;
             }
         }

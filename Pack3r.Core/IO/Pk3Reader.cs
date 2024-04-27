@@ -1,5 +1,4 @@
 ﻿using System.IO.Compression;
-using Microsoft.VisualBasic;
 using Pack3r.Extensions;
 using Pack3r.Logging;
 
