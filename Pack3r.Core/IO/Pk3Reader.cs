@@ -2,6 +2,8 @@
 using System.IO.Compression;
 using Pack3r.Extensions;
 using Pack3r.Logging;
+using Pack3r.Models;
+using Pack3r.Parsers;
 
 namespace Pack3r.IO;
 
@@ -44,8 +46,8 @@ public class Pk3Reader(
 
                 await ProcessItem(
                     contents,
-                    entry.FullName,
-                    new ResourcePath(path, entry),
+                    path,
+                    entry,
                     cancellationToken);
             }
 
@@ -60,36 +62,37 @@ public class Pk3Reader(
 
     private async ValueTask ProcessItem(
         Pk3Contents contents,
-        string relativePath,
-        ResourcePath resourcePath,
+        string archivePath,
+        ZipArchiveEntry archiveEntry,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (Tokens.ShaderPath().IsMatch(relativePath))
+        if (Tokens.ShaderPath().IsMatch(archiveEntry.FullName))
         {
-            await foreach (var shader in shaderParser.Parse(resourcePath, cancellationToken))
+            await foreach (var shader in shaderParser.Parse(archivePath, archiveEntry, cancellationToken))
             {
                 contents.Shaders.Add(shader.Name);
             }
         }
         else
         {
-            var extension = resourcePath.Path.GetTextureExtension();
+            var extension = archiveEntry.FullName.GetTextureExtension();
 
+            // TODO: fix hack
             // allow using jpg/tga as shaderless tex
             if (extension != TextureExtension.Other)
             {
-                contents.Shaders.Add(relativePath.AsMemory(..^4));
+                contents.Shaders.Add(archiveEntry.FullName.AsMemory(..^4));
             }
 
             // jpg textures can be referenced with tga paths in shaders
             if (extension == TextureExtension.Jpg)
             {
-                contents.Resources.Add(Path.ChangeExtension(relativePath, "tga").AsMemory());
+                contents.Resources.Add(Path.ChangeExtension(archiveEntry.FullName, "tga").AsMemory());
             }
 
-            contents.Resources.Add(relativePath.AsMemory());
+            contents.Resources.Add(archiveEntry.FullName.AsMemory());
         }
     }
 }

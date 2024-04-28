@@ -1,11 +1,12 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.Logging;
 using Pack3r.Models;
+using Pack3r.Parsers;
 using Pack3r.Progress;
 using Pack3r.Services;
 
@@ -106,15 +107,10 @@ public sealed class Packager(
 
                 styleLights = styleLights || shader.HasLightStyles;
 
-                if (shader.Path.Entry is not null)
-                {
-                    throw new UnreachableException($"Can't include file from pk3: {shader.Path.Entry}");
-                }
-
                 if (!shader.NeededInPk3)
                     continue;
 
-                if (!addedFiles.Contains(shader.ArchivePath.AsMemory()))
+                if (!addedFiles.Contains(shader.DestinationPath.AsMemory()))
                     AddShaderFile(shader);
 
                 if (shader.ImplicitMapping is { } implicitMapping)
@@ -180,10 +176,10 @@ public sealed class Packager(
         void AddShaderFile(Shader shader)
         {
             if (!TryAddFileCore(
-                archivePath: shader.ArchivePath,
-                absolutePath: shader.Path.Path))
+                archivePath: shader.DestinationPath,
+                absolutePath: shader.AbsolutePath))
             {
-                OnFailedAddFile(false, $"Shader file '{shader.Path}' not found");
+                OnFailedAddFile(false, $"Shader file '{shader.AbsolutePath}' not found");
             }
         }
 
@@ -226,10 +222,6 @@ public sealed class Packager(
                     // should be rare
                     logger.Error($"Failed to pack file '{absolutePath}':{Environment.NewLine}{ex.Message}");
                 }
-            }
-            else
-            {
-                logger.Trace($"File not found: '{absolutePath}' (pk3 path: '{archivePath}')");
             }
 
             return false;

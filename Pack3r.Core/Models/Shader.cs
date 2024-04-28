@@ -3,16 +3,19 @@ using IOPath = System.IO.Path;
 
 namespace Pack3r.Models;
 
-/// <summary>
-/// x
-/// </summary>
-/// <param name="Path">Location of the shader file</param>
-/// <param name="Name">Shader name, e.g. <c>textures/common/caulk</c></param>
-public sealed record Shader(
-    ResourcePath Path,
-    ReadOnlyMemory<char> Name)
+public sealed record class ArchiveData(string ArchivePath, string EntryPath);
+
+public sealed class Shader(
+    ReadOnlyMemory<char> name,
+    string absolutePath,
+    ArchiveData? archiveData)
     : IEquatable<Shader>
 {
+    public string AbsolutePath { get; } = absolutePath;
+    public ArchiveData? ArchiveData { get; } = archiveData;
+
+    public ReadOnlyMemory<char> Name { get; } = name;
+
     /// <summary>References to texture files</summary>
     public List<ReadOnlyMemory<char>> Textures { get; } = [];
 
@@ -41,27 +44,53 @@ public sealed record Shader(
     {
         get
         {
-            var scripts = IOPath.GetDirectoryName(Path.Path.AsSpan());
+            if (ArchiveData is not null)
+                throw new NotSupportedException($"Attempting to get AssetDirectory for archived shader {AbsolutePath}");
+
+            var scripts = IOPath.GetDirectoryName(AbsolutePath.AsSpan());
             var etmainOrPk3dir = IOPath.GetDirectoryName(scripts);
             return IOPath.GetFileName(etmainOrPk3dir);
         }
     }
 
-    public string ArchivePath => _archivePath ??= IOPath.GetRelativePath(
-        IOPath.GetDirectoryName(IOPath.GetDirectoryName(Path.Path.AsSpan())).ToString(),
-        Path.Path);
+    public string DestinationPath
+    {
+        get
+        {
+            if (_destinationPath is null)
+            {
+                if (ArchiveData is null)
+                {
+                    _destinationPath = IOPath.GetRelativePath(
+                       IOPath.GetDirectoryName(IOPath.GetDirectoryName(AbsolutePath.AsSpan())).ToString(),
+                       AbsolutePath);
+                }
+                else
+                {
+                    _destinationPath = ArchiveData.EntryPath;
+                }
+            }
 
-    private string? _archivePath;
+            return _destinationPath;
+        }
+    }
+
+    private string? _destinationPath;
 
     public bool Equals(Shader? other)
     {
         return other is not null
-            && Path.Equals(other.Path)
+            && AbsolutePath.EqualsF(other.AbsolutePath)
             && ROMCharComparer.Instance.Equals(Name, other.Name);
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Path, ROMCharComparer.Instance.GetHashCode(Name));
+        return HashCode.Combine(AbsolutePath, ROMCharComparer.Instance.GetHashCode(Name));
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return Equals(obj as Shader);
     }
 }

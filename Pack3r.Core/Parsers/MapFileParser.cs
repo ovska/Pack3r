@@ -20,7 +20,6 @@ public class MapFileParser(
     PackOptions options)
     : IMapFileParser
 {
-    private const StringComparison cmp = StringComparison.OrdinalIgnoreCase;
     private readonly bool _devFiles = options.DevFiles;
 
     public async Task<MapAssets> ParseMapAssets(
@@ -205,23 +204,23 @@ public class MapFileParser(
 
                 if (key[0] == '_' && key.Length >= 4 && key[1] != 's')
                 {
-                    if (key.StartsWith("_remap", cmp))
+                    if (key.StartsWithF("_remap"))
                     {
                         var ranges = value.Split(';');
 
                         if (ranges.Count >= 2)
                             shaders.Add(value[ranges[1]]);
                     }
-                    else if (key.Equals("_fog", cmp))
+                    else if (key.EqualsF("_fog"))
                     {
                         shaders.Add(value);
                     }
-                    else if (key.Equals("_celshader", cmp))
+                    else if (key.EqualsF("_celshader"))
                     {
                         shaders.Add($"textures/{value}".AsMemory());
                     }
                 }
-                else if (key.StartsWith("model", cmp))
+                else if (key.StartsWithF("model"))
                 {
                     if (key.Length == 5)
                     {
@@ -235,23 +234,22 @@ public class MapFileParser(
                         resources.Add(value);
                     }
                 }
-                else if (key.Equals("skin", cmp) || key.Equals("_skin", cmp))
+                else if (key.EqualsF("skin") || key.EqualsF("_skin"))
                 {
                     unsupSkins.Add(currentEntity);
                     resources.Add(value);
                 }
-                else if (key.Equals("noise", cmp)
-                    || (key.Equals("sound", cmp) && IsClassName("dlight")))
+                else if (key.EqualsF("noise") || (key.EqualsF("sound") && IsClassName("dlight")))
                 {
-                    if (!value.Span.Equals("NOSOUND", cmp))
+                    if (!value.Span.EqualsF("NOSOUND"))
                         resources.Add(value);
                 }
-                else if (key.Equals("shader", cmp))
+                else if (key.EqualsF("shader"))
                 {
                     // terrains require some extra trickery
                     ROMC val = value;
                     if (entitydata.ContainsKey("terrain".AsMemory()) &&
-                        !value.Span.StartsWith("textures/", cmp))
+                        !value.Span.StartsWithF("textures/"))
                     {
                         val = $"textures/{value}".AsMemory();
                         unsupTerrains.Add(currentEntity);
@@ -259,19 +257,19 @@ public class MapFileParser(
 
                     shaders.Add(val);
                 }
-                else if (key.StartsWith("targetShader", cmp))
+                else if (key.StartsWithF("targetShader"))
                 {
-                    if (key.Equals("targetShaderName", cmp) ||
-                        key.Equals("targetShaderNewName", cmp))
+                    if (key.EqualsF("targetShaderName") ||
+                        key.EqualsF("targetShaderNewName"))
                     {
                         shaders.Add(value);
                     }
                 }
-                else if (key.Equals("sun", cmp))
+                else if (key.EqualsF("sun"))
                 {
                     shaders.Add(value);
                 }
-                else if (!hasStyleLights && key.Equals("style", cmp) && IsClassName("light"))
+                else if (!hasStyleLights && key.EqualsF("style") && IsClassName("light"))
                 {
                     hasStyleLights = true;
                 }
@@ -283,7 +281,7 @@ public class MapFileParser(
 
         bool IsClassName(string className)
         {
-            return entitydata.GetValueOrDefault("classname".AsMemory()).Span.Equals(className, cmp);
+            return entitydata.GetValueOrDefault("classname".AsMemory()).EqualsF(className);
         }
     }
 

@@ -10,15 +10,15 @@ public static class StringExtensions
     public static TextureExtension GetTextureExtension(this string path) => GetTextureExtension(path.AsSpan());
     public static TextureExtension GetTextureExtension(this ReadOnlySpan<char> path)
     {
-        ReadOnlySpan<char> extension = Path.GetExtension(path);
+        ReadOnlySpan<char> extension = path.GetExtension();
 
         if (extension.IsEmpty)
             return TextureExtension.Empty;
 
-        if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+        if (extension.EqualsF(".tga"))
             return TextureExtension.Tga;
 
-        if (extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase))
+        if (extension.EqualsF(".jpg"))
             return TextureExtension.Jpg;
 
         return TextureExtension.Other;
@@ -76,9 +76,7 @@ public static class StringExtensions
 
     public static bool MatchPrefix(in this Line line, string prefix, out ReadOnlyMemory<char> remainder)
     {
-        var span = line.Value.Span;
-
-        if (span.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        if (line.Value.StartsWithF(prefix.AsSpan()))
         {
             remainder = line.Value[prefix.Length..].Trim();
             return true;

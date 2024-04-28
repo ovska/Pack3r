@@ -10,39 +10,7 @@ using Pack3r.Models;
 using Pack3r.Progress;
 using Pack3r.Services;
 
-namespace Pack3r;
-
-public readonly struct ResourcePath : IEquatable<ResourcePath>
-{
-    public string Path { get; }
-    public ZipArchiveEntry? Entry { get; }
-
-    public ResourcePath(string archivePath, ZipArchiveEntry entry)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(archivePath);
-        ArgumentNullException.ThrowIfNull(entry);
-
-        Path = System.IO.Path.GetFullPath(System.IO.Path.Combine(archivePath, entry.FullName));
-        Entry = entry;
-    }
-
-    public ResourcePath(string absolutePath)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
-        Path = absolutePath;
-    }
-
-    public static implicit operator ResourcePath(string path) => new(path);
-    public static implicit operator string(ResourcePath resource) => resource.Path;
-
-    public bool Equals(ResourcePath other) => Path.Equals(other.Path);
-
-    public override bool Equals(object? obj) => obj is ResourcePath resourcePath && Equals(resourcePath);
-
-    public override int GetHashCode() => Path.GetHashCode();
-
-    public override string ToString() => Path;
-}
+namespace Pack3r.Parsers;
 
 public interface IShaderParser
 {
@@ -51,7 +19,12 @@ public interface IShaderParser
         CancellationToken cancellationToken);
 
     IAsyncEnumerable<Shader> Parse(
-        ResourcePath path,
+        string path,
+        CancellationToken cancellationToken);
+
+    IAsyncEnumerable<Shader> Parse(
+        string archivePath,
+        ZipArchiveEntry archiveEntry,
         CancellationToken cancellationToken);
 }
 
@@ -122,21 +95,21 @@ public class ShaderParser(
                             if (!shader.NeededInPk3 && !existing.NeededInPk3)
                                 return existing;
 
-                            if (shader.Equals(existing))
+                            if (shader.AbsolutePath.EqualsF(existing.AbsolutePath))
                             {
-                                logger.Warn($"Shader {shader.Name} found multiple times in file '{shader.Path.Path}' + {existing.Path.Path}");
+                                logger.Warn($"Shader {shader.Name} found multiple times in file '{shader.AbsolutePath}'");
                                 return existing;
                             }
 
                             var defaultDir = map.AssetDirectories[0].Name;
-                            var matchA = shader.AssetDirectory.Equals(defaultDir, StringComparison.OrdinalIgnoreCase);
-                            var matchB = existing.AssetDirectory.Equals(defaultDir, StringComparison.OrdinalIgnoreCase);
+                            var matchA = shader.AssetDirectory.EqualsF(defaultDir);
+                            var matchB = existing.AssetDirectory.EqualsF(defaultDir);
 
                             if (matchA == matchB)
                             {
                                 logger.Warn(
-                                    $"Shader {shader.Name} both in file '{shader.Path.Path}'" +
-                                    $" and '{existing.Path.Path}'");
+                                    $"Shader {shader.Name} both in file '{shader.AbsolutePath}'" +
+                                    $" and '{existing.AbsolutePath}'");
                             }
 
                             return matchA ? shader : existing;
@@ -198,9 +171,26 @@ public class ShaderParser(
         }
     }
 
-    public async IAsyncEnumerable<Shader> Parse(
-        ResourcePath path,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public IAsyncEnumerable<Shader> Parse(string path, CancellationToken cancellationToken)
+    {
+        return ParseCore(
+            path,
+            null,
+            reader.ReadLines(path, default, cancellationToken));
+    }
+
+    public IAsyncEnumerable<Shader> Parse(string archivePath, ZipArchiveEntry archiveEntry, CancellationToken cancellationToken)
+    {
+        return ParseCore(
+            Path.Combine(archivePath, archiveEntry.FullName),
+            new ArchiveData(archivePath, archiveEntry.FullName),
+            reader.ReadLines(archivePath, archiveEntry, default, cancellationToken));
+    }
+
+    private async IAsyncEnumerable<Shader> ParseCore(
+        string path,
+        ArchiveData? archiveData,
+        IAsyncEnumerable<Line> lines)
     {
         State state = State.None;
 
@@ -208,7 +198,7 @@ public class ShaderParser(
         ReadOnlyMemory<char> token;
         bool inComment = false;
 
-        await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
+        await foreach (var line in lines.ConfigureAwait(false))
         {
             if (inComment)
             {
@@ -258,7 +248,7 @@ public class ShaderParser(
                     }
                 }
 
-                shader = new Shader(path, shaderName);
+                shader = new Shader(shaderName, path, archiveData);
                 state = next;
                 continue;
             }

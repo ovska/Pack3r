@@ -6,6 +6,7 @@ using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
+using Pack3r.Parsers;
 using Pack3r.Progress;
 using Pack3r.Services;
 using Pure.DI;

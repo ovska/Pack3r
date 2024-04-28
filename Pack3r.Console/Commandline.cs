@@ -1,6 +1,7 @@
 ﻿using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
+using Pack3r.Extensions;
 using Pack3r.Logging;
 
 namespace Pack3r.Console;
@@ -129,7 +130,7 @@ internal static class Commandline
                 return;
             }
 
-            var extension = Path.GetExtension(file.FullName.AsSpan());
+            ReadOnlySpan<char> extension = file.FullName.GetExtension();
 
             if (extension.IsEmpty)
             {
@@ -141,7 +142,7 @@ internal static class Commandline
 
                 file = new FileInfo(Path.ChangeExtension(file.FullName, ".map"));
             }
-            else if (!extension.Equals(".map", StringComparison.OrdinalIgnoreCase))
+            else if (!extension.EqualsF(".map"))
             {
                 result.ErrorMessage = "File is not a .map-file";
                 return;
@@ -182,7 +183,7 @@ internal static class Commandline
                 file = new FileInfo(Path.Combine(etmain.FullName, Path.ChangeExtension(pk3Name, ".pk3")));
             }
 
-            var extension = Path.GetExtension(file.FullName.AsSpan());
+            var extension = file.FullName.GetExtension();
 
             if (extension.IsEmpty)
             {
@@ -194,8 +195,7 @@ internal static class Commandline
 
                 file = new FileInfo(Path.ChangeExtension(file.FullName, ".pk3"));
             }
-            else if (!extension.Equals(".pk3", StringComparison.OrdinalIgnoreCase)
-                && !extension.Equals(".zip", StringComparison.OrdinalIgnoreCase))
+            else if (!extension.EqualsF(".pk3") && !extension.EqualsF(".zip"))
             {
                 result.ErrorMessage = "Output file is not a .pk3 or .zip-file";
                 return;

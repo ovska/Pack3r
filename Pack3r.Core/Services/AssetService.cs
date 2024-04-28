@@ -41,8 +41,8 @@ public class AssetService(
         {
             etmainDirectory = mapsParent;
         }
-        else if (mapsParent.Name.EndsWith(".pk3dir", StringComparison.OrdinalIgnoreCase)
-            && mapsParent.Parent is { Name: "etmain" } pk3dirParent)
+        else if (mapsParent.Name.GetExtension().EqualsF(".pk3dir") &&
+            mapsParent.Parent is { Name: "etmain" } pk3dirParent)
         {
             etmainDirectory = pk3dirParent;
         }

@@ -1,43 +1,64 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Pack3r.IO;
 
 public class FSLineReader() : ILineReader
 {
-    public async IAsyncEnumerable<Line> ReadLines(
-        ResourcePath path,
+    public IAsyncEnumerable<Line> ReadLines(
+        string archivePath,
+        ZipArchiveEntry entry,
+        LineOptions options,
+        CancellationToken cancellationToken)
+    {
+        return ReadLinesCore(archivePath, entry.Open(), options, cancellationToken);
+    }
+
+    public IAsyncEnumerable<Line> ReadLines(
+        string path,
+        LineOptions options,
+        CancellationToken cancellationToken)
+    {
+        FileStream stream = new(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: Path.HasExtension(".map") ? 4096 * 16 : 4096,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+        return ReadLinesCore(path, stream, options, cancellationToken);
+    }
+
+    private static async IAsyncEnumerable<Line> ReadLinesCore(
+        string path,
+        Stream source,
         LineOptions options,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         int index = 0;
 
-        int bufferSize = Path.GetExtension(path.Path.AsSpan()).Equals(".map", StringComparison.OrdinalIgnoreCase)
-            ? 4096 * 16
-            : 4096;
-
-        using var reader = new StreamReader(
-                 path.Entry?.Open() ?? new FileStream(
-                    path.Path,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read,
-                    bufferSize: bufferSize,
-                    FileOptions.Asynchronous | FileOptions.SequentialScan),
-                Encoding.UTF8,
-                detectEncodingFromByteOrderMarks: true);
-
-        string? line;
-
-        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
+        await using (source)
         {
-            if (line.Length == 0 && !options.KeepEmpty)
-                continue;
+            using var reader = new StreamReader(
+                    source,
+                    Encoding.UTF8,
+                    detectEncodingFromByteOrderMarks: true,
+                    bufferSize: -1);
 
-            var obj = new Line(path.Path, ++index, line, options.KeepRaw);
+            string? line;
 
-            if (obj.HasValue || options.KeepEmpty)
-                yield return obj;
+            while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
+            {
+                if (line.Length == 0 && !options.KeepEmpty)
+                    continue;
+
+                var obj = new Line(path, ++index, line, options.KeepRaw);
+
+                if (obj.HasValue || options.KeepEmpty)
+                    yield return obj;
+            }
         }
     }
 }
