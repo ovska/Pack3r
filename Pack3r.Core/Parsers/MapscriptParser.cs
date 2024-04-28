@@ -1,11 +1,10 @@
 ﻿using System.Runtime.CompilerServices;
-using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
 
-namespace Pack3r;
+namespace Pack3r.Parsers;
 
 public class MapscriptParser(
     ILineReader reader,

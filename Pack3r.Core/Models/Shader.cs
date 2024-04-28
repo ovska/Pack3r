@@ -45,7 +45,7 @@ public sealed class Shader(
         get
         {
             if (ArchiveData is not null)
-                throw new NotSupportedException($"Attempting to get AssetDirectory for archived shader {AbsolutePath}");
+                return IOPath.GetFileName(ArchiveData.ArchivePath);
 
             var scripts = IOPath.GetDirectoryName(AbsolutePath.AsSpan());
             var etmainOrPk3dir = IOPath.GetDirectoryName(scripts);

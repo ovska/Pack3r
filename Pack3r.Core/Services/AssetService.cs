@@ -1,23 +1,16 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO;
-using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
+using Pack3r.Parsers;
 
 namespace Pack3r.Services;
 
-public sealed class PackingData
-{
-    public required Map Map { get; init; }
-    public required Pk3Contents Pak0 { get; init; }
-}
-
 public interface IAssetService
 {
-    Task<PackingData> GetPackingData(CancellationToken cancellationToken);
+    Task<Map> GetPackingData(CancellationToken cancellationToken);
 }
 
 public class AssetService(
@@ -28,35 +21,23 @@ public class AssetService(
     IEnumerable<IResourceParser> resourceParsers)
     : IAssetService
 {
-    public async Task<PackingData> GetPackingData(CancellationToken cancellationToken)
+    public async Task<Map> GetPackingData(CancellationToken cancellationToken)
     {
         if (options.MapFile.Directory is not { Name: "maps", Parent: DirectoryInfo mapsParent })
         {
             throw new EnvironmentException($".map file not in maps-directory: '{options.MapFile.FullName}'");
         }
 
-        DirectoryInfo etmainDirectory;
-
-        if (mapsParent.Name is "etmain")
+        DirectoryInfo etmainDirectory = mapsParent switch
         {
-            etmainDirectory = mapsParent;
-        }
-        else if (mapsParent.Name.GetExtension().EqualsF(".pk3dir") &&
-            mapsParent.Parent is { Name: "etmain" } pk3dirParent)
-        {
-            etmainDirectory = pk3dirParent;
-        }
-        else
-        {
-            throw new EnvironmentException($"maps-directory should be in etmain or a pk3dir in etmain: '{options.MapFile.FullName}'");
-        }
-
-        // start pak0 parse task in background
-        var pk3task = GetBuiltinContents(etmainDirectory, cancellationToken);
+            { Name: "etmain" } => mapsParent,
+            { Parent: { Name: "etmain" } pk3dirParent } when mapsParent.Name.HasExtension(".pk3dir") => pk3dirParent,
+            _ => throw new EnvironmentException($"maps-directory should be in etmain or a pk3dir in etmain: '{options.MapFile.FullName}'"),
+        };
 
         MapAssets assets = await mapFileParser.ParseMapAssets(options.MapFile.FullName, cancellationToken).ConfigureAwait(false);
 
-        Map map = new()
+        Map map = new(options)
         {
             Name = Path.GetFileNameWithoutExtension(options.MapFile.FullName),
             Path = options.MapFile.FullName,
@@ -92,11 +73,7 @@ public class AssetService(
             (resource.IsShader ? map.Shaders : map.Resources).Add(resource.Value);
         }
 
-        return new PackingData
-        {
-            Map = map,
-            Pak0 = await pk3task.ConfigureAwait(false),
-        };
+        return map;
     }
 
     private async Task<Pk3Contents> GetBuiltinContents(
@@ -148,8 +125,7 @@ public class AssetService(
                     return await pk3Reader.ReadPk3(path, cancellationToken);
                 }
             }
-            catch (FileNotFoundException) { }
-            catch (DirectoryNotFoundException) { }
+            catch (IOException) { }
 
             return null;
         }

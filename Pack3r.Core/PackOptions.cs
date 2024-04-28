@@ -16,4 +16,8 @@ public class PackOptions
     public bool Overwrite { get; set; }
     public string? ETJumpDir { get; set; }
     public LogLevel LogLevel { get; set; } = LogLevel.Debug;
+
+    public bool Pure { get; set; }
+    public bool LoadPk3s { get; set; }
+    public List<string> ExcludedPk3s { get; set; } = ["pak0.pk3"];
 }

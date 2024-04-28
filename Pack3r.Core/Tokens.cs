@@ -14,6 +14,9 @@ public static partial class Tokens
     [GeneratedRegex("""^scripts[/\\][^\.]+.shader$""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
     public static partial Regex ShaderPath();
 
+    [GeneratedRegex("""\.(tga|jpg|mdc|md3|ase|shader|wav|roq|skin)$""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
+    public static partial Regex PackableFile();
+
     public static readonly SearchValues<char> Braces = SearchValues.Create("{}");
     public static readonly SearchValues<char> SpaceOrTab = SearchValues.Create(" \t");
 }

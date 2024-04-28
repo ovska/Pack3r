@@ -29,6 +29,10 @@ public sealed class AppLifetime : IDisposable
     {
         bool dontDrain = false;
 
+        try
+        { _cts.Cancel(); }
+        catch (AggregateException) { }
+
         if (ex is OperationCanceledException && _cts.IsCancellationRequested)
         {
             _logger.Exception(null, "Operation was canceled by the user");

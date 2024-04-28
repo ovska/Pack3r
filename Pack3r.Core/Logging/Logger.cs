@@ -20,8 +20,26 @@ public sealed class LoggerBase : ILogger
         LogLevel Level,
         string Message,
         string? Context)
+        : IComparable<LogMessage>
     {
         public readonly long Timestamp = Stopwatch.GetTimestamp();
+
+        public int CompareTo(LogMessage other)
+        {
+            int cmp = Level.CompareTo(other.Level);
+
+            if (cmp == 0)
+            {
+                cmp = string.CompareOrdinal(Context, other.Context);
+            }
+
+            if (cmp == 0)
+            {
+                cmp = Timestamp.CompareTo(other.Timestamp);
+            }
+
+            return cmp;
+        }
     }
 
     private readonly LogLevel _minimumLogLevel;
@@ -69,9 +87,10 @@ public sealed class LoggerBase : ILogger
     {
         lock (Global.ConsoleLock)
         {
-            var messages = _messages.ToArray();
+            Span<LogMessage> messages = [.._messages];
+            messages.Sort();
 
-            foreach (var message in _messages.OrderBy(m => (int)m.Level).ThenBy(x => x.Context).ThenBy(x => x.Timestamp))
+            foreach (var message in messages)
             {
                 LogInternalNoLock(message.Level, message.Message, message.Context);
             }

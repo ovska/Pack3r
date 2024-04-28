@@ -3,7 +3,7 @@ using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Models;
 
-namespace Pack3r.Core.Parsers;
+namespace Pack3r.Parsers;
 
 public class SpeakerScriptParser(
     ILineReader reader) : IResourceParser

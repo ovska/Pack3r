@@ -2,10 +2,10 @@
 using System.Text.Json.Serialization.Metadata;
 using Pack3r;
 using Pack3r.Console;
-using Pack3r.Core.Parsers;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
+using Pack3r.Models;
 using Pack3r.Parsers;
 using Pack3r.Progress;
 using Pack3r.Services;
@@ -57,25 +57,25 @@ static async Task<int> Execute(PackOptions options, CancellationToken systemToke
                 app.Logger.System($"Running asset discovery for '{mapName}' in '{mapsDir}' without creating a pk3");
             }
 
+            Stream destination;
             var timer = Stopwatch.StartNew();
 
-            PackingData data = await app.AssetService.GetPackingData(cancellationToken);
-
-            Stream destination;
-
-            if (!options.DryRun)
+            using (Map map = await app.AssetService.GetPackingData(cancellationToken))
             {
-                destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
-            }
-            else
-            {
-                options.Pk3File = null!;
-                destination = new CountingStream();
-            }
+                if (!options.DryRun)
+                {
+                    destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
+                }
+                else
+                {
+                    options.Pk3File = null!;
+                    destination = new CountingStream();
+                }
 
-            await using (destination)
-            {
-                await app.Packager.CreateZip(data, destination, cancellationToken);
+                await using (destination)
+                {
+                    await app.Packager.CreateZip(map, destination, cancellationToken);
+                }
             }
 
             timer.Stop();

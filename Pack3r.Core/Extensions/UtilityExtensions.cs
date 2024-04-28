@@ -4,14 +4,14 @@ namespace Pack3r.Extensions;
 
 public static class UtilityExtensions
 {
-    private const StringComparison fscmp = StringComparison.OrdinalIgnoreCase;
+    private const StringComparison cmp = StringComparison.OrdinalIgnoreCase;
 
     public static bool HasExtension(this string file, ReadOnlySpan<char> extension) => HasExtension(file.AsSpan(), extension);
     public static bool HasExtension(this ReadOnlyMemory<char> file, ReadOnlySpan<char> extension) => HasExtension(file.Span, extension);
 
     public static bool HasExtension(this ReadOnlySpan<char> file, ReadOnlySpan<char> extension)
     {
-        return Path.GetExtension(file).EqualsF(extension);
+        return Path.GetExtension(file).Equals(extension, cmp);
     }
 
     public static ReadOnlySpan<char> GetExtension(this string file) => GetExtension(file.AsSpan());
@@ -27,7 +27,7 @@ public static class UtilityExtensions
 
     public static bool EqualsF(this ReadOnlySpan<char> value, ReadOnlySpan<char> other)
     {
-        return value.Equals(other, fscmp);
+        return value.Equals(other, cmp);
     }
 
     public static bool StartsWithF(this string value, ReadOnlySpan<char> other) => StartsWithF(value.AsSpan(), other);
@@ -35,7 +35,7 @@ public static class UtilityExtensions
 
     public static bool StartsWithF(this ReadOnlySpan<char> value, ReadOnlySpan<char> other)
     {
-        return value.StartsWith(other, fscmp);
+        return value.StartsWith(other, cmp);
     }
 
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "get_Text")]

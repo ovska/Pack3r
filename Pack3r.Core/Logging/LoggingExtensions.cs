@@ -9,7 +9,7 @@ public static class LoggingExtensions
         string prefix,
         string raw)
     {
-        logger.Warn($"Unparsable keyword '{prefix}' on line {index} in file {path}: {raw}");
+        logger.Warn($"Unparsable keyword '{prefix}' on line {index} in file '{path}': {raw}");
     }
 
     public static bool CheckAndLogTimestampWarning(

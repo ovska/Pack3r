@@ -1,4 +1,4 @@
-﻿using Pack3r.Core.Parsers;
+﻿using Pack3r.Parsers;
 
 namespace Pack3r.Tests;
 

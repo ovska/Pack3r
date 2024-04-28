@@ -2,20 +2,18 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO.Compression;
-using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Progress;
-using Pack3r.Services;
 
 namespace Pack3r.Parsers;
 
 public interface IShaderParser
 {
     Task<Dictionary<ReadOnlyMemory<char>, Shader>> GetReferencedShaders(
-        PackingData data,
+        Map map,
         CancellationToken cancellationToken);
 
     IAsyncEnumerable<Shader> Parse(
@@ -36,64 +34,71 @@ public class ShaderParser(
     : IShaderParser
 {
     public async Task<Dictionary<ReadOnlyMemory<char>, Shader>> GetReferencedShaders(
-        PackingData data,
+        Map map,
         CancellationToken cancellationToken)
     {
-        var scriptsDirs = data.Map.AssetDirectories
-            .Select(a => a.EnumerateDirectories("scripts", SearchOption.TopDirectoryOnly).SingleOrDefault())
-            .OfType<DirectoryInfo>()
-            .ToList();
-
-        if (scriptsDirs.Count == 0)
-        {
-            throw new EnvironmentException(
-                $"Could not find 'scripts'-folder(s) in: {string.Join(", ", data.Map.AssetDirectories.Select(d => d.FullName))}");
-        }
-
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders = new(ROMCharComparer.Instance);
 
-        var whitelist = await ParseShaderLists(scriptsDirs, cancellationToken);
+        var whitelistsBySource = await ParseShaderLists(map, cancellationToken);
         int shaderFileCount = 0;
 
-        using (var progress = progressManager.Create("Processing shader files", max: null))
+        using (var progress = progressManager.Create($"Parsing shaders files from {map.AssetSources.Length} source(s)", max: null))
         {
-            var allShaderFiles = scriptsDirs.SelectMany(dir => dir.EnumerateFiles("*.shader", SearchOption.AllDirectories));
-
-            await Parallel.ForEachAsync(allShaderFiles, cancellationToken, async (file, ct) =>
+            await Parallel.ForEachAsync(map.AssetSources, cancellationToken, async (source, ct) =>
             {
-                int currentCount = Interlocked.Increment(ref shaderFileCount);
-                progress.Report(currentCount);
+                var whitelist = whitelistsBySource.GetValueOrDefault(source);
 
-                if (whitelist?.Contains(file.FullName) == false)
+                bool skipPredicate(string name)
                 {
-                    logger.Debug($"Skipped shader parsing from file {file.Name} (not in shaderlist)");
-                    return;
+                    progress.Report(Interlocked.Increment(ref shaderFileCount));
+
+                    var fileName = Path.GetFileNameWithoutExtension(name);
+
+                    if (whitelist?.Contains(fileName.AsMemory()) == false)
+                    {
+                        logger.Debug($"Skipped parsing shaders from {name} (not in shaderlist)");
+                        return true;
+                    }
+
+                    if (fileName.EqualsF("q3shadersCopyForRadiant.shader"))
+                    {
+                        logger.Debug($"Skipped parsing Radiant specific file {name}");
+                        return true;
+                    }
+
+                    if (fileName.StartsWithF("q3map_"))
+                    {
+                        logger.Debug($"Skipped shader parsing from compiler generated file {fileName}");
+                        return true;
+                    }
+
+                    return false;
                 }
 
-                if (file.Name.Equals("q3shadersCopyForRadiant.shader"))
-                {
-                    logger.Debug($"Skipped parsing Radiant specific file {file.Name}");
-                    return;
-                }
-
-                if (file.Name.StartsWith("q3map_"))
-                {
-                    logger.Debug($"Skipped shader parsing from compiler generated file {file.Name}");
-                    return;
-                }
-
-                await foreach (var shader in Parse(file.FullName, ct).ConfigureAwait(false))
+                await foreach (var shader in source.EnumerateShaders(this, skipPredicate, ct))
                 {
                     allShaders.AddOrUpdate(
                         shader.Name,
                         static (_, tuple) => tuple.shader,
                         static (_, existing, tuple) =>
                         {
-                            var (shader, logger, map) = tuple;
+                            var (shader, logger, map, options) = tuple;
 
                             // compile time shader, ignore
                             if (!shader.NeededInPk3 && !existing.NeededInPk3)
                                 return existing;
+
+                            var fromArchiveShader = shader.ArchiveData is not null;
+                            var fromArchiveExisting = existing.ArchiveData is not null;
+
+                            if (fromArchiveExisting != fromArchiveShader)
+                            {
+                                return options.Pure
+                                    ? (fromArchiveExisting ? existing : shader)
+                                    : (fromArchiveShader ? existing : shader);
+                            }
+
+                            // TODO
 
                             if (shader.AbsolutePath.EqualsF(existing.AbsolutePath))
                             {
@@ -101,6 +106,7 @@ public class ShaderParser(
                                 return existing;
                             }
 
+                            // TODO: better ordering
                             var defaultDir = map.AssetDirectories[0].Name;
                             var matchA = shader.AssetDirectory.EqualsF(defaultDir);
                             var matchB = existing.AssetDirectory.EqualsF(defaultDir);
@@ -114,16 +120,18 @@ public class ShaderParser(
 
                             return matchA ? shader : existing;
                         },
-                        (shader, logger, data.Map));
+                        (shader, logger, map, options));
                 }
             }).ConfigureAwait(false);
         }
 
+        logger.Debug($"Parsed total of {allShaders.Count} shaders");
+
         var included = new Dictionary<ReadOnlyMemory<char>, Shader>(ROMCharComparer.Instance);
 
         AddShaders(
-            data,
-            data.Map.Shaders.GetEnumerator(),
+            map,
+            map.Shaders,
             allShaders,
             included,
             cancellationToken);
@@ -131,22 +139,16 @@ public class ShaderParser(
         return included;
     }
 
-    private void AddShaders<TEnumerator>(
-        PackingData data,
-        TEnumerator enumerator,
+    private static void AddShaders(
+        Map map,
+        IEnumerable<ReadOnlyMemory<char>> shaders,
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders,
         Dictionary<ReadOnlyMemory<char>, Shader> included,
         CancellationToken cancellationToken)
-        where TEnumerator : IEnumerator<ReadOnlyMemory<char>>
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        while (enumerator.MoveNext())
+        foreach (var name in shaders)
         {
-            ReadOnlyMemory<char> name = enumerator.Current;
-
-            if (data.Pak0.Shaders.Contains(name))
-                continue;
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (included.ContainsKey(name))
                 continue;
@@ -162,8 +164,8 @@ public class ShaderParser(
             if (shader.Shaders.Count != 0)
             {
                 AddShaders(
-                    data,
-                    shader.Shaders.GetEnumerator(),
+                    map,
+                    shader.Shaders,
                     allShaders,
                     included,
                     cancellationToken);
@@ -420,42 +422,47 @@ public class ShaderParser(
         }
     }
 
-    private async Task<HashSet<string>?> ParseShaderLists(
-        IEnumerable<DirectoryInfo> scriptsDirs,
+    private async Task<Dictionary<AssetSource, HashSet<ReadOnlyMemory<char>>>> ParseShaderLists(
+        Map map,
         CancellationToken cancellationToken)
     {
         if (!options.ShaderlistOnly)
-            return null;
+            return [];
 
-        var allowedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var dict = new Dictionary<AssetSource, HashSet<ReadOnlyMemory<char>>>();
 
-        foreach (var dir in scriptsDirs)
+        foreach (var source in map.AssetSources)
         {
+            var shaderlist = source.GetShaderlist();
+
+            if (shaderlist is null)
+                continue;
+
             try
             {
-                var shaderlistPath = Path.Combine(dir.FullName, "shaderlist.txt");
-
-                if (!File.Exists(shaderlistPath))
+                if (!shaderlist.Exists)
                 {
-                    logger.Debug($"Shaderlist skipped, does not exist in {dir.FullName}");
+                    logger.Debug($"Shaderlist skipped, does not exist in {shaderlist.FullName}");
                     continue;
                 }
 
-                await foreach (var line in reader.ReadLines(shaderlistPath, default, cancellationToken))
+                HashSet<ReadOnlyMemory<char>> allowedFiles = new(ROMCharComparer.Instance);
+
+                await foreach (var line in reader.ReadLines(shaderlist.FullName, default, cancellationToken))
                 {
-                    allowedFiles.Add(Path.Combine(dir.FullName, $"{line}.shader"));
+                    allowedFiles.Add(line.Value);
                 }
 
-                return allowedFiles;
+                dict.Add(source, allowedFiles);
             }
             catch (Exception e)
             {
-                logger.Exception(e, $"Could not read shaderlist.txt in {dir.FullName}");
+                logger.Exception(e, $"Could not read shaderlist '{shaderlist.FullName}'");
                 throw new ControlledException();
             }
         }
 
-        return allowedFiles;
+        return dict;
     }
 
     private static readonly ImmutableArray<string> _skySuffixes =

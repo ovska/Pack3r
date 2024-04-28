@@ -15,7 +15,7 @@ public sealed class ConsoleProgressMeter : IProgressMeter
     private uint _lastSpin;
 
     private static readonly char[] _spinner = ['-', '\\', '|', '/'];
-    private static readonly TimeSpan _frequency = TimeSpan.FromMilliseconds(50);
+    private static readonly TimeSpan _frequency = TimeSpan.FromMilliseconds(100);
 
     private char Spin => _spinner[_lastSpin++ % _spinner.Length];
 

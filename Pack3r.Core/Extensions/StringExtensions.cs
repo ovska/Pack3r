@@ -1,4 +1,5 @@
 ﻿using Pack3r.Extensions;
+using Pack3r.IO;
 
 namespace Pack3r.Extensions;
 
@@ -6,6 +7,18 @@ public enum TextureExtension { Empty = 0, Other, Tga, Jpg }
 
 public static class StringExtensions
 {
+    public static ReadOnlyMemory<char> ChangeExtension(this ReadOnlyMemory<char> file, ReadOnlySpan<char> extension)
+    {
+        int extensionLength = file.GetExtension().Length;
+
+        var withoutExtension = file[..^extensionLength];
+
+        if (extension.IsEmpty)
+            return withoutExtension;
+
+        return $"{withoutExtension.Span}{extension}".AsMemory();
+    }
+
     public static TextureExtension GetTextureExtension(this ReadOnlyMemory<char> path) => GetTextureExtension(path.Span);
     public static TextureExtension GetTextureExtension(this string path) => GetTextureExtension(path.AsSpan());
     public static TextureExtension GetTextureExtension(this ReadOnlySpan<char> path)

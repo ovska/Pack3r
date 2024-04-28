@@ -1,4 +1,5 @@
 ﻿using Pack3r.Extensions;
+using Pack3r.IO;
 
 namespace Pack3r.Tests.ExtensionTests;
 
@@ -53,5 +54,24 @@ public static class MemoryTests
     public static void Should_Check_For_Shader_File(string input, bool expected)
     {
         Assert.Equal(expected, Tokens.ShaderPath().IsMatch(input));
+    }
+
+    [Theory]
+    [InlineData("test.tga", true)]
+    [InlineData("test.jpg", true)]
+    [InlineData("test.mdc", true)]
+    [InlineData("test.md3", true)]
+    [InlineData("test.ase", true)]
+    [InlineData("test.shader", true)]
+    [InlineData("test.wav", true)]
+    [InlineData("test.roq", true)]
+    [InlineData("test.skin", true)]
+    [InlineData("test.dat", false)]
+    [InlineData("test.cfg", false)]
+    [InlineData("test.menu", false)]
+    [InlineData("test.weap", false)]
+    public static void Should_Return_Packable_Files(string input, bool expected)
+    {
+        Assert.Equal(expected, Tokens.PackableFile().IsMatch(input));
     }
 }

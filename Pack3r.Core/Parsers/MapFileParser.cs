@@ -5,7 +5,7 @@ using Pack3r.Logging;
 using Pack3r.Models;
 using ROMC = System.ReadOnlyMemory<char>;
 
-namespace Pack3r.Core.Parsers;
+namespace Pack3r.Parsers;
 
 public interface IMapFileParser
 {

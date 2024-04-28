@@ -1,16 +1,15 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
+using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Parsers;
 using Pack3r.Progress;
-using Pack3r.Services;
 
-namespace Pack3r;
+namespace Pack3r.Services;
 
 public sealed class Packager(
     ILogger<Packager> logger,
@@ -19,20 +18,18 @@ public sealed class Packager(
     IShaderParser shaderParser)
 {
     public async Task CreateZip(
-        PackingData data,
+        Map map,
         Stream destination,
         CancellationToken cancellationToken)
     {
-        Map map = data.Map;
-
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
 
-        var shadersByName = await shaderParser.GetReferencedShaders(data, cancellationToken);
+        var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
 
         // contains both actual and alternate files added
-        HashSet<ReadOnlyMemory<char>> addedFiles = new(ROMCharComparer.Instance);
+        HashSet<ReadOnlyMemory<char>> handledFiles = new(ROMCharComparer.Instance);
         HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
-        List<(string absolute, string archive)> includedFiles = [];
+        List<(string source, ReadOnlyMemory<char> relative)> includedFiles = [];
 
         FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
         AddCompileFile(bsp.FullName);
@@ -48,7 +45,7 @@ public sealed class Packager(
         if (lightmapDir.Exists && lightmapDir.GetFiles("lm_????.tga") is { Length: > 0 } lmFiles)
         {
             bool timestampWarned = false;
-            using var progress = progressManager.Create("Packing lightmaps", lmFiles.Length);
+            using var progress = progressManager.Create("Compressing lightmaps", lmFiles.Length);
 
             for (int i = 0; i < lmFiles.Length; i++)
             {
@@ -61,38 +58,39 @@ public sealed class Packager(
         }
         else
         {
-            logger.Debug($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
+            logger.Info($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
         }
 
-        using (var progress = progressManager.Create("Packing resources", data.Map.Resources.Count))
+        using (var progress = progressManager.Create("Compressing resources", map.Resources.Count))
         {
             int count = 1;
 
-            foreach (var resource in data.Map.Resources)
+            foreach (var resource in map.Resources)
             {
                 progress.Report(count++);
 
-                if (data.Pak0.Resources.Contains(resource) || addedFiles.Contains(resource))
+                if (handledFiles.Contains(resource) || map.Pak0.Contains(resource))
                 {
                     continue;
                 }
 
-                AddFileRelative(resource.ToString());
+                AddFileRelative(resource);
             }
         }
 
         bool styleLights = map.HasStyleLights;
 
-        using (var progress = progressManager.Create("Packing files referenced by shaders", data.Map.Shaders.Count))
+        using (var progress = progressManager.Create("Compressing files referenced by shaders", map.Shaders.Count))
         {
             int count = 1;
 
-            foreach (var shaderName in data.Map.Shaders)
+            foreach (var shaderName in map.Shaders)
             {
                 progress.Report(count++);
 
-                if (data.Pak0.Shaders.Contains(shaderName))
-                    continue;
+                // TODO
+                // if (data.Pak0.Shaders.Contains(shaderName))
+                //     continue;
 
                 // already handled
                 if (!handledShaders.Add(shaderName))
@@ -101,7 +99,7 @@ public sealed class Packager(
                 if (!shadersByName.TryGetValue(shaderName, out Shader? shader))
                 {
                     // might just be a texture without a shader
-                    AddTexture(shaderName.ToString());
+                    AddFileRelative(shaderName);
                     continue;
                 }
 
@@ -110,28 +108,28 @@ public sealed class Packager(
                 if (!shader.NeededInPk3)
                     continue;
 
-                if (!addedFiles.Contains(shader.DestinationPath.AsMemory()))
+                if (!handledFiles.Contains(shader.DestinationPath.AsMemory()))
                     AddShaderFile(shader);
 
                 if (shader.ImplicitMapping is { } implicitMapping)
                 {
-                    AddTexture(implicitMapping.ToString());
+                    AddFileRelative(implicitMapping);
                 }
 
                 foreach (var file in shader.Files)
                 {
-                    if (data.Pak0.Resources.Contains(file) || addedFiles.Contains(file))
+                    if (map.Pak0.Contains(file) || handledFiles.Contains(file))
                         continue;
 
-                    AddFileRelative(file.ToString());
+                    AddFileRelative(file);
                 }
 
                 foreach (var file in shader.Textures)
                 {
-                    if (data.Pak0.Resources.Contains(file) || addedFiles.Contains(file))
+                    if (map.Pak0.Contains(file) || handledFiles.Contains(file))
                         continue;
 
-                    AddTexture(file.ToString());
+                    AddFileRelative(file);
                 }
             }
         }
@@ -154,9 +152,9 @@ public sealed class Packager(
 
         if (options.LogLevel == LogLevel.Debug)
         {
-            foreach (var (abs, arch) in includedFiles.Order())
+            foreach (var (abs, arch) in includedFiles.OrderBy(x => x.relative, ROMCharComparer.Instance))
             {
-                logger.Debug($"File packed: '{arch}' (from: {abs})");
+                logger.Debug($"File packed: '{arch}' from '{abs}'");
             }
         }
 
@@ -165,7 +163,7 @@ public sealed class Packager(
 
         void AddCompileFile(string absolutePath)
         {
-            if (!TryAddFileCore(
+            if (!TryAddFileAbsolute(
                 archivePath: map.GetArchivePath(absolutePath),
                 absolutePath))
             {
@@ -175,7 +173,27 @@ public sealed class Packager(
 
         void AddShaderFile(Shader shader)
         {
-            if (!TryAddFileCore(
+            if (shader.ArchiveData is not null)
+            {
+                foreach (var source in map.AssetSources)
+                {
+                    if (source.RootPath.EqualsF(shader.ArchiveData.ArchivePath))
+                    {
+                        if (source is Pk3AssetSource { IsBuiltin: true })
+                            return;
+
+                        if (TryAddFileFromSource(source, shader.ArchiveData.EntryPath.AsMemory()))
+                            return;
+
+                        OnFailedAddFile(false, $"Failed to add shader file: {shader.AbsolutePath}");
+                        return;
+                    }
+                }
+
+                throw new UnreachableException($"Shader '{shader.AbsolutePath}' not in source(s)");
+            }
+
+            if (!TryAddFileAbsolute(
                 archivePath: shader.DestinationPath,
                 absolutePath: shader.AbsolutePath))
             {
@@ -183,116 +201,81 @@ public sealed class Packager(
             }
         }
 
-        void AddFileRelative(string relative)
+        void AddFileRelative(ReadOnlyMemory<char> relativePath)
         {
-            foreach (var dir in map.AssetDirectories)
+            foreach (var source in map.AssetSources)
             {
-                if (TryAddFileCore(relative, Path.Combine(dir.FullName, relative)))
+                if (TryAddFileFromSource(source, relativePath))
                     return;
             }
 
-            OnFailedAddFile(false, $"File '{relative}' not found in etmain or pk3dirs");
+            OnFailedAddFile(false, $"File '{relativePath}' not found in etmain or pk3dirs");
         }
 
-        bool TryAddFileCore(
-            string archivePath,
-            string absolutePath)
+        bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (File.Exists(absolutePath))
+            Exception ex;
+
+            try
             {
-                Exception ex;
+                if (!source.TryHandleAsset(archive, relativePath, out var entry))
+                    return false;
 
-                try
-                {
-                    archive!.CreateEntryFromFile(sourceFileName: absolutePath, entryName: archivePath);
-                    addedFiles.Add(archivePath.AsMemory());
-                    includedFiles.Add((absolutePath, archivePath));
-                    return true;
-                }
-                catch (IOException ioex) { ex = ioex; }
+                handledFiles.Add(relativePath);
 
-                if (options.LogLevel == LogLevel.Trace)
+                if (entry is not null)
                 {
-                    logger.Exception(ex, "Failed to copy an existing file");
+                    includedFiles.Add((source.ToString()!, relativePath));
                 }
-                else
-                {
-                    // should be rare
-                    logger.Error($"Failed to pack file '{absolutePath}':{Environment.NewLine}{ex.Message}");
-                }
+
+                return true;
+            }
+            catch (IOException ioex) { ex = ioex; }
+
+            if (options.LogLevel == LogLevel.Trace)
+            {
+                logger.Exception(ex, $"Failed to pack file '{relativePath}' from source {source}");
+            }
+            else
+            {
+                logger.Error($"Failed to pack file '{relativePath}' from source {source}");
             }
 
             return false;
         }
 
-        bool TryAddRelative(string relative)
+        bool TryAddFileAbsolute(string archivePath, string absolutePath)
         {
-            foreach (var dir in map.AssetDirectories)
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!File.Exists(absolutePath))
             {
-                if (TryAddFileCore(
-                    archivePath: relative,
-                    absolutePath: Path.Combine(dir.FullName, relative)))
-                {
-                    return true;
-                }
+                return false;
+            }
+
+            Exception ex;
+
+            try
+            {
+                archive.CreateEntryFromFile(absolutePath, archivePath);
+                handledFiles.Add(archivePath.AsMemory());
+                includedFiles.Add((absolutePath, archivePath.AsMemory()));
+                return true;
+            }
+            catch (IOException ioex) { ex = ioex; }
+
+            if (options.LogLevel == LogLevel.Trace)
+            {
+                logger.Exception(ex, $"Failed to pack file '{archivePath}' from path: '{absolutePath}'");
+            }
+            else
+            {
+                logger.Error($"Failed to pack file '{archivePath}' from path: '{absolutePath}'");
             }
 
             return false;
-        }
-
-        void AddTexture(string name)
-        {
-            bool tgaAttempted = false;
-
-            TextureExtension extension = name.GetTextureExtension();
-
-            if (extension is TextureExtension.Empty or TextureExtension.Tga)
-            {
-                goto TryAddTga;
-            }
-            else if (extension is TextureExtension.Jpg)
-            {
-                goto TryAddJpeg;
-            }
-
-            goto Fail;
-
-            TryAddTga:
-            string tga = Path.ChangeExtension(name, ".tga");
-            tgaAttempted = true;
-
-            if (data.Pak0.Resources.Contains(tga.AsMemory()) || addedFiles.Contains(tga.AsMemory()))
-            {
-                return;
-            }
-
-            if (TryAddRelative(tga))
-            {
-                // consider the original texture added as well
-                addedFiles.Add(name.AsMemory());
-                return;
-            }
-
-            TryAddJpeg:
-            string jpg = Path.ChangeExtension(name, ".jpg");
-
-            if (data.Pak0.Resources.Contains(jpg.AsMemory()) || addedFiles.Contains(jpg.AsMemory()))
-            {
-                return;
-            }
-
-            if (TryAddRelative(jpg))
-            {
-                // consider the original texture added as well
-                addedFiles.Add(name.AsMemory());
-                return;
-            }
-
-            Fail:
-            string detail = tgaAttempted ? " (no .tga or .jpg found)" : "";
-            OnFailedAddFile(false, $"Missing texture reference{detail}: {name}");
         }
     }
 
