@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -18,7 +19,10 @@ public sealed class LoggerBase : ILogger
     private readonly record struct LogMessage(
         LogLevel Level,
         string Message,
-        string? Context);
+        string? Context)
+    {
+        public readonly long Timestamp = Stopwatch.GetTimestamp();
+    }
 
     private readonly LogLevel _minimumLogLevel;
 
@@ -67,7 +71,7 @@ public sealed class LoggerBase : ILogger
         {
             var messages = _messages.ToArray();
 
-            foreach (var message in _messages.OrderBy(m => (int)m.Level).ThenBy(x => x.Context))
+            foreach (var message in _messages.OrderBy(m => (int)m.Level).ThenBy(x => x.Context).ThenBy(x => x.Timestamp))
             {
                 LogInternalNoLock(message.Level, message.Message, message.Context);
             }
