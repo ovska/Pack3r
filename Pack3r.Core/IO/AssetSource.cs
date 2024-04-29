@@ -1,4 +1,5 @@
 ﻿using System.IO.Compression;
+using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
 
@@ -42,5 +43,15 @@ public abstract class AssetSource : IDisposable
             entry = null;
             return false;
         }
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj?.GetType() == GetType() && RootPath.EqualsF((obj as AssetSource)?.RootPath);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(GetType(), RootPath);
     }
 }

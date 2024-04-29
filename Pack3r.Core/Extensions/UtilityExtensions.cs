@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace Pack3r.Extensions;
 
@@ -36,6 +37,26 @@ public static class UtilityExtensions
     public static bool StartsWithF(this ReadOnlySpan<char> value, ReadOnlySpan<char> other)
     {
         return value.StartsWith(other, cmp);
+    }
+
+    public static bool TryPickOne<TState, TItem>(
+        TState state,
+        TItem a,
+        TItem b,
+        Func<TState, TItem, bool> predicate,
+        [NotNullWhen(true)] out TItem item)
+    {
+        var fora = predicate(state, a);
+        var forb = predicate(state, b);
+
+        if (fora == forb)
+        {
+            item = default!;
+            return false;
+        }
+
+        item = (fora ? a : b)!;
+        return true;
     }
 
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "get_Text")]

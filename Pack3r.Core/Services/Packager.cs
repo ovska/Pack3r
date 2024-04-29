@@ -173,32 +173,13 @@ public sealed class Packager(
 
         void AddShaderFile(Shader shader)
         {
-            if (shader.ArchiveData is not null)
-            {
-                foreach (var source in map.AssetSources)
-                {
-                    if (source.RootPath.EqualsF(shader.ArchiveData.ArchivePath))
-                    {
-                        if (source is Pk3AssetSource { IsBuiltin: true })
-                            return;
+            if (shader.Source is Pk3AssetSource { IsBuiltin: true })
+                return;
 
-                        if (TryAddFileFromSource(source, shader.ArchiveData.EntryPath.AsMemory()))
-                            return;
+            if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory()))
+                return;
 
-                        OnFailedAddFile(false, $"Failed to add shader file: {shader.AbsolutePath}");
-                        return;
-                    }
-                }
-
-                throw new UnreachableException($"Shader '{shader.AbsolutePath}' not in source(s)");
-            }
-
-            if (!TryAddFileAbsolute(
-                archivePath: shader.DestinationPath,
-                absolutePath: shader.AbsolutePath))
-            {
-                OnFailedAddFile(false, $"Shader file '{shader.AbsolutePath}' not found");
-            }
+            OnFailedAddFile(false, $"Shader file '{shader.GetAbsolutePath()}' not found");
         }
 
         void AddFileRelative(ReadOnlyMemory<char> relativePath)

@@ -32,7 +32,7 @@ public sealed class Map : MapAssets, IDisposable
     {
         _options = options;
         _assetDirs = new(() => InitAssetDirectories().ToImmutableArray(), LazyThreadSafetyMode.ExecutionAndPublication);
-        _assetSrcs = new(() => InitAssetSources().ToImmutableArray(), LazyThreadSafetyMode.ExecutionAndPublication);
+        _assetSrcs = new(InitAssetSources, LazyThreadSafetyMode.ExecutionAndPublication);
         _pak0 = new(
             () => (AssetSource?)AssetSources.OfType<Pk3AssetSource>().FirstOrDefault(
                 src => IOPath.GetFileName(src.ArchivePath).EqualsF("pak0.pk3"))
@@ -121,13 +121,15 @@ public sealed class Map : MapAssets, IDisposable
         }
     }
 
-    private IEnumerable<AssetSource> InitAssetSources()
+    private ImmutableArray<AssetSource> InitAssetSources()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        var builder = ImmutableArray.CreateBuilder<AssetSource>();
+
         foreach (var dir in AssetDirectories)
         {
-            yield return new DirectoryAssetSource(dir);
+            builder.Add(new DirectoryAssetSource(dir));
 
             if (_options.LoadPk3s || _options.ExcludedPk3s.Count > 0)
             {
@@ -145,10 +147,25 @@ public sealed class Map : MapAssets, IDisposable
                     }
 
                     if (isBuiltin || _options.LoadPk3s)
-                        yield return new Pk3AssetSource(file.FullName, isBuiltin);
+                        builder.Add(new Pk3AssetSource(file.FullName, isBuiltin));
                 }
             }
         }
+
+        var result = builder.ToImmutableArray();
+
+        // HACK TODO FIXME
+        Parallel.ForEach(result, source =>
+        {
+            _ = source switch
+            {
+                DirectoryAssetSource dir => dir.Assets,
+                Pk3AssetSource pk3 => pk3.Assets,
+                _ => default(object?),
+            };
+        });
+
+        return result;
     }
 
     public void Dispose()

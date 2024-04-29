@@ -45,7 +45,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory) : AssetSource<
                 if (skipPredicate(shaderFile.FullName))
                     continue;
 
-                await foreach (var shader in parser.Parse(shaderFile.FullName, cancellationToken))
+                await foreach (var shader in parser.Parse(this, shaderFile.FullName, cancellationToken))
                 {
                     yield return shader;
                 }

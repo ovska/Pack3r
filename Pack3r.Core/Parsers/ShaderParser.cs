@@ -17,11 +17,12 @@ public interface IShaderParser
         CancellationToken cancellationToken);
 
     IAsyncEnumerable<Shader> Parse(
-        string path,
+        DirectoryAssetSource source,
+        string absolutePath,
         CancellationToken cancellationToken);
 
     IAsyncEnumerable<Shader> Parse(
-        string archivePath,
+        Pk3AssetSource source,
         ZipArchiveEntry archiveEntry,
         CancellationToken cancellationToken);
 }
@@ -88,37 +89,37 @@ public class ShaderParser(
                             if (!shader.NeededInPk3 && !existing.NeededInPk3)
                                 return existing;
 
-                            var fromArchiveShader = shader.ArchiveData is not null;
-                            var fromArchiveExisting = existing.ArchiveData is not null;
-
-                            if (fromArchiveExisting != fromArchiveShader)
+                            if (ReferenceEquals(map.Pak0, shader.Source) &&
+                                ReferenceEquals(map.Pak0, existing.Source))
                             {
-                                return options.Pure
-                                    ? (fromArchiveExisting ? existing : shader)
-                                    : (fromArchiveShader ? existing : shader);
-                            }
-
-                            // TODO
-
-                            if (shader.AbsolutePath.EqualsF(existing.AbsolutePath))
-                            {
-                                logger.Warn($"Shader {shader.Name} found multiple times in file '{shader.AbsolutePath}'");
                                 return existing;
                             }
 
-                            // TODO: better ordering
-                            var defaultDir = map.AssetDirectories[0].Name;
-                            var matchA = shader.AssetDirectory.EqualsF(defaultDir);
-                            var matchB = existing.AssetDirectory.EqualsF(defaultDir);
+                            // what to do here?
+                            //if (existing.Source.Equals(map.Pak0))
+                            //{
+                            //}
 
-                            if (matchA == matchB)
+                            if (UtilityExtensions.TryPickOne(
+                                map,
+                                shader,
+                                existing,
+                                static (map, s) => object.ReferenceEquals(map.Pak0, s.Source),
+                                out Shader item))
                             {
-                                logger.Warn(
-                                    $"Shader {shader.Name} both in file '{shader.AbsolutePath}'" +
-                                    $" and '{existing.AbsolutePath}'");
+                                return item;
                             }
 
-                            return matchA ? shader : existing;
+                            if (object.ReferenceEquals(shader.Source, existing.Source))
+                            {
+                                logger.Warn($"Shader {shader.Name} found multiple times in '{shader.Source.RootPath}'");
+                                return existing;
+                            }
+
+                            // TODO: sort order
+                            logger.Warn(
+                                $"Shader {shader.Name} both in '{shader.GetAbsolutePath()}' and '{existing.GetAbsolutePath()}'");
+                            return existing;
                         },
                         (shader, logger, map, options));
                 }
@@ -173,27 +174,29 @@ public class ShaderParser(
         }
     }
 
-    public IAsyncEnumerable<Shader> Parse(string path, CancellationToken cancellationToken)
+    public IAsyncEnumerable<Shader> Parse(DirectoryAssetSource source, string absolutePath, CancellationToken cancellationToken)
     {
         return ParseCore(
-            path,
-            null,
-            reader.ReadLines(path, default, cancellationToken));
+            Path.GetRelativePath(source.RootPath, absolutePath),
+            source,
+            reader.ReadLines(absolutePath, default, cancellationToken));
     }
 
-    public IAsyncEnumerable<Shader> Parse(string archivePath, ZipArchiveEntry archiveEntry, CancellationToken cancellationToken)
+    public IAsyncEnumerable<Shader> Parse(Pk3AssetSource source, ZipArchiveEntry archiveEntry, CancellationToken cancellationToken)
     {
         return ParseCore(
-            Path.Combine(archivePath, archiveEntry.FullName),
-            new ArchiveData(archivePath, archiveEntry.FullName),
-            reader.ReadLines(archivePath, archiveEntry, default, cancellationToken));
+            relativePath: archiveEntry.FullName,
+            source,
+            reader.ReadLines(source.ArchivePath, archiveEntry, default, cancellationToken));
     }
 
     private async IAsyncEnumerable<Shader> ParseCore(
-        string path,
-        ArchiveData? archiveData,
+        string relativePath,
+        AssetSource source,
         IAsyncEnumerable<Line> lines)
     {
+        string absPath() => Path.Combine(source.RootPath, relativePath);
+
         State state = State.None;
 
         Shader? shader = null;
@@ -222,7 +225,7 @@ public class ShaderParser(
                 if (!line.IsOpeningBrace)
                 {
                     throw new InvalidDataException(
-                        $"Expected {{ on line {line.Index} in file '{path}', but line was: {line.Raw}");
+                        $"Expected {{ on line {line.Index} in file '{absPath()}', but line was: {line.Raw}");
                 }
 
                 state = State.Shader;
@@ -246,11 +249,11 @@ public class ShaderParser(
                     if (shaderName.Span.ContainsAny(Tokens.Braces))
                     {
                         throw new InvalidDataException(
-                            $"Expected shader name on line {line.Index} in file '{path}', got: '{line.Raw}'");
+                            $"Expected shader name on line {line.Index} in file '{absPath()}', got: '{line.Raw}'");
                     }
                 }
 
-                shader = new Shader(shaderName, path, archiveData);
+                shader = new Shader(shaderName, relativePath.Replace('\\', '/'), source);
                 state = next;
                 continue;
             }
@@ -262,7 +265,7 @@ public class ShaderParser(
                 if (line.IsOpeningBrace)
                 {
                     throw new InvalidDataException(
-                        $"Invalid token '{line.Raw}' on line {line.Index} in file {path}");
+                        $"Invalid token '{line.Raw}' on line {line.Index} in file {absPath()}");
                 }
 
                 if (line.IsClosingBrace)
@@ -296,7 +299,7 @@ public class ShaderParser(
                     }
                     else
                     {
-                        logger.UnparsableKeyword(path, line.Index, "animMap", line.Raw);
+                        logger.UnparsableKeyword(absPath(), line.Index, "animMap", line.Raw);
                     }
                 }
                 else if (line.MatchPrefix("videomap ", out token))
@@ -361,7 +364,7 @@ public class ShaderParser(
                 {
                     if (!token.TryReadPastWhitespace(out token))
                     {
-                        logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{path}'");
+                        logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{absPath()}'");
                     }
                     else
                     {
@@ -379,7 +382,7 @@ public class ShaderParser(
                 {
                     if (!token.TryReadUpToWhitespace(out token))
                     {
-                        logger.UnparsableKeyword(path, line.Index, "skyparms", line.Raw);
+                        logger.UnparsableKeyword(absPath(), line.Index, "skyparms", line.Raw);
                         continue;
                     }
 
@@ -405,7 +408,7 @@ public class ShaderParser(
                     }
                     else
                     {
-                        logger.UnparsableKeyword(path, line.Index, "q3map_surfaceModel", line.Raw);
+                        logger.UnparsableKeyword(absPath(), line.Index, "q3map_surfaceModel", line.Raw);
                     }
                 }
                 else if (!shader.HasLightStyles && line.MatchPrefix("q3map_lightstyle ", out _))
@@ -417,7 +420,7 @@ public class ShaderParser(
 
         if (state != State.None)
         {
-            logger.Fatal($"Shader '{path}' ended in an invalid state: {state}");
+            logger.Fatal($"Shader '{absPath()}' ended in an invalid state: {state}");
             throw new ControlledException();
         }
     }

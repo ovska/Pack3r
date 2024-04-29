@@ -75,7 +75,7 @@ public sealed class Pk3AssetSource(string path, bool isBuiltin) : AssetSource<Zi
 
             if (entry.FullName.HasExtension(".shader"))
             {
-                await foreach (var shader in parser.Parse(ArchivePath, entry, cancellationToken))
+                await foreach (var shader in parser.Parse(this, entry, cancellationToken))
                 {
                     yield return shader;
                 }

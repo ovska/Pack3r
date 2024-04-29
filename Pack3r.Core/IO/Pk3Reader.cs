@@ -68,31 +68,32 @@ public class Pk3Reader(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (Tokens.ShaderPath().IsMatch(archiveEntry.FullName))
-        {
-            await foreach (var shader in shaderParser.Parse(archivePath, archiveEntry, cancellationToken))
-            {
-                contents.Shaders.Add(shader.Name);
-            }
-        }
-        else
-        {
-            var extension = archiveEntry.FullName.GetTextureExtension();
+        throw new NotSupportedException();
+        //if (Tokens.ShaderPath().IsMatch(archiveEntry.FullName))
+        //{
+        //    await foreach (var shader in shaderParser.Parse(archivePath, archiveEntry, cancellationToken))
+        //    {
+        //        contents.Shaders.Add(shader.Name);
+        //    }
+        //}
+        //else
+        //{
+        //    var extension = archiveEntry.FullName.GetTextureExtension();
 
-            // TODO: fix hack
-            // allow using jpg/tga as shaderless tex
-            if (extension != TextureExtension.Other)
-            {
-                contents.Shaders.Add(archiveEntry.FullName.AsMemory(..^4));
-            }
+        //    // TODO: fix hack
+        //    // allow using jpg/tga as shaderless tex
+        //    if (extension != TextureExtension.Other)
+        //    {
+        //        contents.Shaders.Add(archiveEntry.FullName.AsMemory(..^4));
+        //    }
 
-            // jpg textures can be referenced with tga paths in shaders
-            if (extension == TextureExtension.Jpg)
-            {
-                contents.Resources.Add(Path.ChangeExtension(archiveEntry.FullName, "tga").AsMemory());
-            }
+        //    // jpg textures can be referenced with tga paths in shaders
+        //    if (extension == TextureExtension.Jpg)
+        //    {
+        //        contents.Resources.Add(Path.ChangeExtension(archiveEntry.FullName, "tga").AsMemory());
+        //    }
 
-            contents.Resources.Add(archiveEntry.FullName.AsMemory());
-        }
+        //    contents.Resources.Add(archiveEntry.FullName.AsMemory());
+        //}
     }
 }
