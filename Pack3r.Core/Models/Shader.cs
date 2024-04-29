@@ -53,10 +53,10 @@ public sealed class Shader(
     public override int GetHashCode()
     {
         throw new NotSupportedException();
-        return HashCode.Combine(
-            Source,
-            DestinationPath,
-            ROMCharComparer.Instance.GetHashCode(Name));
+        //return HashCode.Combine(
+        //    Source,
+        //    DestinationPath,
+        //    ROMCharComparer.Instance.GetHashCode(Name));
     }
 
     public override bool Equals(object? obj)

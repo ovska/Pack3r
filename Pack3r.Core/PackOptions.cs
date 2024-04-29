@@ -19,5 +19,7 @@ public class PackOptions
 
     public bool Pure { get; set; }
     public bool LoadPk3s { get; set; }
-    public List<string> ExcludedPk3s { get; set; } = ["pak0.pk3"];
+
+    public List<string> IgnoreSources { get; set; } = [];
+    public List<string> ExcludedSources { get; set; } = ["pak0.pk3"];
 }

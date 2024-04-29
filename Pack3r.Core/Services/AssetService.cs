@@ -1,7 +1,5 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
 using Pack3r.Extensions;
-using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Parsers;
@@ -16,7 +14,6 @@ public interface IAssetService
 public class AssetService(
     PackOptions options,
     ILogger<AssetService> logger,
-    IPk3Reader pk3Reader,
     IMapFileParser mapFileParser,
     IEnumerable<IResourceParser> resourceParsers)
     : IAssetService
@@ -74,60 +71,5 @@ public class AssetService(
         }
 
         return map;
-    }
-
-    private async Task<Pk3Contents> GetBuiltinContents(
-        DirectoryInfo etmain,
-        CancellationToken cancellationToken)
-    {
-        var timer = Stopwatch.StartNew();
-
-        var pak0task = pk3Reader.ReadPk3(Path.Combine(etmain.FullName, "pak0.pk3"), cancellationToken);
-
-        List<Task<Pk3Contents?>> auxiliary =
-        [
-            TryLoadPk3(Path.Combine(etmain.FullName, "sd-mapobjects.pk3"))
-        ];
-
-        if (etmain.Parent is { } etfolder &&
-            etfolder.GetDirectories(options.ETJumpDir ?? "etjump") is { Length: 1 } etjumpdirs &&
-            etjumpdirs[0].GetFiles("etjump-*.pk3").OrderByDescending(f => f.Name).FirstOrDefault() is { } etjumpPk3)
-        {
-            auxiliary.Add(TryLoadPk3(etjumpPk3.FullName));
-        }
-
-        var pak0 = await pak0task;
-
-        List<string> pakNames = [pak0.Name];
-
-        foreach (var auxTask in auxiliary)
-        {
-            if (await auxTask is { } pk3)
-            {
-                pakNames.Add(pk3.Name);
-                pak0.Shaders.UnionWith(pk3.Shaders);
-                pak0.Resources.UnionWith(pk3.Resources);
-            }
-        }
-
-        timer.Stop();
-
-        logger.System($"{string.Join(", ", pakNames)} processed successfully in {timer.ElapsedMilliseconds} ms");
-
-        return pak0;
-
-        async Task<Pk3Contents?> TryLoadPk3(string path)
-        {
-            try
-            {
-                if (File.Exists(path))
-                {
-                    return await pk3Reader.ReadPk3(path, cancellationToken);
-                }
-            }
-            catch (IOException) { }
-
-            return null;
-        }
     }
 }

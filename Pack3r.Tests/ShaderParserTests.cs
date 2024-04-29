@@ -1,3 +1,4 @@
+using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Parsers;
@@ -6,10 +7,12 @@ namespace Pack3r.Tests;
 
 public class ShaderParserTests
 {
+    private static DirectoryAssetSource Source => new(new DirectoryInfo("~/"), false);
+
     private static async Task<Shader> ParseSingle(string data, bool includeDevFiles = false)
     {
         var parser = GetParser(data, includeDevFiles);
-        var results = await parser.Parse("Ö:\\test.map", default).ToList();
+        var results = await parser.Parse(Source, "C:\\test.shader",default).ToList();
 
         Assert.Single(results);
         return results[0];
@@ -44,7 +47,7 @@ public class ShaderParserTests
             }
             """);
 
-        var results = await parser.Parse("Ö:\\test.map", default).ToList();
+        var results = await parser.Parse(Source, "C:\\test.shader", default).ToList();
 
         Assert.Equal(2, results.Count);
 

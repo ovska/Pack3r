@@ -33,11 +33,6 @@ public sealed class Map : MapAssets, IDisposable
         _options = options;
         _assetDirs = new(() => InitAssetDirectories().ToImmutableArray(), LazyThreadSafetyMode.ExecutionAndPublication);
         _assetSrcs = new(InitAssetSources, LazyThreadSafetyMode.ExecutionAndPublication);
-        _pak0 = new(
-            () => (AssetSource?)AssetSources.OfType<Pk3AssetSource>().FirstOrDefault(
-                src => IOPath.GetFileName(src.ArchivePath).EqualsF("pak0.pk3"))
-                ?? new AssetSource.Empty(),
-            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     /// <summary>
@@ -57,13 +52,11 @@ public sealed class Map : MapAssets, IDisposable
 
     public ImmutableArray<DirectoryInfo> AssetDirectories => _assetDirs.Value;
     public ImmutableArray<AssetSource> AssetSources => _assetSrcs.Value;
-    public AssetSource Pak0 => _pak0.Value;
 
     private readonly PackOptions _options;
     private string? _root;
     private readonly Lazy<ImmutableArray<DirectoryInfo>> _assetDirs;
     private readonly Lazy<ImmutableArray<AssetSource>> _assetSrcs;
-    private readonly Lazy<AssetSource> _pak0;
 
     /// <summary>
     /// Gets the relative etmain of the map.<br/>
@@ -129,25 +122,24 @@ public sealed class Map : MapAssets, IDisposable
 
         foreach (var dir in AssetDirectories)
         {
-            builder.Add(new DirectoryAssetSource(dir));
+            var filter = IsExcluded(IOPath.GetDirectoryName(dir.FullName.AsSpan()));
 
-            if (_options.LoadPk3s || _options.ExcludedPk3s.Count > 0)
+            if (filter == SourceFilter.Ignored)
+                continue;
+
+            builder.Add(new DirectoryAssetSource(dir, filter == SourceFilter.Excluded));
+
+            if (_options.LoadPk3s || _options.ExcludedSources.Count > 0)
             {
                 foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
                 {
-                    bool isBuiltin = false;
+                    var pk3Filter = IsExcluded(IOPath.GetDirectoryName(file.FullName.AsSpan()));
 
-                    foreach (var builtinAssetName in _options.ExcludedPk3s)
-                    {
-                        if (IOPath.GetFileName(file.FullName.AsSpan()).EqualsF(builtinAssetName))
-                        {
-                            isBuiltin = true;
-                            break;
-                        }
-                    }
+                    if (pk3Filter == SourceFilter.Ignored)
+                        continue;
 
-                    if (isBuiltin || _options.LoadPk3s)
-                        builder.Add(new Pk3AssetSource(file.FullName, isBuiltin));
+                    if (_options.LoadPk3s || pk3Filter == SourceFilter.Excluded)
+                        builder.Add(new Pk3AssetSource(file.FullName, pk3Filter == SourceFilter.Excluded));
                 }
             }
         }
@@ -167,6 +159,25 @@ public sealed class Map : MapAssets, IDisposable
 
         return result;
     }
+
+    private SourceFilter IsExcluded(ReadOnlySpan<char> dirOrPk3)
+    {
+        foreach (var value in _options.IgnoreSources)
+        {
+            if (dirOrPk3.EqualsF(value))
+                return SourceFilter.Ignored;
+        }
+
+        foreach (var value in _options.ExcludedSources)
+        {
+            if (dirOrPk3.EqualsF(value))
+                return SourceFilter.Excluded;
+        }
+
+        return SourceFilter.None;
+    }
+
+    private enum SourceFilter { None, Excluded, Ignored }
 
     public void Dispose()
     {

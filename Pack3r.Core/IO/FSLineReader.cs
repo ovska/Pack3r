@@ -1,6 +1,7 @@
 ﻿using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Pack3r.Extensions;
 
 namespace Pack3r.IO;
 
@@ -25,7 +26,7 @@ public class FSLineReader() : ILineReader
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read,
-            bufferSize: Path.HasExtension(".map") ? 4096 * 16 : 4096,
+            bufferSize: path.HasExtension(".map") ? 4096 * 16 : 4096,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
 
         return ReadLinesCore(path, stream, options, cancellationToken);
@@ -42,10 +43,10 @@ public class FSLineReader() : ILineReader
         await using (source)
         {
             using var reader = new StreamReader(
-                    source,
-                    Encoding.UTF8,
-                    detectEncodingFromByteOrderMarks: true,
-                    bufferSize: -1);
+                source,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: true,
+                bufferSize: 4096);
 
             string? line;
 

@@ -89,11 +89,12 @@ public class ShaderParser(
                             if (!shader.NeededInPk3 && !existing.NeededInPk3)
                                 return existing;
 
-                            if (ReferenceEquals(map.Pak0, shader.Source) &&
-                                ReferenceEquals(map.Pak0, existing.Source))
-                            {
-                                return existing;
-                            }
+                            // TODO: check if in pak0
+                            //if (shader.Source.RootPath.().EqualsF("") &&
+                            //    ReferenceEquals(map.Pak0, existing.Source))
+                            //{
+                            //    return existing;
+                            //}
 
                             // what to do here?
                             //if (existing.Source.Equals(map.Pak0))
@@ -190,7 +191,7 @@ public class ShaderParser(
             reader.ReadLines(source.ArchivePath, archiveEntry, default, cancellationToken));
     }
 
-    private async IAsyncEnumerable<Shader> ParseCore(
+    internal async IAsyncEnumerable<Shader> ParseCore(
         string relativePath,
         AssetSource source,
         IAsyncEnumerable<Line> lines)

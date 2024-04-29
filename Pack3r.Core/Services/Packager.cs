@@ -69,7 +69,7 @@ public sealed class Packager(
             {
                 progress.Report(count++);
 
-                if (handledFiles.Contains(resource) || map.Pak0.Contains(resource))
+                if (IsHandledOrExcluded(resource))
                 {
                     continue;
                 }
@@ -118,7 +118,7 @@ public sealed class Packager(
 
                 foreach (var file in shader.Files)
                 {
-                    if (map.Pak0.Contains(file) || handledFiles.Contains(file))
+                    if (IsHandledOrExcluded(file))
                         continue;
 
                     AddFileRelative(file);
@@ -126,7 +126,7 @@ public sealed class Packager(
 
                 foreach (var file in shader.Textures)
                 {
-                    if (map.Pak0.Contains(file) || handledFiles.Contains(file))
+                    if (IsHandledOrExcluded(file))
                         continue;
 
                     AddFileRelative(file);
@@ -161,6 +161,20 @@ public sealed class Packager(
         // end
         logger.Info($"{includedFiles.Count} files included in pk3");
 
+        bool IsHandledOrExcluded(ReadOnlyMemory<char> relativePath)
+        {
+            if (handledFiles.Contains(relativePath))
+                return true;
+
+            foreach (var source in map.AssetSources)
+            {
+                if (source.IsExcluded && source.Contains(relativePath))
+                    return true;
+            }
+
+            return false;
+        }
+
         void AddCompileFile(string absolutePath)
         {
             if (!TryAddFileAbsolute(
@@ -173,7 +187,7 @@ public sealed class Packager(
 
         void AddShaderFile(Shader shader)
         {
-            if (shader.Source is Pk3AssetSource { IsBuiltin: true })
+            if (shader.Source is Pk3AssetSource { IsExcluded: true })
                 return;
 
             if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory()))
@@ -184,6 +198,11 @@ public sealed class Packager(
 
         void AddFileRelative(ReadOnlyMemory<char> relativePath)
         {
+            if (relativePath.Span.Contains("envmap_ice2.tga", StringComparison.Ordinal))
+            {
+                int i = 0;
+            }
+
             foreach (var source in map.AssetSources)
             {
                 if (TryAddFileFromSource(source, relativePath))
