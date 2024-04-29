@@ -3,6 +3,7 @@ using Pack3r.Extensions;
 using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Parsers;
+using Pack3r.Progress;
 
 namespace Pack3r.Services;
 
@@ -42,6 +43,7 @@ public class AssetService(
             Resources = assets.Resources,
             Shaders = assets.Shaders,
             HasStyleLights = assets.HasStyleLights,
+            RenamableResources = [],
         };
 
         logger.System($"Using directories for discovery: {string.Join(", ", map.AssetDirectories.Select(d => d.FullName))}");
@@ -59,6 +61,10 @@ public class AssetService(
                 return;
             }
 
+            map.RenamableResources.Add((
+                AbsolutePath: path,
+                ArchivePath: map.GetRelativeToRoot(parser.GetPath(map, options.Rename))));
+
             await foreach (var resource in parser.Parse(path, ct).ConfigureAwait(false))
             {
                 referencedResources.TryAdd(resource, null);
@@ -68,6 +74,42 @@ public class AssetService(
         foreach (var (resource, _) in referencedResources)
         {
             (resource.IsShader ? map.Shaders : map.Resources).Add(resource.Value);
+        }
+
+        // add .map
+        if (options.DevFiles)
+        {
+            map.RenamableResources.Add((
+                map.Path,
+                Path.Combine("maps", $"{options.Rename ?? map.Name}.map")));
+        }
+
+        // add bsp
+        FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
+        map.RenamableResources.Add((
+            AbsolutePath: bsp.FullName,
+            ArchivePath: Path.Combine("maps", $"{options.Rename ?? map.Name}.bsp")));
+
+        var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
+
+        if (lightmapDir.Exists && lightmapDir.GetFiles("lm_????.tga") is { Length: > 0 } lmFiles)
+        {
+            map.HasLightmaps = true;
+            bool timestampWarned = false;
+
+            for (int i = 0; i < lmFiles.Length; i++)
+            {
+                FileInfo? file = lmFiles[i];
+                timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
+
+                map.RenamableResources.Add((
+                    AbsolutePath: file.FullName,
+                    ArchivePath: Path.Combine("maps", options.Rename ?? map.Name, file.Name)));
+            }
+        }
+        else
+        {
+            logger.Info($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
         }
 
         return map;

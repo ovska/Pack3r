@@ -14,8 +14,8 @@ public class PackOptions
     public bool DevFiles { get; set; }
     public bool RequireAllAssets { get; set; }
     public bool Overwrite { get; set; }
-    public string? ETJumpDir { get; set; }
     public LogLevel LogLevel { get; set; } = LogLevel.Debug;
+    public string? Rename { get; set; }
 
     public bool Pure { get; set; }
     public bool LoadPk3s { get; set; }

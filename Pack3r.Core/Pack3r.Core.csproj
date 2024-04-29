@@ -4,7 +4,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
     <RootNamespace>Pack3r</RootNamespace>
-
     <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 

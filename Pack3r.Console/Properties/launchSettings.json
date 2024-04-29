@@ -2,7 +2,8 @@
   "profiles": {
     "Pack3r.Console": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\"\r\n-d\r\n-v\r\n--loose\r\n--etjumpdir etjump_stable\r\n"
+      //"commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\"\r\n-d\r\n-v\r\n--loose\r\n"
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\void.pk3dir\\maps\\void_b2.map\" -d --loose"
     }
   }
 }

@@ -100,18 +100,16 @@ public class ShaderParser(
                             //if (existing.Source.Equals(map.Pak0))
                             //{
                             //}
-
-                            if (UtilityExtensions.TryPickOne(
-                                map,
-                                shader,
-                                existing,
-                                static (map, s) => object.ReferenceEquals(map.Pak0, s.Source),
-                                out Shader item))
+                            if (shader.Source.IsExcluded || existing.Source.IsExcluded)
                             {
-                                return item;
+                                return existing.Source.IsExcluded ? existing : shader;
+                            }
+                            else if (existing.Source.IsExcluded)
+                            {
+                                return existing;
                             }
 
-                            if (object.ReferenceEquals(shader.Source, existing.Source))
+                            if (ReferenceEquals(shader.Source, existing.Source))
                             {
                                 logger.Warn($"Shader {shader.Name} found multiple times in '{shader.Source.RootPath}'");
                                 return existing;

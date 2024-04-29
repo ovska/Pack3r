@@ -32,7 +32,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, bool isExclude
             else
             {
                 string archivePath = Path.GetRelativePath(Directory.FullName, file.FullName);
-                entry = destination.CreateEntryFromFile(file.FullName, archivePath);
+                entry = destination.CreateEntryFromFile(file.FullName, archivePath, GetCompressionLevel(file.FullName));
             }
             return true;
         }

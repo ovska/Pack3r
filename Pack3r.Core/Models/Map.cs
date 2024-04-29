@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -50,6 +51,13 @@ public sealed class Map : MapAssets, IDisposable
     /// </summary>
     public required DirectoryInfo ETMain { get; init; }
 
+    public bool HasLightmaps { get; set; }
+
+    /// <summary>
+    /// Renamable resources (mapscript etc)
+    /// </summary>
+    public required ConcurrentBag<(string AbsolutePath, string ArchivePath)> RenamableResources { get; init; }
+
     public ImmutableArray<DirectoryInfo> AssetDirectories => _assetDirs.Value;
     public ImmutableArray<AssetSource> AssetSources => _assetSrcs.Value;
 
@@ -84,6 +92,8 @@ public sealed class Map : MapAssets, IDisposable
 
         throw new UnreachableException($"Could not get map root: {Path}");
     }
+
+    public string GetRelativeToRoot(string path) => IOPath.GetRelativePath(GetMapRoot(), path);
 
     /// <summary>
     /// Returns path <strong>relative to ETMain</strong>.
@@ -133,7 +143,7 @@ public sealed class Map : MapAssets, IDisposable
             {
                 foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
                 {
-                    var pk3Filter = IsExcluded(IOPath.GetDirectoryName(file.FullName.AsSpan()));
+                    var pk3Filter = IsExcluded(IOPath.GetFileName(file.FullName.AsSpan()));
 
                     if (pk3Filter == SourceFilter.Ignored)
                         continue;

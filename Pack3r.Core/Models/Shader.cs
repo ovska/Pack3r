@@ -3,8 +3,6 @@ using Pack3r.IO;
 
 namespace Pack3r.Models;
 
-public sealed record class ArchiveData(string ArchivePath, string EntryPath);
-
 public sealed class Shader(
     ReadOnlyMemory<char> name,
     string relativePath,

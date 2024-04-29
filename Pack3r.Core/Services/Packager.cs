@@ -39,26 +39,14 @@ public sealed class Packager(
             AddCompileFile(map.Path);
         }
 
-        var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
-        var includedLightmaps = false;
-
-        if (lightmapDir.Exists && lightmapDir.GetFiles("lm_????.tga") is { Length: > 0 } lmFiles)
+        using (var progress = progressManager.Create("Compressing bsp, lightmaps, mapscript etc.", map.RenamableResources.Count))
         {
-            bool timestampWarned = false;
-            using var progress = progressManager.Create("Compressing lightmaps", lmFiles.Length);
-
-            for (int i = 0; i < lmFiles.Length; i++)
+            int i = 0;
+            foreach (var (absolutePath, archivePath) in map.RenamableResources)
             {
-                FileInfo? file = lmFiles[i];
-                timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
-                AddCompileFile(file.FullName);
-                progress.Report(i + 1);
-                includedLightmaps = true;
+                archive.CreateEntryFromFile(absolutePath, archivePath);
+                progress.Report(++i);
             }
-        }
-        else
-        {
-            logger.Info($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
         }
 
         using (var progress = progressManager.Create("Compressing resources", map.Resources.Count))
@@ -135,7 +123,7 @@ public sealed class Packager(
         }
 
         // most likely no recent light compile if there are no lightmaps
-        if (styleLights && includedLightmaps)
+        if (styleLights && map.HasLightmaps)
         {
             var styleShader = new FileInfo(Path.Combine(map.AssetDirectories[0].FullName, "scripts", $"q3map2_{map.Name}.shader"));
 
@@ -198,11 +186,6 @@ public sealed class Packager(
 
         void AddFileRelative(ReadOnlyMemory<char> relativePath)
         {
-            if (relativePath.Span.Contains("envmap_ice2.tga", StringComparison.Ordinal))
-            {
-                int i = 0;
-            }
-
             foreach (var source in map.AssetSources)
             {
                 if (TryAddFileFromSource(source, relativePath))
@@ -215,8 +198,6 @@ public sealed class Packager(
         bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            Exception ex;
 
             try
             {
@@ -232,18 +213,19 @@ public sealed class Packager(
 
                 return true;
             }
-            catch (IOException ioex) { ex = ioex; }
-
-            if (options.LogLevel == LogLevel.Trace)
+            catch (IOException ex)
             {
-                logger.Exception(ex, $"Failed to pack file '{relativePath}' from source {source}");
-            }
-            else
-            {
-                logger.Error($"Failed to pack file '{relativePath}' from source {source}");
-            }
+                if (options.LogLevel == LogLevel.Trace)
+                {
+                    logger.Exception(ex, $"Failed to pack file '{relativePath}' from source {source}");
+                }
+                else
+                {
+                    logger.Error($"Failed to pack file '{relativePath}' from source {source}");
+                }
 
-            return false;
+                return false;
+            }
         }
 
         bool TryAddFileAbsolute(string archivePath, string absolutePath)

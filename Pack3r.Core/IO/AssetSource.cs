@@ -34,4 +34,9 @@ public abstract class AssetSource : IDisposable
     {
         return HashCode.Combine(GetType(), RootPath);
     }
+
+    protected static CompressionLevel GetCompressionLevel(ReadOnlySpan<char> file) =>
+        file.GetTextureExtension() == TextureExtension.Jpg
+            ? CompressionLevel.NoCompression
+            : CompressionLevel.Optimal;
 }

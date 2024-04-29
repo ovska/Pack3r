@@ -73,15 +73,6 @@ internal static class Commandline
             Arity = ArgumentArity.ZeroOrOne,
         };
 
-        var etjumpdirOption = new Option<string?>(
-            ["--etjumpdir"],
-            () => null,
-            "Override for etjump directory name")
-        {
-            Arity = ArgumentArity.ZeroOrOne,
-            IsHidden = true,
-        };
-
         mapArgument.AddValidator(ValidateMapPath);
         pk3Option.AddValidator(ValidatePk3Path);
 
@@ -95,7 +86,6 @@ internal static class Commandline
             shaderlistOption,
             overwriteOption,
             loglevelOption,
-            etjumpdirOption,
         };
 
         rootCommand.SetHandler(async context =>
@@ -110,7 +100,6 @@ internal static class Commandline
                 ShaderlistOnly = context.ParseResult.GetValueForOption(shaderlistOption),
                 Overwrite = context.ParseResult.GetValueForOption(overwriteOption),
                 LogLevel = context.ParseResult.GetValueForOption(loglevelOption) ?? LogLevel.Debug,
-                ETJumpDir = context.ParseResult.GetValueForOption(etjumpdirOption),
             };
 
             Debug.Assert(options.Pk3File != null || options.DryRun, "Pk3 is required on non-dry runs");

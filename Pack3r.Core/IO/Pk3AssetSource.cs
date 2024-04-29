@@ -46,7 +46,7 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource<Z
             }
             else
             {
-                entry = destination.CreateEntry(pk3entry.FullName);
+                entry = destination.CreateEntry(pk3entry.FullName, GetCompressionLevel(pk3entry.FullName));
                 entry.LastWriteTime = pk3entry.LastWriteTime;
 
                 using Stream destinationStream = entry.Open();
