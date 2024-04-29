@@ -6,7 +6,7 @@ using Pack3r.Parsers;
 
 namespace Pack3r.IO;
 
-public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource<ZipArchiveEntry>
+public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipArchiveEntry>
 {
     public string ArchivePath { get; } = path;
     public ZipArchive Archive
@@ -18,7 +18,7 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource<Z
         }
     }
 
-    public override bool IsExcluded { get; } = isExcluded;
+    public override bool IsPak0 { get; } = isPak0;
     public override string RootPath => ArchivePath;
 
     private readonly ZipArchive _archive = ZipFile.OpenRead(path);
@@ -40,7 +40,7 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource<Z
 
         if (Assets.TryGetValue(relativePath, out var pk3entry))
         {
-            if (IsExcluded)
+            if (IsPak0)
             {
                 entry = null;
             }

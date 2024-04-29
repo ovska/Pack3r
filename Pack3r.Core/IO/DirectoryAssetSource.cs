@@ -5,11 +5,11 @@ using Pack3r.Parsers;
 
 namespace Pack3r.IO;
 
-public sealed class DirectoryAssetSource(DirectoryInfo directory, bool isExcluded) : AssetSource<FileInfo>
+public sealed class DirectoryAssetSource(DirectoryInfo directory) : AssetSource<FileInfo>
 {
     public DirectoryInfo Directory { get; } = directory;
     public override string RootPath => Directory.FullName;
-    public override bool IsExcluded { get; } = isExcluded;
+    public override bool IsPak0 => false;
 
     public override string ToString() => Directory.FullName;
 
@@ -25,7 +25,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, bool isExclude
     {
         if (Assets.TryGetValue(relativePath, out var file))
         {
-            if (IsExcluded)
+            if (IsPak0)
             {
                 entry = null;
             }

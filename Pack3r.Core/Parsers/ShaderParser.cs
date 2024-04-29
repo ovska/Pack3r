@@ -100,11 +100,11 @@ public class ShaderParser(
                             //if (existing.Source.Equals(map.Pak0))
                             //{
                             //}
-                            if (shader.Source.IsExcluded || existing.Source.IsExcluded)
+                            if (shader.Source.IsPak0 || existing.Source.IsPak0)
                             {
-                                return existing.Source.IsExcluded ? existing : shader;
+                                return existing.Source.IsPak0 ? existing : shader;
                             }
-                            else if (existing.Source.IsExcluded)
+                            else if (existing.Source.IsPak0)
                             {
                                 return existing;
                             }
@@ -342,7 +342,7 @@ public class ShaderParser(
                     }
                 }
 
-                if (!found && options.DevFiles)
+                if (!found && options.IncludeSource)
                 {
                     foreach (var prefix in _devTexturePrefixes)
                     {
@@ -428,7 +428,7 @@ public class ShaderParser(
         Map map,
         CancellationToken cancellationToken)
     {
-        if (!options.ShaderlistOnly)
+        if (!options.UseShaderlist)
             return [];
 
         var dict = new Dictionary<AssetSource, HashSet<ReadOnlyMemory<char>>>();
@@ -495,7 +495,7 @@ public class ShaderParser(
 
         return (line[0] | 0x20) switch
         {
-            'q' => !options.DevFiles && line.StartsWith("qer_"),
+            'q' => !options.IncludeSource && line.StartsWith("qer_"),
             's' => line.StartsWith("surfaceparm "),
             'c' => line.StartsWith("cull "),
             'n' => line.StartsWith("nopicmip") || line.StartsWith("nomipmaps"),

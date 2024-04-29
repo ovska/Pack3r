@@ -132,14 +132,15 @@ public sealed class Map : MapAssets, IDisposable
 
         foreach (var dir in AssetDirectories)
         {
+            // TODO: never ignore etmain?
             var filter = IsExcluded(IOPath.GetDirectoryName(dir.FullName.AsSpan()));
 
             if (filter == SourceFilter.Ignored)
                 continue;
 
-            builder.Add(new DirectoryAssetSource(dir, filter == SourceFilter.Excluded));
+            builder.Add(new DirectoryAssetSource(dir));
 
-            if (_options.LoadPk3s || _options.ExcludedSources.Count > 0)
+            if (_options.LoadPk3s || _options.ExcludeSources.Count > 0)
             {
                 foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
                 {
@@ -178,7 +179,7 @@ public sealed class Map : MapAssets, IDisposable
                 return SourceFilter.Ignored;
         }
 
-        foreach (var value in _options.ExcludedSources)
+        foreach (var value in _options.ExcludeSources)
         {
             if (dirOrPk3.EqualsF(value))
                 return SourceFilter.Excluded;

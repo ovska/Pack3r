@@ -10,16 +10,22 @@ public class PackOptions
 
     [MemberNotNullWhen(false, nameof(Pk3File))]
     public bool DryRun { get; set; }
-    public bool ShaderlistOnly { get; set; }
-    public bool DevFiles { get; set; }
+
+    public bool UseShaderlist { get; set; }
+
+    public bool IncludeSource { get; set; }
+
     public bool RequireAllAssets { get; set; }
+
     public bool Overwrite { get; set; }
-    public LogLevel LogLevel { get; set; } = LogLevel.Debug;
+
+    public LogLevel LogLevel { get; set; } = LogLevel.Info;
+
     public string? Rename { get; set; }
 
-    public bool Pure { get; set; }
     public bool LoadPk3s { get; set; }
 
-    public List<string> IgnoreSources { get; set; } = [];
-    public List<string> ExcludedSources { get; set; } = ["pak0.pk3"];
+    public required List<string> IgnoreSources { get; init; }
+
+    public required List<string> ExcludeSources { get; init; }
 }

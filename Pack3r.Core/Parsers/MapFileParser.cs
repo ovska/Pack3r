@@ -20,7 +20,7 @@ public class MapFileParser(
     PackOptions options)
     : IMapFileParser
 {
-    private readonly bool _devFiles = options.DevFiles;
+    private readonly bool _devFiles = options.IncludeSource;
 
     public async Task<MapAssets> ParseMapAssets(
         string path,

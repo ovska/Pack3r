@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
@@ -37,6 +36,7 @@ public sealed class Packager(
             foreach (var (absolutePath, archivePath) in map.RenamableResources)
             {
                 archive.CreateEntryFromFile(absolutePath, archivePath);
+                includedFiles.Add((absolutePath, archivePath.AsMemory()));
                 progress.Report(++i);
             }
         }
@@ -149,7 +149,7 @@ public sealed class Packager(
 
             foreach (var source in map.AssetSources)
             {
-                if (source.IsExcluded && source.Contains(relativePath))
+                if (source.IsPak0 && source.Contains(relativePath))
                     return true;
             }
 
@@ -168,7 +168,7 @@ public sealed class Packager(
 
         void AddShaderFile(Shader shader)
         {
-            if (shader.Source is Pk3AssetSource { IsExcluded: true })
+            if (shader.Source is Pk3AssetSource { IsPak0: true })
                 return;
 
             if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory()))

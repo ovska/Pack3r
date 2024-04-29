@@ -7,7 +7,7 @@ namespace Pack3r.Tests;
 
 public class ShaderParserTests
 {
-    private static DirectoryAssetSource Source => new(new DirectoryInfo("~/"), false);
+    private static DirectoryAssetSource Source => new(new DirectoryInfo("~/"));
 
     private static async Task<Shader> ParseSingle(string data, bool includeDevFiles = false)
     {
@@ -25,7 +25,7 @@ public class ShaderParserTests
         var reader = new StringLineReader(data);
         return new ShaderParser(
             reader,
-            new PackOptions { DevFiles = includeDevFiles, MapFile = null! },
+            new PackOptions { IncludeSource = includeDevFiles, MapFile = null! },
             NullLogger<ShaderParser>.Instance,
             new NoOpProgressManager());
     }

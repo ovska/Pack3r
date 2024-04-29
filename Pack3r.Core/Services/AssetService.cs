@@ -77,7 +77,7 @@ public class AssetService(
         }
 
         // add .map
-        if (options.DevFiles)
+        if (options.IncludeSource)
         {
             map.RenamableResources.Add((
                 map.Path,

@@ -28,7 +28,7 @@ public static class MapParserTests
             }
             """);
 
-        var map = await CreateParser(reader, new PackOptions { DevFiles = include, MapFile = null! })
+        var map = await CreateParser(reader, new PackOptions { IncludeSource = include, MapFile = null! })
             .ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         if (include)
