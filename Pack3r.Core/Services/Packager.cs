@@ -31,14 +31,6 @@ public sealed class Packager(
         HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
         List<(string source, ReadOnlyMemory<char> relative)> includedFiles = [];
 
-        FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
-        AddCompileFile(bsp.FullName);
-
-        if (options.DevFiles)
-        {
-            AddCompileFile(map.Path);
-        }
-
         using (var progress = progressManager.Create("Compressing bsp, lightmaps, mapscript etc.", map.RenamableResources.Count))
         {
             int i = 0;
@@ -129,6 +121,7 @@ public sealed class Packager(
 
             if (styleShader.Exists)
             {
+                FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
                 logger.CheckAndLogTimestampWarning("Stylelight shader", bsp, styleShader);
                 AddCompileFile(styleShader.FullName);
             }
