@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;

@@ -56,7 +56,7 @@ public sealed class Map : MapAssets, IDisposable
     /// <summary>
     /// Renamable resources (mapscript etc)
     /// </summary>
-    public required ConcurrentBag<(string AbsolutePath, string ArchivePath)> RenamableResources { get; init; }
+    public required ConcurrentBag<RenamableResource> RenamableResources { get; init; }
 
     public ImmutableArray<DirectoryInfo> AssetDirectories => _assetDirs.Value;
     public ImmutableArray<AssetSource> AssetSources => _assetSrcs.Value;

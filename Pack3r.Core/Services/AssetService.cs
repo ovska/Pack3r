@@ -1,9 +1,10 @@
 ﻿using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
+using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Parsers;
-using Pack3r.Progress;
 
 namespace Pack3r.Services;
 
@@ -61,9 +62,11 @@ public class AssetService(
                 return;
             }
 
-            map.RenamableResources.Add((
-                AbsolutePath: path,
-                ArchivePath: map.GetRelativeToRoot(parser.GetPath(map, options.Rename))));
+            map.RenamableResources.Add(new()
+            {
+                AbsolutePath = path,
+                ArchivePath = map.GetRelativeToRoot(parser.GetPath(map, options.Rename))
+            });
 
             await foreach (var resource in parser.Parse(path, ct).ConfigureAwait(false))
             {
@@ -79,16 +82,20 @@ public class AssetService(
         // add .map
         if (options.IncludeSource)
         {
-            map.RenamableResources.Add((
-                map.Path,
-                Path.Combine("maps", $"{options.Rename ?? map.Name}.map")));
+            map.RenamableResources.Add(new()
+            {
+                AbsolutePath = map.Path,
+                ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.map"),
+            });
         }
 
         // add bsp
         FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
-        map.RenamableResources.Add((
-            AbsolutePath: bsp.FullName,
-            ArchivePath: Path.Combine("maps", $"{options.Rename ?? map.Name}.bsp")));
+        map.RenamableResources.Add(new()
+        {
+            AbsolutePath = bsp.FullName,
+            ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.bsp")
+        });
 
         var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
 
@@ -102,15 +109,50 @@ public class AssetService(
                 FileInfo? file = lmFiles[i];
                 timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
 
-                map.RenamableResources.Add((
-                    AbsolutePath: file.FullName,
-                    ArchivePath: Path.Combine("maps", options.Rename ?? map.Name, file.Name)));
+                map.RenamableResources.Add(new()
+                {
+                    AbsolutePath = file.FullName,
+                    ArchivePath = Path.Combine("maps", options.Rename ?? map.Name, file.Name)
+                });
             }
         }
         else
         {
             logger.Info($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
         }
+
+        var objdata = new FileInfo(Path.ChangeExtension(map.Path, "objdata"));
+
+        if (objdata.Exists)
+        {
+            map.RenamableResources.Add(new()
+            {
+                AbsolutePath = objdata.FullName,
+                ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.objdata")
+            });
+        }
+        else
+        {
+            logger.Info($"Objdata skipped, file not found in '{objdata.FullName}'");
+        }
+
+        var arena = new FileInfo(Path.Combine(map.GetMapRoot(), "scripts", $"{map.Name}.arena"));
+
+        if (arena.Exists)
+        {
+            map.RenamableResources.Add(new()
+            {
+                AbsolutePath = arena.FullName,
+                ArchivePath = Path.Combine("scripts", $"{options.Rename ?? map.Name}.arena"),
+                Convert = static (line, options) => Tokens.ArenaMapName().IsMatch(line) ? $"map \"{options.Rename}\"" : line,
+            });
+        }
+        else
+        {
+            logger.Info($"Arena skipped, file not found in '{arena.FullName}'");
+        }
+
+        // TODO :levelshots
 
         return map;
     }

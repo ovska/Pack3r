@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
@@ -33,10 +34,10 @@ public sealed class Packager(
         using (var progress = progressManager.Create("Compressing bsp, lightmaps, mapscript etc.", map.RenamableResources.Count))
         {
             int i = 0;
-            foreach (var (absolutePath, archivePath) in map.RenamableResources)
+            foreach (var res in map.RenamableResources)
             {
-                archive.CreateEntryFromFile(absolutePath, archivePath);
-                includedFiles.Add((absolutePath, archivePath.AsMemory()));
+                await CreateRenamable(archive, options, res, cancellationToken);
+                includedFiles.Add((res.AbsolutePath, res.ArchivePath.AsMemory()));
                 progress.Report(++i);
             }
         }
@@ -268,22 +269,46 @@ public sealed class Packager(
         }
     }
 
-    private readonly struct PackingPath
+    private static async ValueTask CreateRenamable(
+        ZipArchive archive,
+        PackOptions options,
+        RenamableResource resource,
+        CancellationToken cancellationToken)
     {
-        public static PackingPath CreateAbsolute(string value) => new(value, null);
-        public static PackingPath CreateRelative(string value) => new(null, value);
-
-        public string? Absolute { get; }
-        public string? Relative { get; }
-
-        private PackingPath(string? absolute, string? relative)
+        if (options.Rename is null || resource.Convert is null)
         {
-            Absolute = absolute;
-            Relative = relative;
+            archive.CreateEntryFromFile(resource.AbsolutePath, resource.ArchivePath);
+            return;
         }
 
-        [MemberNotNullWhen(true, nameof(Relative))]
-        [MemberNotNullWhen(false, nameof(Absolute))]
-        public bool IsRelative => Relative is not null;
+        var entry = archive.CreateEntry(resource.ArchivePath);
+
+        DateTime lastWrite = File.GetLastWriteTime(resource.AbsolutePath);
+
+        // If file to be archived has an invalid last modified time, use the first datetime representable in the Zip timestamp format
+        // (midnight on January 1, 1980):
+        if (lastWrite.Year < 1980 || lastWrite.Year > 2107)
+            lastWrite = new DateTime(1980, 1, 1, 0, 0, 0);
+
+        entry.LastWriteTime = lastWrite;
+
+        using var reader = new StreamReader(resource.AbsolutePath, new FileStreamOptions
+        {
+            Access = FileAccess.Read,
+            Mode = FileMode.Open,
+            Share = FileShare.Read,
+        });
+
+        await using var writer = new StreamWriter(
+            entry.Open(),
+            System.Text.Encoding.UTF8,
+            leaveOpen: false);
+
+        string? line;
+
+        while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
+        {
+            await writer.WriteLineAsync(resource.Convert(line, options).AsMemory(), cancellationToken);
+        }
     }
 }

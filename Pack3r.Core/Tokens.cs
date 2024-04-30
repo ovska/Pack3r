@@ -22,6 +22,11 @@ public static partial class Tokens
         """, RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
     public static partial Regex WhitespaceSeparatedTokens();
 
+    [GeneratedRegex("""
+        [\s]?map[\s]+"
+        """, RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
+    public static partial Regex ArenaMapName();
+
     public static readonly SearchValues<char> Braces = SearchValues.Create("{}");
     public static readonly SearchValues<char> SpaceOrTab = SearchValues.Create(" \t");
 }
