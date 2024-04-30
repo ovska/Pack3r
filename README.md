@@ -2,35 +2,44 @@
 
 Create release-ready pk3 archives quickly. Pack3r uses NetRadiant `.map`-files, shaders, mapscripts and sound/speakerscripts for asset discovery and includes only files required to play the map in the pk3.
 
-```
-Description:
-  Pack3r, tool to create release-ready pk3s from NetRadiant maps
+## Usage
+`Pack3r.Console <map> <options>`
 
-Usage:
-  Pack3r.Console [<map>] [options]
+### Arguments:
+<map>  Path to the .map file [required]
 
-Arguments:
-  <map>  .map file to create the pk3 from (NetRadiant format) []
-
-Options:
-  --pk3 <pk3>                                    Destination to write the pk3 to, defaults to etmain (ignored on dry runs) []
-  -d, --dry-run                                  Print files that would be packed without creating the pk3 [default: False]
-  --allowpartial, --loose                        Pack the pk3 even if some assets are missing  (ignored on dry runs) [default: False]
-  --includesource, --src                         Include source (.map, editorimages etc.) in pk3 [default: False]
-  --shaderlist, --sl                             Only consider shaders included in shaderlist.txt [default: False]
-  --force, --overwrite                           Overwrites an existing output pk3 file if one exists [default: False]
-  -v, --verbosity <Debug|Error|Fatal|Info|Warn>  Output log level, use without parameter to view all output [default: Info]
-  --version                                      Show version information
-  -?, -h, --help                                 Show help and usage information
-```
+### Options:
++ `-o, --output` Path of destination directory or pk3 name, defaults to etmain
++ `-d, --dryrun` Print files that would be packed, without creating a pk3 [default: False]
++ `-r, --rename` Name of the map release, changes name of bsp, mapscript, etc.
++ `-v, --verbosity` Log severity threshold [default: Info]
++ `-l, --loose` Complete packing even if some files are missing [default: False]
++ `-s, --source` Pack source files such as .map, editorimages, misc_models [default: False]
++ `-sl, --shaderlist` Only read shaders present in shaderlist.txt [default: False]
++ `-f, --force` Overwrite existing files in the output path with impunity [default: False]
++ `-i, --includepk3` Include pk3 files and pk3dirs in etmain when indexing files [default: False]
++ `-?, -h, --help` Show help and usage information
++ `-v, --version` Show version information
 
 Example:
 
 ```bash
-.\Pack3r.Console.exe 'C:\Temp\ET\map\ET\etmain\maps\sungilarity.map' --pk3 'C:\Temp\test.pk3' --loose --overwrite -v
+.\Pack3r.Console.exe 'C:\Temp\ET\map\ET\etmain\maps\sungilarity.map' --o 'C:\Temp\test.pk3'
 ```
 
-### Limitations
-- Only NetRadiant `.map` files are supported, not GTK radiant
+## Limitations
+- Only NetRadiant `.map` files are supported, not GTKRadiant
 - `.ase`, `.md3` and `.skin` files aren't parsed to see which textures and shaders they use.
 - `terrain` shaders are not supported.
+- `--rename` does not take into account arena/objdata files, or levelshots-shaders (yet)
+
+## File priority order
+1. `pak0.pk3`, if a file or shader is found in pak0, it won't be included in the release
+2. Files inside the _relative_ `etmain` of your map file (directory contaning `/maps`)
+3. `etmain`, if the map is for example in `some.pk3dir/maps/mymap.map`
+4. `pk3dir`-folders in `etmain`, in reverse alphabetical order
+BSP, lightmaps, mapscript, speakerscript, soundscript, etc. are always assumed to be in the same _relative_ etmain as your map file.
+
+#### Example
+Map is `etmain/void.pk3dir/void_b1.map`, the priority is:
+  `pak0.pk3` -> `etmain/void.pk3dir/` -> `etmain/` -> any pk3 files in etmain
