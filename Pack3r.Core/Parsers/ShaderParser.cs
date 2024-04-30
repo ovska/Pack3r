@@ -43,7 +43,7 @@ public class ShaderParser(
         var whitelistsBySource = await ParseShaderLists(map, cancellationToken);
         int shaderFileCount = 0;
 
-        using (var progress = progressManager.Create($"Parsing shaders files from {map.AssetSources.Length} source(s)", max: null))
+        using (var progress = progressManager.Create($"Parsing shader files from {map.AssetSources.Length} source(s)", max: null))
         {
             await Parallel.ForEachAsync(map.AssetSources, cancellationToken, async (source, ct) =>
             {
@@ -79,48 +79,39 @@ public class ShaderParser(
                 await foreach (var shader in source.EnumerateShaders(this, skipPredicate, ct))
                 {
                     allShaders.AddOrUpdate(
-                        shader.Name,
-                        static (_, tuple) => tuple.shader,
-                        static (_, existing, tuple) =>
+                        key: shader.Name,
+                        addValueFactory: static (_, tuple) => tuple.shader,
+                        updateValueFactory: static (_, a, tuple) =>
                         {
-                            var (shader, logger, map, options) = tuple;
+                            var (b, logger, map) = tuple;
 
                             // compile time shader, ignore
-                            if (!shader.NeededInPk3 && !existing.NeededInPk3)
-                                return existing;
+                            if (!a.NeededInPk3 && !b.NeededInPk3)
+                                return a;
 
-                            // TODO: check if in pak0
-                            //if (shader.Source.RootPath.().EqualsF("") &&
-                            //    ReferenceEquals(map.Pak0, existing.Source))
-                            //{
-                            //    return existing;
-                            //}
-
-                            // what to do here?
-                            //if (existing.Source.Equals(map.Pak0))
-                            //{
-                            //}
-                            if (shader.Source.IsPak0 || existing.Source.IsPak0)
+                            // eary exit for pak0
+                            if (a.Source.IsPak0 || b.Source.IsPak0)
                             {
-                                return existing.Source.IsPak0 ? existing : shader;
-                            }
-                            else if (existing.Source.IsPak0)
-                            {
-                                return existing;
+                                return a.Source.IsPak0 ? a : b;
                             }
 
-                            if (ReferenceEquals(shader.Source, existing.Source))
+                            int cmp = map.AssetSources.IndexOf(a.Source).CompareTo(map.AssetSources.IndexOf(b.Source));
+
+                            if (cmp != 0)
                             {
-                                logger.Warn($"Shader {shader.Name} found multiple times in '{shader.Source.RootPath}'");
-                                return existing;
+                                var toReturn = cmp > 0 ? a : b;
+                                var other = cmp > 0 ? b : a;
+
+                                logger.Trace(
+                                    $"Shader {a.Name} resolved from '{toReturn.Source}' instead of '{other.Source}'");
+
+                                return toReturn;
                             }
 
-                            // TODO: sort order
-                            logger.Warn(
-                                $"Shader {shader.Name} both in '{shader.GetAbsolutePath()}' and '{existing.GetAbsolutePath()}'");
-                            return existing;
+                            logger.Warn($"Shader {b.Name} found multiple times in file {b.DestinationPath} in '{b.Source.RootPath}'");
+                            return a;
                         },
-                        (shader, logger, map, options));
+                        factoryArgument: (shader, logger, map));
                 }
             }).ConfigureAwait(false);
         }

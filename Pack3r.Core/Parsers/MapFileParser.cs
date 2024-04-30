@@ -184,7 +184,7 @@ public class MapFileParser(
             logger.Warn($"Shaders referenced by terrains are not supported, please include manually (on entities: {entities})");
         }
 
-        logger.System($".map file ({lineCount} lines) parsed successfully in {timer.ElapsedMilliseconds} ms");
+        logger.System($".map file ({lineCount:N0} lines) parsed successfully in {timer.ElapsedMilliseconds} ms");
 
         return new MapAssets
         {

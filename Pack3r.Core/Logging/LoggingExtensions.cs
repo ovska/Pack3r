@@ -23,9 +23,9 @@ public static class LoggingExtensions
 
         if (isStale)
         {
-            var readable = delta.TotalDays < 1 ? $"{delta:%h} hours+" : $"{delta:%d} day(s)+";
-            logger.Warn(
-                $"{type} file(s) have different timestamps than BSP ({readable}), ensure they are from a recent compile");
+            var d = delta.Days;
+            var h = delta.Hours;
+            logger.Warn($"{type} file(s) have different timestamps than BSP ({d}d {h}h), ensure they are from a recent compile");
         }
 
         return isStale;

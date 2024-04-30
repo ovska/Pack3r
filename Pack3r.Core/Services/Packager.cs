@@ -68,10 +68,6 @@ public sealed class Packager(
             {
                 progress.Report(count++);
 
-                // TODO
-                // if (data.Pak0.Shaders.Contains(shaderName))
-                //     continue;
-
                 // already handled
                 if (!handledShaders.Add(shaderName))
                     continue;
@@ -117,12 +113,17 @@ public sealed class Packager(
         // most likely no recent light compile if there are no lightmaps
         if (styleLights && map.HasLightmaps)
         {
-            var styleShader = new FileInfo(Path.Combine(map.AssetDirectories[0].FullName, "scripts", $"q3map2_{map.Name}.shader"));
+            var styleShader = new FileInfo(Path.Combine(
+                map.GetMapRoot(),
+                "scripts",
+                $"q3map2_{map.Name}.shader"));
 
             if (styleShader.Exists)
             {
-                FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
-                logger.CheckAndLogTimestampWarning("Stylelight shader", bsp, styleShader);
+                logger.CheckAndLogTimestampWarning(
+                    "Stylelight shader",
+                    new FileInfo(Path.ChangeExtension(map.Path, "bsp")),
+                    styleShader);
                 AddCompileFile(styleShader.FullName);
             }
             else

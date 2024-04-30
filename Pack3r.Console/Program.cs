@@ -62,7 +62,7 @@ public class Program
                 }
                 else
                 {
-                    app.Logger.System($"Running asset discovery for '{mapName}' without creating a pk3");
+                    app.Logger.System($"Running dry run for '{mapName}' without creating a pk3");
                 }
 
                 Stream destination;
@@ -90,15 +90,22 @@ public class Program
 
                 app.Logger.Drain();
 
-                if (options.DryRun)
+                if (!options.DryRun)
                 {
-                    long written = ((CountingStream)destination).Position;
-                    app.Logger.System($"Pk3 size: {(double)written / 1024:N} KB ({written} bytes)");
-                    app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
+                    app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
                 }
                 else
                 {
-                    app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
+                    long written = ((CountingStream)destination).Position;
+
+                    const int kilobyte = 1024;
+                    const int megabyte = 1024 * 1024;
+                    string size = written > megabyte
+                        ? $"{(double)written / megabyte:N} MB"
+                        : $"{(double)written / kilobyte:N} KB";
+
+                    app.Logger.System($"Compressed size: {size} ({written:N0} bytes)");
+                    app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
                 }
             }
             catch (Exception e)
