@@ -1,4 +1,5 @@
-﻿using Pack3r.Extensions;
+﻿using System.Text.RegularExpressions;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r.Extensions;
@@ -99,17 +100,64 @@ public static class StringExtensions
         return false;
     }
 
+    public static ReadOnlyMemory<char> TrimQuotes(this ReadOnlyMemory<char> token)
+    {
+        var keySpan = token.Span;
+
+        if (keySpan.Length >= 2 &&
+            keySpan[0] == '"' &&
+            keySpan[^1] == '"')
+        {
+            return token[1..^1];
+        }
+
+        return token;
+    }
+
+    public static bool TryTrimQuotes(this ReadOnlyMemory<char> token, out ReadOnlyMemory<char> trimmed)
+    {
+        var keySpan = token.Span;
+
+        if (keySpan.Length >= 2 &&
+            keySpan[0] == '"' &&
+            keySpan[^1] == '"')
+        {
+            trimmed = token[1..^1];
+            return true;
+        }
+
+        trimmed = token;
+        return false;
+    }
+
     public static (ReadOnlyMemory<char> key, ReadOnlyMemory<char> value) ReadKeyValue(in this Line line)
     {
-        if (line.Value.Span.IndexOf("\" \"") is int index and >= 0)
+        var enumerator = Tokens.WhitespaceSeparatedTokens().EnumerateMatches(line.Value.Span);
+
+        if (enumerator.MoveNext())
         {
-            return (
-                line.Value[1..index],
-                line.Value[(index + 3)..^1]);
+            var key = line.Value.Slice(enumerator.Current);
+
+            if (key.TryTrimQuotes(out var keyTrimmed) &&
+                enumerator.MoveNext())
+            {
+                var value = line.Value.Slice(enumerator.Current);
+
+                if (value.TryTrimQuotes(out var valueTrimmed) &&
+                    !enumerator.MoveNext())
+                {
+                    return (keyTrimmed, valueTrimmed);
+                }
+            }
         }
 
         ThrowForInvalidKVP(in line);
         return default;
+    }
+
+    public static ReadOnlyMemory<char> Slice(this ReadOnlyMemory<char> token, ValueMatch match)
+    {
+        return token.Slice(match.Index, match.Length);
     }
 
     private static void ThrowForInvalidKVP(in Line line)

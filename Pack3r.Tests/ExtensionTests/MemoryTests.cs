@@ -74,4 +74,29 @@ public static class MemoryTests
     {
         Assert.Equal(expected, Tokens.PackableFile().IsMatch(input));
     }
+
+    [Theory, MemberData(nameof(MapscriptTokens))]
+    public static void Should_Parse_Mapscript_Tokens(string input, string[] expected)
+    {
+        //var tokens = Tokens.MapscriptTokens().Matches(input).Select(m => m.Groups[0].Value.Trim('"')).ToArray();
+        var tokens = new List<string>();
+
+        foreach (var range in Tokens.WhitespaceSeparatedTokens().EnumerateMatches(input))
+            tokens.Add(input.Substring(range.Index, range.Length).Trim('"'));
+
+        Assert.Equal(expected, tokens);
+    }
+
+    public static IEnumerable<object[]> MapscriptTokens => (((string, string[])[])[
+        ("remapshader testi testi", ["remapshader", "testi", "testi"]),
+        ("remapshader \"testi\" testi", ["remapshader", "testi", "testi"]),
+        ("remapshader \"testi\" \"testi\"", ["remapshader", "testi", "testi"]),
+        ("\"origin\" \"-1 -5 -99\"", ["origin", "-1 -5 -99"]),
+        ("\"origin\" \"-24 -72 -96\"", ["origin", "-24 -72 -96"]),
+        ("\"-24 -72 -96\" \"origin\"", [ "-24 -72 -96", "origin"]),
+        ("\"message\" \"hello, world\"", ["message", "hello, world"]),
+    ])
+    .SelectMany(x => new[] { x, (x.Item1.Replace("\" \"", "\"\t\""), x.Item2) })
+    .Select(x => new object[] { x.Item1, x.Item2 });
+
 }

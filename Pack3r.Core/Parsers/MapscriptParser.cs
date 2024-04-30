@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -27,23 +28,9 @@ public class MapscriptParser(
                 continue;
             }
 
-            if (line.MatchPrefix("playsound ", out var token))
+            if (TryRead(in line, out Resource resource))
             {
-                // read first arg, playsound can have multiple, e.g.:
-                //    playsound sound/menu/filter.wav volume 256 looping
-                if (token.TryReadUpToWhitespace(out var firstArg))
-                {
-                    token = firstArg;
-                }
-
-                yield return new Resource(
-                    token.Trim('"').Trim(),
-                    IsShader: false);
-            }
-            else if (line.MatchPrefix("remapshader ", out token))
-            {
-                foreach (var range in token.Split(' '))
-                    yield return new Resource(token[range], IsShader: true);
+                yield return resource;
             }
             else if (Tokens.UnsupportedMapscript().IsMatch(line.Value.Span))
             {
@@ -56,6 +43,39 @@ public class MapscriptParser(
             var keywords = string.Join(", ", unsupported.Select(l => l));
             logger.Warn($"Mapscript has keyword(s) ({keywords}) that can include undiscoverable resources, please manually ensure they are included");
         }
+    }
+
+    private static bool TryRead(in Line line, out Resource resource)
+    {
+        var enumerator = Tokens.WhitespaceSeparatedTokens().EnumerateMatches(line.Value.Span);
+
+        if (enumerator.MoveNext())
+        {
+            var keyword = line.Value.Slice(enumerator.Current).Span;
+
+            if (keyword.EqualsF("playsound"))
+            {
+                // first token is the sound file
+                if (enumerator.MoveNext())
+                {
+                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), IsShader: false);
+                    return true;
+                }
+
+            }
+            else if (keyword.EqualsF("remapshader"))
+            {
+                // second token is the target shader
+                if (enumerator.MoveNext() && enumerator.MoveNext())
+                {
+                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), IsShader: true);
+                    return true;
+                }
+            }
+        }
+
+        resource = default;
+        return false;
     }
 
     public string GetPath(Map map, string? rename = null)

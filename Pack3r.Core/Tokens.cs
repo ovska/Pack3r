@@ -17,6 +17,11 @@ public static partial class Tokens
     [GeneratedRegex("""\.(tga|jpg|mdc|md3|ase|shader|wav|roq|skin)$""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
     public static partial Regex PackableFile();
 
+    [GeneratedRegex("""
+        [^\s"]+|"([^"]*)"
+        """, RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
+    public static partial Regex WhitespaceSeparatedTokens();
+
     public static readonly SearchValues<char> Braces = SearchValues.Create("{}");
     public static readonly SearchValues<char> SpaceOrTab = SearchValues.Create(" \t");
 }

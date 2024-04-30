@@ -25,7 +25,7 @@ public class PackOptions
 
     public bool LoadPk3s { get; set; }
 
-    public required List<string> IgnoreSources { get; init; }
+    public List<string> IgnoreSources { get; init; } = null!;
 
-    public required List<string> ExcludeSources { get; init; }
-}
+    public List<string> ExcludeSources { get; init; } = null!;
+} 
