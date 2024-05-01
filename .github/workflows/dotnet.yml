@@ -48,28 +48,25 @@ jobs:
       with:
         dotnet-version: 8.0.x
     - name: Release
-      run: dotnet publish Pack3r.Console -c Release -o .release -r ${{ matrix.config.rid }}
-#    - name: Create release
-#      id: create_release
-#      uses: actions/create-release@v1
-#      env:
-#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#      with:
-#        tag_name: v0.0.1  # Specify your desired tag name here
-#        release_name: Release v0.0.1  # Specify your desired release name here
-#        body: |
-#          TODO
-    - run: ls -a
-    - run: ls -a Pack3r.Console
-    - run: ls -a ..
-    - run: ls -a ../..
-#    - name: Upload release asset
-#      id: upload-release-asset
-#      uses: actions/upload-release-asset@v1
-#      env:
-#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#      with:
-#        upload_url: ${{ steps.create_release.outputs.upload_url }}
-#        asset_path: Pack3r/.release/  # Path to the directory or file you want to include in the release
-#        asset_name: my-release.zip  # Name of the release asset
-#        asset_content_type: application/zip  # Adjust the content type if necessary
+      run: dotnet publish Pack3r.Console -c Release -o release_dir -r ${{ matrix.config.rid }}
+    - run: ls -a ./release_dir
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v0.0.1  # Specify your desired tag name here
+        release_name: Release v0.0.1  # Specify your desired release name here
+        body: |
+          TODO
+    - name: Upload release asset
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release_dir  # Path to the directory or file you want to include in the release
+        asset_name: my-release.zip  # Name of the release asset
+        asset_content_type: application/zip  # Adjust the content type if necessary
