@@ -40,15 +40,15 @@ jobs:
         config: 
           - os: ubuntu-latest
             rid: linux-x64
-#          - os: windows-latest
-#            rid: win-x64
+          - os: windows-latest
+            rid: win-x64
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    - name: Release
+    - name: Publish
       run: dotnet publish Pack3r.Console --self-contained -c Release -o release_dir -r ${{ matrix.config.rid }}
     - run: ls -a ./release_dir
     - name: Create Zip File
@@ -58,13 +58,14 @@ jobs:
         dest: ./pack3r-release.zip
     - run: ls -a
     - name: Create release
+      if: ${{ matrix.config.rid }} == 'linux-x64'
       id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: v0.0.1  # Specify your desired tag name here
-        release_name: Release v0.0.1  # Specify your desired release name here
+        tag_name: v0.0.2  # Specify your desired tag name here
+        release_name: Release v0.0.2  # Specify your desired release name here
         body: |
           TODO
     - name: Upload release asset
@@ -75,5 +76,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./pack3r-release.zip
-        asset_name: pack3r.zip  # Name of the release asset
+        asset_name: pack3r-${{ matrix.config.rid }}.zip  # Name of the release asset
         asset_content_type: application/zip  # Adjust the content type if necessary
