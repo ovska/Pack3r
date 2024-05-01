@@ -8,11 +8,13 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:  # This allows manual triggering of the workflow
 
 jobs:
   build:
 
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'  # Only run on push events
 
     steps:
     - uses: actions/checkout@v4
@@ -29,6 +31,8 @@ jobs:
 
   release:
     runs-on: ${{ matrix.config.os }}
+    if: github.event_name == 'workflow_dispatch'  # Only run on workflow_dispatch events
+
     strategy:
       matrix:
         config: 
@@ -42,9 +46,5 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
     - name: Release
-      run: dotnet release -c Release --no-build --no-restore -r ${{ matrix.config.rid }}
+      run: dotnet publish Pack3r.Console -c Release -o .release -r ${{ matrix.config.rid }}
