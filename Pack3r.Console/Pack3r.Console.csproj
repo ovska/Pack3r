@@ -33,6 +33,8 @@
 
     <IlcDisableReflection>false</IlcDisableReflection>
     <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+
+    <AssemblyName>Pack3r</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
