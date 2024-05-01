@@ -56,7 +56,6 @@ jobs:
       with:
         files: ./release_dir
         dest: ./pack3r-release.zip
-    - run: ls -a
     - name: Create release
       if: ${{ matrix.config.rid }} == 'linux-x64'
       id: create_release
