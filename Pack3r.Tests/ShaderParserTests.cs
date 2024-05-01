@@ -57,7 +57,6 @@ public class ShaderParserTests
 
         foreach (var shader in results)
         {
-            Assert.Empty(shader.Files);
             Assert.Empty(shader.Shaders);
             Assert.Empty(shader.Resources);
 
@@ -82,7 +81,6 @@ public class ShaderParserTests
 
         Assert.Equal("textures/pgm/light_rec_blu_5000", shader.Name.ToString());
         Assert.Empty(shader.Shaders);
-        Assert.Empty(shader.Files);
         Assert.Empty(shader.Resources);
 
         Assert.Equal("textures/pgm/abal2.tga", shader.ImplicitMapping?.ToString());
@@ -106,7 +104,6 @@ public class ShaderParserTests
 
         Assert.Equal("textures/common/clipweap_glass", shader.Name.ToString());
         Assert.Empty(shader.Shaders);
-        Assert.Empty(shader.Files);
         Assert.Empty(shader.Resources);
     }
 
@@ -134,7 +131,6 @@ public class ShaderParserTests
 
         Assert.Equal("textures/pgm/sky", shader.Name.ToString());
         Assert.Empty(shader.Shaders);
-        Assert.Empty(shader.Files);
 
         Assert.Equal(
             [
@@ -238,17 +234,12 @@ public class ShaderParserTests
 
         Assert.Equal(
             [
+                "models/pgm/ice_haze.md3",
                 "textures/pgm/ice_floor1.jpg",
                 "textures/pgm/iceoverlay.tga",
                 "textures/pgm/ice_effect.tga",
             ],
             shader.Resources.AsStrings());
-
-        Assert.Equal(
-            [
-                "models/pgm/ice_haze.md3",
-            ],
-            shader.Files.AsStrings());
     }
 
     [Fact]
@@ -276,7 +267,6 @@ public class ShaderParserTests
             }
             """);
 
-        Assert.Empty(shader.Files);
         Assert.Empty(shader.Shaders);
 
         Assert.Equal(2, shader.Resources.Count);
