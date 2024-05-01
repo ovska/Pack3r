@@ -39,6 +39,7 @@ public class ShaderParser(
         CancellationToken cancellationToken)
     {
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders = new(ROMCharComparer.Instance);
+        ConcurrentDictionary<ReadOnlyMemory<char>, List<Shader>> duplicateShaders = new(ROMCharComparer.Instance);
 
         var whitelistsBySource = await ParseShaderLists(map, cancellationToken);
         int shaderFileCount = 0;
@@ -53,27 +54,29 @@ public class ShaderParser(
                 {
                     progress.Report(Interlocked.Increment(ref shaderFileCount));
 
-                    var fileName = Path.GetFileNameWithoutExtension(name);
+                    string fileName = Path.GetFileNameWithoutExtension(name);
 
                     if (whitelist?.Contains(fileName.AsMemory()) == false)
                     {
-                        logger.Debug($"Skipped parsing shaders from {name} (not in shaderlist)");
+                        logger.Debug($"Skipped parsing shaders from {getName()} (not in shaderlist)");
                         return true;
                     }
 
                     if (fileName.EqualsF("q3shadersCopyForRadiant"))
                     {
-                        logger.Debug($"Skipped parsing Radiant specific file {name}");
+                        logger.Debug($"Skipped parsing Radiant specific file {getName()}");
                         return true;
                     }
 
                     if (fileName.StartsWithF("q3map_") || fileName.StartsWithF("q3map2_"))
                     {
-                        logger.Debug($"Skipped shader parsing from compiler generated file {fileName}");
+                        logger.Debug($"Skipped shader parsing from compiler generated file '{getName()}'");
                         return true;
                     }
 
                     return false;
+
+                    string getName() => Path.Combine(source.RootPath, "scripts", name);
                 }
 
                 await foreach (var shader in source.EnumerateShaders(this, skipPredicate, ct))
@@ -83,17 +86,7 @@ public class ShaderParser(
                         addValueFactory: static (_, tuple) => tuple.shader,
                         updateValueFactory: static (_, a, tuple) =>
                         {
-                            var (b, logger, map) = tuple;
-
-                            // compile time shader, ignore
-                            if (!a.NeededInPk3 && !b.NeededInPk3)
-                                return a;
-
-                            // eary exit for pak0
-                            if (a.Source.IsPak0 || b.Source.IsPak0)
-                            {
-                                return a.Source.IsPak0 ? a : b;
-                            }
+                            var (b, logger, map, duplicate) = tuple;
 
                             int cmp = map.AssetSources.IndexOf(a.Source).CompareTo(map.AssetSources.IndexOf(b.Source));
 
@@ -108,10 +101,17 @@ public class ShaderParser(
                                 return toReturn;
                             }
 
-                            logger.Warn($"Shader {b.Name} found multiple times in file {b.DestinationPath} in '{b.Source.RootPath}'");
+                            if (!a.Source.IsPak0 || !b.Source.IsPak0)
+                            {
+                                duplicate.AddOrUpdate(
+                                    key: a.Name,
+                                    addValueFactory: static (_, arg) => [arg.a, arg.b],
+                                    updateValueFactory: static (_, existing, arg) => [arg.a, arg.b, .. existing],
+                                    (a, b));
+                            }
                             return a;
                         },
-                        factoryArgument: (shader, logger, map));
+                        factoryArgument: (shader, logger, map, duplicateShaders));
                 }
             }).ConfigureAwait(false);
         }
@@ -124,16 +124,18 @@ public class ShaderParser(
             map,
             map.Shaders,
             allShaders,
+            duplicateShaders,
             included,
             cancellationToken);
 
         return included;
     }
 
-    private static void AddShaders(
+    private void AddShaders(
         Map map,
         IEnumerable<ReadOnlyMemory<char>> shaders,
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders,
+        ConcurrentDictionary<ReadOnlyMemory<char>, List<Shader>> duplicateShaders,
         Dictionary<ReadOnlyMemory<char>, Shader> included,
         CancellationToken cancellationToken)
     {
@@ -152,12 +154,19 @@ public class ShaderParser(
 
             included.Add(name, shader);
 
+            if (duplicateShaders.TryRemove(name, out List<Shader>? duplicates))
+            {
+                var display = string.Join(", ", duplicates.Select(s => $"'{s.GetAbsolutePath()}'"));
+                logger.Warn($"Shader '{name}' found in multiple sources: {display}");
+            }
+
             if (shader.Shaders.Count != 0)
             {
                 AddShaders(
                     map,
                     shader.Shaders,
                     allShaders,
+                    duplicateShaders,
                     included,
                     cancellationToken);
             }
@@ -276,7 +285,7 @@ public class ShaderParser(
                     // $lightmap, $whiteimage etc
                     if (token.Span[0] != '$')
                     {
-                        shader.Textures.Add(token);
+                        shader.Resources.Add(token);
                     }
                 }
                 else if (line.MatchPrefix("animMap ", out token))
@@ -285,7 +294,7 @@ public class ShaderParser(
                     if (token.TryReadPastWhitespace(out token))
                     {
                         foreach (var range in token.Split(' '))
-                            shader.Textures.Add(token[range]);
+                            shader.Resources.Add(token[range]);
                     }
                     else
                     {
@@ -294,7 +303,7 @@ public class ShaderParser(
                 }
                 else if (line.MatchPrefix("videomap ", out token))
                 {
-                    shader.Files.Add(token);
+                    shader.Resources.Add(token);
                 }
 
                 continue;
@@ -340,7 +349,7 @@ public class ShaderParser(
                         if (line.MatchPrefix(prefix, out token))
                         {
                             if (!token.Span.StartsWith("$", StringComparison.Ordinal))
-                                shader.Textures.Add(token);
+                                shader.Resources.Add(token);
                             found = true;
                             break;
                         }
@@ -383,7 +392,7 @@ public class ShaderParser(
 
                     foreach (var suffix in _skySuffixes)
                     {
-                        shader.Textures.Add($"{token}{suffix}".AsMemory());
+                        shader.Resources.Add($"{token}{suffix}".AsMemory());
                     }
                 }
                 else if (line.MatchPrefix("sunshader ", out token))
@@ -394,7 +403,7 @@ public class ShaderParser(
                 {
                     if (token.TryReadUpToWhitespace(out token))
                     {
-                        shader.Files.Add(token);
+                        shader.Resources.Add(token);
                     }
                     else
                     {

@@ -59,7 +59,7 @@ public class ShaderParserTests
         {
             Assert.Empty(shader.Files);
             Assert.Empty(shader.Shaders);
-            Assert.Empty(shader.Textures);
+            Assert.Empty(shader.Resources);
 
             Assert.Equal(Path.ChangeExtension(shader.Name.ToString(), "tga"), shader.ImplicitMapping?.ToString());
         }
@@ -83,7 +83,7 @@ public class ShaderParserTests
         Assert.Equal("textures/pgm/light_rec_blu_5000", shader.Name.ToString());
         Assert.Empty(shader.Shaders);
         Assert.Empty(shader.Files);
-        Assert.Empty(shader.Textures);
+        Assert.Empty(shader.Resources);
 
         Assert.Equal("textures/pgm/abal2.tga", shader.ImplicitMapping?.ToString());
     }
@@ -107,7 +107,7 @@ public class ShaderParserTests
         Assert.Equal("textures/common/clipweap_glass", shader.Name.ToString());
         Assert.Empty(shader.Shaders);
         Assert.Empty(shader.Files);
-        Assert.Empty(shader.Textures);
+        Assert.Empty(shader.Resources);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public class ShaderParserTests
                 "textures/pgm/sky/desert194_rt",
                 "textures/pgm/sky/desert194_up",
             ],
-            shader.Textures.AsStrings().Order());
+            shader.Resources.AsStrings().Order());
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public class ShaderParserTests
                 "textures/sfx/flame8.tga",
                 "textures/sfx/flameball.tga",
             ],
-            shader.Textures.AsStrings().Order().Distinct());
+            shader.Resources.AsStrings().Order().Distinct());
     }
 
     [Fact]
@@ -242,7 +242,7 @@ public class ShaderParserTests
                 "textures/pgm/iceoverlay.tga",
                 "textures/pgm/ice_effect.tga",
             ],
-            shader.Textures.AsStrings());
+            shader.Resources.AsStrings());
 
         Assert.Equal(
             [
@@ -279,9 +279,9 @@ public class ShaderParserTests
         Assert.Empty(shader.Files);
         Assert.Empty(shader.Shaders);
 
-        Assert.Equal(2, shader.Textures.Count);
+        Assert.Equal(2, shader.Resources.Count);
         Assert.Equal(
             ["textures/effects/envmap_slate.tga", "models/powerups/holdable/binoc.jpg"],
-            shader.Textures.Select(t => t.ToString()));
+            shader.Resources.Select(t => t.ToString()));
     }
 }

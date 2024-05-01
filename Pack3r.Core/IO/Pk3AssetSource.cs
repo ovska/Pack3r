@@ -24,7 +24,7 @@ public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipAr
     private readonly ZipArchive _archive = ZipFile.OpenRead(path);
     private bool _disposed;
 
-    public override string ToString() => ArchivePath;
+    public override string ToString() => $"{{ Pk3: {ArchivePath} }}";
 
     public override bool Contains(ReadOnlyMemory<char> relativePath)
     {

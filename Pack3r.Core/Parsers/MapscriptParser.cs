@@ -39,7 +39,7 @@ public class MapscriptParser(
 
         if (unsupported.Count > 0)
         {
-            var keywords = string.Join(", ", unsupported.Select(l => l));
+            var keywords = string.Join(", ", unsupported.Select(l => $"'{l}'"));
             logger.Warn($"Mapscript has keyword(s) ({keywords}) that can include undiscoverable resources, please manually ensure they are included");
         }
     }
@@ -79,9 +79,6 @@ public class MapscriptParser(
 
     public string GetPath(Map map, string? rename = null)
     {
-        return Path.Combine(
-            map.GetMapRoot(),
-            "maps",
-            $"{rename ?? map.Name}.script");
+        return Path.Combine(map.GetMapRoot(), "maps", $"{rename ?? map.Name}.script");
     }
 }

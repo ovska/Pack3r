@@ -93,15 +93,7 @@ public sealed class Packager(
                     AddFileRelative(implicitMapping);
                 }
 
-                foreach (var file in shader.Files)
-                {
-                    if (IsHandledOrExcluded(file))
-                        continue;
-
-                    AddFileRelative(file);
-                }
-
-                foreach (var file in shader.Textures)
+                foreach (var file in shader.Resources)
                 {
                     if (IsHandledOrExcluded(file))
                         continue;

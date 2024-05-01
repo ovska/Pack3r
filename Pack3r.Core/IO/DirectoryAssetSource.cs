@@ -11,7 +11,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory) : AssetSource<
     public override string RootPath => Directory.FullName;
     public override bool IsPak0 => false;
 
-    public override string ToString() => Directory.FullName;
+    public override string ToString() => $"{{ Dir: {Directory.FullName} }}";
 
     public override bool Contains(ReadOnlyMemory<char> relativePath)
     {
