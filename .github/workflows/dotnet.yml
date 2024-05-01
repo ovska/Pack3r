@@ -28,7 +28,7 @@ jobs:
       run: dotnet test --no-build --verbosity normal
 
   release:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.config.os }}
     strategy:
       matrix:
         config: 
@@ -47,4 +47,4 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Release
-      run: dotnet release -c Release --no-build --no-restore -r ${{ matrix.rid }}
+      run: dotnet release -c Release --no-build --no-restore -r ${{ matrix.config.rid }}
