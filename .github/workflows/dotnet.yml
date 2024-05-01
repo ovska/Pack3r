@@ -49,7 +49,7 @@ jobs:
       with:
         dotnet-version: 8.0.x
     - name: Release
-      run: dotnet publish Pack3r.Console -c Release -o release_dir -r ${{ matrix.config.rid }}
+      run: dotnet publish Pack3r.Console --self-contained -c Release -o release_dir -r ${{ matrix.config.rid }}
     - run: ls -a ./release_dir
     - name: Create Zip File
       uses: papeloto/action-zip@v1
