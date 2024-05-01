@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.IO.Compression;
 using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
@@ -19,6 +20,13 @@ public abstract class AssetSource : IDisposable
         ZipArchive destination,
         ReadOnlyMemory<char> relativePath,
         out ZipArchiveEntry? entry);
+
+    public abstract bool TryRead(
+        ReadOnlyMemory<char> resourcePath,
+        ILineReader reader,
+        LineOptions options,
+        CancellationToken cancellationToken,
+        [NotNullWhen(true)] out IAsyncEnumerable<Line>? lines);
 
     public abstract IAsyncEnumerable<Shader> EnumerateShaders(
         IShaderParser parser,

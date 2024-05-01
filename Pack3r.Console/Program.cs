@@ -24,6 +24,7 @@ public class Program
             .Bind<IResourceParser>(3).To<SpeakerScriptParser>()
             .Bind<IShaderParser>().To<ShaderParser>()
             .Bind<IMapFileParser>().To<MapFileParser>()
+            .Bind<IModelParser>().To<ModelParser>()
             .Bind<IAssetService>().To<AssetService>()
             .Bind<LoggerBase>().To<LoggerBase>()
             .Bind<ILogger<TT>>().To<Logger<TT>>()

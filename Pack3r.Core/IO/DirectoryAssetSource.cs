@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Models;
 using Pack3r.Parsers;
@@ -38,6 +39,23 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory) : AssetSource<
         }
 
         entry = null;
+        return false;
+    }
+
+    public override bool TryRead(
+        ReadOnlyMemory<char> resourcePath,
+        ILineReader reader,
+        LineOptions options,
+        CancellationToken cancellationToken,
+        [NotNullWhen(true)] out IAsyncEnumerable<Line>? lines)
+    {
+        if (Assets.TryGetValue(resourcePath, out var file))
+        {
+            lines = reader.ReadLines(file.FullName, options, cancellationToken);
+            return true;
+        }
+
+        lines = null;
         return false;
     }
 

@@ -3,7 +3,7 @@ using Pack3r.IO;
 
 namespace Pack3r.Models;
 
-[DebuggerDisplay("Shader '{Name}' in {GetAbsolutePath()}")]
+[DebuggerDisplay("{DebuggerDisplay,nq}")]
 public sealed class Shader(
     ReadOnlyMemory<char> name,
     string relativePath,
@@ -52,4 +52,6 @@ public sealed class Shader(
     {
         return Equals(obj as Shader);
     }
+
+    private string DebuggerDisplay => $"Shader '{Name}' in {Path.GetFileName(Source.RootPath)}/{DestinationPath}";
 }

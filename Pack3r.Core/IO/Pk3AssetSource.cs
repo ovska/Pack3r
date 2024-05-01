@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.Models;
@@ -29,6 +30,23 @@ public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipAr
     public override bool Contains(ReadOnlyMemory<char> relativePath)
     {
         return Assets.ContainsKey(relativePath);
+    }
+
+    public override bool TryRead(
+        ReadOnlyMemory<char> resourcePath,
+        ILineReader reader,
+        LineOptions options,
+        CancellationToken cancellationToken,
+        [NotNullWhen(true)] out IAsyncEnumerable<Line>? lines)
+    {
+        if (Assets.TryGetValue(resourcePath, out var entry))
+        {
+            lines = reader.ReadLines(ArchivePath, entry, options, cancellationToken);
+            return true;
+        }
+
+        lines = null;
+        return false;
     }
 
     public override bool TryHandleAsset(

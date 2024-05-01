@@ -33,6 +33,7 @@ public class MapFileParser(
         HashSet<ROMC> nonPrefixedShaders = new(ROMCharComparer.Instance);
         HashSet<ROMC> shaders = new(ROMCharComparer.Instance);
         HashSet<ROMC> resources = new(ROMCharComparer.Instance);
+        HashSet<ROMC> referenceResources = new(ROMCharComparer.Instance);
 
         ROMC currentEntity = default;
         bool hasStyleLights = false;
@@ -224,7 +225,12 @@ public class MapFileParser(
                 {
                     if (key.Length == 5)
                     {
-                        if (_devFiles || !IsClassName("misc_model"))
+                        // include misc_model .ase and .md3 files in reference assets if dev files not included
+                        if (!_devFiles && IsClassName("misc_model"))
+                        {
+                            referenceResources.Add(value);
+                        }
+                        else
                         {
                             resources.Add(value);
                         }

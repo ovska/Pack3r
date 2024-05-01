@@ -17,7 +17,8 @@ public class AssetService(
     PackOptions options,
     ILogger<AssetService> logger,
     IMapFileParser mapFileParser,
-    IEnumerable<IResourceParser> resourceParsers)
+    IEnumerable<IResourceParser> resourceParsers,
+    IModelParser modelParser)
     : IAssetService
 {
     public async Task<Map> GetPackingData(CancellationToken cancellationToken)
@@ -77,6 +78,11 @@ public class AssetService(
         foreach (var (resource, _) in referencedResources)
         {
             (resource.IsShader ? map.Shaders : map.Resources).Add(resource.Value);
+        }
+
+        await foreach (var modelShaderName in modelParser.ParseModelShaders(map, cancellationToken))
+        {
+            map.Shaders.Add(modelShaderName);
         }
 
         // add .map
