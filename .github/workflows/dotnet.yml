@@ -51,6 +51,12 @@ jobs:
     - name: Release
       run: dotnet publish Pack3r.Console -c Release -o release_dir -r ${{ matrix.config.rid }}
     - run: ls -a ./release_dir
+    - name: Create Zip File
+      uses: papeloto/action-zip@v1
+      with:
+        files: ./release_dir
+        dest: ./pack3r-release.zip
+    - run: ls -a
     - name: Create release
       id: create_release
       uses: actions/create-release@v1
@@ -68,6 +74,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./release_dir  # Path to the directory or file you want to include in the release
-        asset_name: my-release.zip  # Name of the release asset
+        asset_path: ./pack3r-release.zip
+        asset_name: pack3r.zip  # Name of the release asset
         asset_content_type: application/zip  # Adjust the content type if necessary
