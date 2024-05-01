@@ -4,15 +4,17 @@
 name: .NET
 
 on:
-  push:
-    branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-  workflow_dispatch:  # This allows manual triggering of the workflow
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+      description:
+        required: true
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
 
@@ -29,10 +31,25 @@ jobs:
     - name: Test
       run: dotnet test --no-build --verbosity normal
 
-  release:
+  create_release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ inputs.version }} 
+        release_name: Release ${{ inputs.version }}
+        body: ${{ inputs.description }}
+
+  publish:
     permissions:
       contents: write
     runs-on: ${{ matrix.config.os }}
+    needs: create_release
     if: github.event_name == 'workflow_dispatch'  # Only run on workflow_dispatch events
 
     strategy:
@@ -43,9 +60,6 @@ jobs:
           - os: windows-latest
             rid: win-x64
     steps:
-#    - shell: powershell
-#      run: |
-#        "mypath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
     - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -58,24 +72,13 @@ jobs:
       with:
         files: ./release_dir
         dest: ./pack3r-release.zip
-    - name: Create release
-      if: matrix.config.rid == 'linux-x64'
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v0.0.2  # Specify your desired tag name here
-        release_name: Release v0.0.2  # Specify your desired release name here
-        body: |
-          TODO
     - name: Upload release asset
       id: upload-release-asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        upload_url: ${{ needs.create_release.outputs.upload_url }}
         asset_path: ./pack3r-release.zip
-        asset_name: pack3r-${{ matrix.config.rid }}.zip  # Name of the release asset
+        asset_name: pack3r-${{ inputs.version }}-${{ matrix.config.rid }}.zip  # Name of the release asset
         asset_content_type: application/zip  # Adjust the content type if necessary
