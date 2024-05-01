@@ -3,10 +3,10 @@
 Create release-ready pk3 archives quickly. Pack3r uses NetRadiant `.map`-files, shaders, mapscripts and sound/speakerscripts for asset discovery and includes only files required to play the map in the pk3.
 
 ## Usage
-`Pack3r.Console <map> <options>`
+`Pack3r <map> <options>`
 
 ### Arguments:
-<map>  Path to the .map file [required]
+`<map>`  Path to the .map file [required]
 
 ### Options:
 + `-o, --output` Path of destination directory or pk3 name, defaults to etmain
@@ -19,7 +19,7 @@ Create release-ready pk3 archives quickly. Pack3r uses NetRadiant `.map`-files, 
 + `-f, --force` Overwrite existing files in the output path with impunity [default: False]
 + `-i, --includepk3` Include pk3 files and pk3dirs in etmain when indexing files [default: False]
 + `-?, -h, --help` Show help and usage information
-+ `-v, --version` Show version information
++ `--version` Show version information
 
 Example:
 
@@ -28,10 +28,10 @@ Example:
 ```
 
 ## Limitations
-- Only NetRadiant `.map` files are supported, not GTKRadiant
+- Only brush primitives map format is supported (NetRadiant default)
 - `.ase`, `.md3` and `.skin` files aren't parsed to see which textures and shaders they use.
-- `terrain` shaders are not supported.
-- `--rename` does not take into account arena/objdata files, or levelshots-shaders (yet)
+- `terrain` shaders (1to2 etc) are not supported.
+- `--rename` does not yet work for levelshots-shaders
 
 ## File priority order
 1. `pak0.pk3`, if a file or shader is found in pak0, it won't be included in the release
