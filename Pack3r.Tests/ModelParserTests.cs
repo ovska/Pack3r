@@ -376,10 +376,13 @@ public static class ModelParserTests
             }
             """);
 
-        var parser = new ModelParser(NullLogger<ModelParser>.Instance, reader, new NoOpProgressManager());
+        var parser = new AseParser(NullLogger<AseParser>.Instance, reader);
 
-        var results = await parser.ParseAse(null!, default, reader.ReadLines("", default, default)).ToList();
+        var results = await parser.Parse("", default);
 
+        Assert.NotNull(results);
         Assert.Single(results);
+        Assert.Equal("textures/pgm_props/crate_01", results.First().Value.ToString());
+        Assert.True(results.First().IsShader);
     }
 }

@@ -10,8 +10,10 @@ public static class Md3ParserTests
     {
         var path = Path.GetFullPath("../../../TestData/etmain/models/spire_active_red.md3");
         var parser = new Md3Parser(NullLogger<Md3Parser>.Instance);
-        var shaders = await parser.ReadShaders(path, default);
+        var result = await parser.Parse(path, default);
 
+        Assert.NotNull(result);
+        Assert.All(result, s => Assert.True(s.IsShader));
         Assert.Equal(
         [
             "textures/pgm/spire_bar3",
@@ -23,6 +25,6 @@ public static class Md3ParserTests
             "textures/pgm/spire_glass",
             "textures/pgm/spire_abal6_small",
             "textures/pgm/crystal_red",
-        ], shaders);
+        ], result!.Select(s => s.Value.ToString()));
     }
 }
