@@ -38,7 +38,6 @@ public class MapFileParser(
         ROMC currentEntity = default;
         bool hasStyleLights = false;
 
-        List<ROMC> unsupSkins = [];
         List<ROMC> unsupTerrains = [];
 
         int lineCount = 0;
@@ -173,12 +172,6 @@ public class MapFileParser(
             }
         }
 
-        if (unsupSkins.Count > 0)
-        {
-            string entities = string.Join(", ", unsupSkins);
-            logger.Warn($"Resources referenced by skins are not supported, please include manually (on entities: {entities})");
-        }
-
         if (unsupTerrains.Count > 0)
         {
             string entities = string.Join(", ", unsupTerrains);
@@ -246,7 +239,6 @@ public class MapFileParser(
                 }
                 else if (key.EqualsF("skin") || key.EqualsF("_skin"))
                 {
-                    unsupSkins.Add(currentEntity);
                     resources.Add(value);
                     referenceResources.Add(value);
                 }

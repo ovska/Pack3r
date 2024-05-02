@@ -26,6 +26,7 @@ public class Program
             .Bind<IMapFileParser>().To<MapFileParser>()
             .Bind<IReferenceParser>(1).To<AseParser>()
             .Bind<IReferenceParser>(2).To<Md3Parser>()
+            .Bind<IReferenceParser>(3).To<SkinParser>()
             .Bind<IReferenceResourceParser>().To<ReferenceResourceParser>()
             .Bind<IAssetService>().To<AssetService>()
             .Bind<LoggerBase>().To<LoggerBase>()
