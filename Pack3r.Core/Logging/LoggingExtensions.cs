@@ -25,7 +25,7 @@ public static class LoggingExtensions
         {
             var d = delta.Days;
             var h = delta.Hours;
-            logger.Warn($"{type} file(s) have different timestamps than BSP ({d}d {h}h), ensure they are from a recent compile");
+            logger.Warn($"{type} mismatch with BSP timestamp by {d}d {h}h, ensure some files aren't from an older compile");
         }
 
         return isStale;

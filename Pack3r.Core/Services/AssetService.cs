@@ -44,6 +44,7 @@ public class AssetService(
             ETMain = etmainDirectory,
             Resources = assets.Resources,
             ReferenceResources = assets.ReferenceResources,
+            MiscModels = assets.MiscModels,
             Shaders = assets.Shaders,
             HasStyleLights = assets.HasStyleLights,
             RenamableResources = [],
@@ -111,7 +112,7 @@ public class AssetService(
             for (int i = 0; i < lmFiles.Length; i++)
             {
                 FileInfo? file = lmFiles[i];
-                timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmap", bsp, file);
+                timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmaps", bsp, file);
 
                 map.RenamableResources.Add(new()
                 {

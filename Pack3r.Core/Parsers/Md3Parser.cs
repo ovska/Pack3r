@@ -121,8 +121,11 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
             {
                 if (shader.name.TryGetString(out string? shaderName))
                 {
-                    bool isShader = shaderName.GetExtension().IsEmpty;
-                    shadersHashSet.Add(new Resource(shaderName.Replace('\\', '/').AsMemory(), IsShader: isShader));
+                    if (!string.IsNullOrEmpty(shaderName))
+                    {
+                        bool isShader = shaderName.GetExtension().IsEmpty;
+                        shadersHashSet.Add(new Resource(shaderName.Replace('\\', '/').AsMemory(), IsShader: isShader));
+                    }
                 }
                 else
                 {

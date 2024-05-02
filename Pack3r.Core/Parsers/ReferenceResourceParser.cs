@@ -1,4 +1,6 @@
 ﻿using System.IO.Compression;
+using System.Threading;
+using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
@@ -23,62 +25,106 @@ public class ReferenceResourceParser(
         Map map,
         CancellationToken cancellationToken)
     {
-        using var progress = progressManager.Create("Parsing md3, ase and skin files for assets", map.ReferenceResources.Count);
-        int counter = 0;
+        // remove all misc_models that are referenced elsewhere, as all their assets are 100% needed in that case
+        if (map.MiscModels.Count > 0)
+        {
+            foreach (var res in map.ReferenceResources.Concat(map.Resources))
+            {
+                if (map.MiscModels.Remove(res) && map.MiscModels.Count == 0)
+                    break;
+            }
+        }
 
-        foreach (var resource in map.ReferenceResources)
+        int counter = 0;
+        using var progress = progressManager.Create(
+            "Parsing md3, ase and skin files for assets",
+            map.ReferenceResources.Count + map.MiscModels.Count);
+
+        foreach (var resource in map.ReferenceResources.Concat(map.MiscModels.Keys))
         {
             progress.Report(++counter);
 
-            foreach (var parser in parsers)
+            var result = await TryParse(map, resource, cancellationToken);
+
+            if (result is null)
             {
-                if (!parser.CanParse(resource))
-                    continue;
+                continue;
+            }
 
-                HashSet<Resource>? result = null;
-                bool fileFound = false;
-
-                foreach (var source in map.AssetSources)
+            // if the misc_model is still present, this resource is ONLY a misc_model
+            // and we can try to trim the values
+            if (map.MiscModels.TryGetValue(resource, out var instances))
+            {
+                foreach (var item in result.ToArray()) // loop over a copy
                 {
-                    if (source is DirectoryAssetSource dirSource)
+                    bool allRemapped = true;
+
+                    foreach (ReferenceMiscModel instance in instances)
                     {
-                        if (dirSource.Assets.TryGetValue(resource, out FileInfo? file))
+                        if (!instance.Remaps.TryGetValue(item.Value, out var remap) ||
+                            item.Value.EqualsF(remap.Span))
                         {
-                            fileFound = true;
-                            result = await parser.Parse(file.FullName, cancellationToken);
-                        }
-                    }
-                    else if (source is Pk3AssetSource pk3Source)
-                    {
-                        if (pk3Source.Assets.TryGetValue(resource, out ZipArchiveEntry? entry))
-                        {
-                            fileFound = true;
-                            result = await parser.Parse(entry, pk3Source.ArchivePath, cancellationToken);
+                            allRemapped = false;
+                            break;
                         }
                     }
 
-                    // found
-                    if (result is not null)
+                    // this resource is remapped on all instances using this
+                    if (allRemapped)
                     {
-                        break;
+                        result.Remove(item);
                     }
                 }
+            }
 
-                if (!fileFound)
-                {
-                    logger.Warn($"Reference resource not found: '{resource}'");
-                }
+            foreach (var item in result)
+            {
+                (item.IsShader ? map.Shaders : map.Resources).Add(item.Value);
+            }
+        }
+    }
 
-                if (result is not null)
-                {
-                    foreach (var parsed in result)
-                    {
-                        (parsed.IsShader ? map.Shaders : map.Resources).Add(parsed.Value);
-                    }
-                }
+    private Task<HashSet<Resource>?> TryParse(
+        Map map,
+        ReadOnlyMemory<char> resource,
+        CancellationToken cancellationToken)
+    {
+        IReferenceParser? parser = null;
 
+        foreach (var item in parsers)
+        {
+            if (item.CanParse(resource))
+            {
+                parser = item;
                 break;
             }
         }
+
+        if (parser is null)
+        {
+            logger.Warn($"Unsupported reference resource type: {resource}");
+            return Task.FromResult(default(HashSet<Resource>));
+        }
+
+        foreach (var source in map.AssetSources)
+        {
+            if (source is DirectoryAssetSource dirSource)
+            {
+                if (dirSource.Assets.TryGetValue(resource, out FileInfo? file))
+                {
+                    return parser.Parse(file.FullName, cancellationToken);
+                }
+            }
+            else if (source is Pk3AssetSource pk3Source)
+            {
+                if (pk3Source.Assets.TryGetValue(resource, out ZipArchiveEntry? entry))
+                {
+                    return parser.Parse(entry, pk3Source.ArchivePath, cancellationToken);
+                }
+            }
+        }
+
+        logger.Warn($"Reference resource not found in source(s): '{resource}'");
+        return Task.FromResult(default(HashSet<Resource>));
     }
 }

@@ -130,26 +130,36 @@ public static class StringExtensions
         return false;
     }
 
-    public static (ReadOnlyMemory<char> key, ReadOnlyMemory<char> value) ReadKeyValue(in this Line line)
+    public static bool TryReadKeyValue(this ReadOnlyMemory<char> line, out (ReadOnlyMemory<char> key, ReadOnlyMemory<char> value) kvp)
     {
-        var enumerator = Tokens.WhitespaceSeparatedTokens().EnumerateMatches(line.Value.Span);
+        var enumerator = Tokens.WhitespaceSeparatedTokens().EnumerateMatches(line.Span);
 
         if (enumerator.MoveNext())
         {
-            var key = line.Value.Slice(enumerator.Current);
+            var key = line.Slice(enumerator.Current);
 
             if (key.TryTrimQuotes(out var keyTrimmed) &&
                 enumerator.MoveNext())
             {
-                var value = line.Value.Slice(enumerator.Current);
+                var value = line.Slice(enumerator.Current);
 
                 if (value.TryTrimQuotes(out var valueTrimmed) &&
                     !enumerator.MoveNext())
                 {
-                    return (keyTrimmed, valueTrimmed);
+                    kvp = (keyTrimmed, valueTrimmed);
+                    return true;
                 }
             }
         }
+
+        kvp = default;
+        return false;
+    }
+
+    public static (ReadOnlyMemory<char> key, ReadOnlyMemory<char> value) ReadKeyValue(in this Line line)
+    {
+        if (TryReadKeyValue(line.Value, out var kvp))
+            return kvp;
 
         ThrowForInvalidKVP(in line);
         return default;

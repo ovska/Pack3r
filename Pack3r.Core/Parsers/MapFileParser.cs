@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -20,8 +21,6 @@ public class MapFileParser(
     PackOptions options)
     : IMapFileParser
 {
-    private readonly bool _devFiles = options.IncludeSource;
-
     public async Task<MapAssets> ParseMapAssets(
         string path,
         CancellationToken cancellationToken)
@@ -34,6 +33,7 @@ public class MapFileParser(
         HashSet<ROMC> shaders = new(ROMCharComparer.Instance);
         HashSet<ROMC> resources = new(ROMCharComparer.Instance);
         HashSet<ROMC> referenceResources = new(ROMCharComparer.Instance);
+        Dictionary<ROMC, List<ReferenceMiscModel>> miscModels = new(ROMCharComparer.Instance);
 
         ROMC currentEntity = default;
         bool hasStyleLights = false;
@@ -185,6 +185,7 @@ public class MapFileParser(
             Shaders = shaders,
             Resources = resources,
             ReferenceResources = referenceResources,
+            MiscModels = miscModels,
             HasStyleLights = hasStyleLights,
         };
 
@@ -197,37 +198,29 @@ public class MapFileParser(
                 if (key.IsEmpty)
                     continue;
 
-                if (key[0] == '_' && key.Length >= 4 && key[1] != 's')
-                {
-                    if (key.StartsWithF("_remap"))
-                    {
-                        var ranges = value.Split(';');
+                // _remap handled elsewhere
 
-                        if (ranges.Count >= 2)
-                            shaders.Add(value[ranges[1]]);
-                    }
-                    else if (key.EqualsF("_fog"))
-                    {
-                        shaders.Add(value);
-                    }
-                    else if (key.EqualsF("_celshader"))
-                    {
-                        shaders.Add($"textures/{value}".AsMemory());
-                    }
+                if (key.EqualsF("_fog"))
+                {
+                    shaders.Add(value);
+                }
+                else if (key.EqualsF("_celshader"))
+                {
+                    shaders.Add($"textures/{value}".AsMemory());
                 }
                 else if (key.StartsWithF("model"))
                 {
                     if (key.Length == 5)
                     {
-                        referenceResources.Add(value);
-
-                        // include misc_model .ase and .md3 files in reference assets if dev files not included
-                        if (!_devFiles && IsClassName("misc_model"))
+                        if (!options.IncludeSource && IsClassName("misc_model"))
                         {
-                            referenceResources.Add(value);
+                            ref var list = ref CollectionsMarshal.GetValueRefOrAddDefault(miscModels, value, out _);
+                            list ??= [];
+                            list.Add(new ReferenceMiscModel(value, entitydata));
                         }
                         else
                         {
+                            referenceResources.Add(value);
                             resources.Add(value);
                         }
                     }

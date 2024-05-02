@@ -118,7 +118,7 @@ public sealed class Packager(
             if (styleShader.Exists)
             {
                 logger.CheckAndLogTimestampWarning(
-                    "Stylelight shader",
+                    $"Stylelight shader ({styleShader.Name})",
                     new FileInfo(Path.ChangeExtension(map.Path, "bsp")),
                     styleShader);
                 AddCompileFile(styleShader.FullName);

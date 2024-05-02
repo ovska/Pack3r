@@ -1,4 +1,6 @@
-﻿namespace Pack3r.Models;
+﻿using Pack3r.Extensions;
+
+namespace Pack3r.Models;
 
 public class MapAssets
 {
@@ -13,12 +15,52 @@ public class MapAssets
     public required HashSet<ReadOnlyMemory<char>> Resources { get; init; }
 
     /// <summary>
-    /// Models and skins that reference other files.
+    /// Models and skins that may reference other files.
     /// </summary>
     public required HashSet<ReadOnlyMemory<char>> ReferenceResources { get; init; }
+
+    /// <summary>
+    /// misc_models which may have remaps
+    /// </summary>
+    public required Dictionary<ReadOnlyMemory<char>, List<ReferenceMiscModel>> MiscModels { get; init; }
 
     /// <summary>
     /// Whether the map has stylelights, and the q3map_mapname.shader file needs to be included.
     /// </summary>
     public required bool HasStyleLights { get; init; }
+}
+
+public sealed class ReferenceMiscModel
+{
+    public ReadOnlyMemory<char> Model { get; }
+    public Dictionary<ReadOnlyMemory<char>, ReadOnlyMemory<char>> Remaps { get; }
+
+    public ReferenceMiscModel(
+        ReadOnlyMemory<char> model,
+        Dictionary<ReadOnlyMemory<char>, ReadOnlyMemory<char>> entitydata)
+    {
+        Model = model;
+
+        Remaps = new(ROMCharComparer.Instance);
+
+        foreach (var (key, value) in entitydata)
+        {
+            if (!key.StartsWithF("_remap"))
+            {
+                continue;
+            }
+
+            int split = value.Span.IndexOf(';');
+
+            if (split < 0)
+            {
+                continue;
+            }
+
+            if (!Remaps.TryAdd(value[..split].Trim(), value.Slice(split + 1).Trim()))
+            {
+
+            }
+        }
+    }
 }
