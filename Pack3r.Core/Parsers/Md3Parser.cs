@@ -9,7 +9,7 @@ using Pack3r.Models;
 
 namespace Pack3r.Parsers;
 
-public class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
+public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
 {
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".md3") || resource.EndsWithF(".mdc");
 
@@ -151,130 +151,5 @@ public class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
         int ShaderOffset { get; }
         int ShaderCount { get; }
         int EndOffset { get; }
-    }
-
-    [InlineArray(4)]
-    private struct Ident
-    {
-        public byte _elem0;
-
-        public override readonly string ToString() => Encoding.ASCII.GetString(this);
-    }
-
-    [InlineArray(64)]
-    private struct Q3Name
-    {
-        public byte _elem0;
-        public override readonly string ToString() => Encoding.ASCII.GetString(((ReadOnlySpan<byte>)this).TrimEnd((byte)0));
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    private struct Md3Header : IModelFormatHeader
-    {
-        public Ident ident;
-        public int version;
-        public Q3Name name;
-        public int flags;
-        public int num_frames;
-        public int num_tags;
-        public int num_surfaces;
-        public int num_skins;
-        public int ofs_frames;
-        public int ofs_tags;
-        public int ofs_surfaces;
-        public int ofs_eof;
-
-        public static int ExpectedVersion => 15;
-        public static string Name => "MD3";
-        public static ReadOnlySpan<byte> Magic => "IDP3"u8;
-        readonly int IModelFormatHeader.Version => version;
-        readonly Ident IModelFormatHeader.Ident => ident;
-        readonly int IModelFormatHeader.SurfaceOffset => ofs_surfaces;
-        readonly int IModelFormatHeader.SurfaceCount => num_surfaces;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    private struct MdcHeader : IModelFormatHeader
-    {
-        public Ident ident;
-        public int version;
-        public Q3Name name;
-        public int flags;
-        public int num_frames;
-        public int num_tags;
-        public int num_surfaces;
-        public int num_skins;
-        public int ofs_frames;
-        public int ofs_tags;
-        public int ofs_tag_infos;
-        public int ofs_surfaces;
-        public int ofs_eof;
-
-        public static int ExpectedVersion => 2;
-        public static string Name => "MDC";
-        public static ReadOnlySpan<byte> Magic => "IDPC"u8;
-        readonly int IModelFormatHeader.Version => version;
-        readonly Ident IModelFormatHeader.Ident => ident;
-        readonly int IModelFormatHeader.SurfaceOffset => ofs_surfaces;
-        readonly int IModelFormatHeader.SurfaceCount => num_surfaces;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    private struct Md3Surface : IModelSurfaceHeader
-    {
-        public Ident ident;
-        public Q3Name name;
-        public int flags;
-        public int num_frames;
-        public int num_shaders;
-        public int num_vertices;
-        public int num_triangles;
-        public int ofs_triangles;
-        public int ofs_shaders;
-        public int ofs_textCoords;
-        public int ofs_vertices;
-        public int ofs_end;
-
-        public static ReadOnlySpan<byte> Magic => "IDP3"u8;
-
-        readonly Ident IModelSurfaceHeader.Ident => ident;
-        readonly int IModelSurfaceHeader.ShaderOffset => ofs_shaders;
-        readonly int IModelSurfaceHeader.ShaderCount => num_shaders;
-        readonly int IModelSurfaceHeader.EndOffset => ofs_end;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    private struct MdcSurface : IModelSurfaceHeader
-    {
-        public Ident ident;
-        public Q3Name name;
-        public int flags;
-        public int num_comp_frames;
-        public int num_base_frames;
-        public int num_shaders;
-        public int num_vertices;
-        public int num_triangles;
-        public int ofs_triangles;
-        public int ofs_shaders;
-        public int ofs_textCoords;
-        public int ofs_base_vertices;
-        public int ofs_comp_vertices;
-        public int ofs_base_frame_indices;
-        public int ofs_comp_frame_indices;
-        public int ofs_end;
-
-        public static ReadOnlySpan<byte> Magic => [7, 0, 0, 0];
-
-        readonly Ident IModelSurfaceHeader.Ident => ident;
-        readonly int IModelSurfaceHeader.ShaderOffset => ofs_shaders;
-        readonly int IModelSurfaceHeader.ShaderCount => num_shaders;
-        readonly int IModelSurfaceHeader.EndOffset => ofs_end;
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    private struct Md3Shader
-    {
-        public Q3Name name;
-        public int index;
     }
 }
