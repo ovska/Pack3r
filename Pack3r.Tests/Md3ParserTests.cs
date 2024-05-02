@@ -10,6 +10,9 @@ public static class Md3ParserTests
     {
         var path = Path.GetFullPath("../../../TestData/etmain/models/spire_active_red.md3");
         var parser = new Md3Parser(NullLogger<Md3Parser>.Instance);
+
+        Assert.True(parser.CanParse(path.AsMemory()));
+
         var result = await parser.Parse(path, default);
 
         Assert.NotNull(result);
@@ -25,6 +28,25 @@ public static class Md3ParserTests
             "textures/pgm/spire_glass",
             "textures/pgm/spire_abal6_small",
             "textures/pgm/crystal_red",
+        ], result!.Select(s => s.Value.ToString()));
+    }
+
+    [Fact]
+    public static async Task Should_Parse_Mdm()
+    {
+        var path = Path.GetFullPath("../../../TestData/etmain/models/sidechair3.mdc");
+        var parser = new Md3Parser(NullLogger<Md3Parser>.Instance);
+
+        Assert.True(parser.CanParse(path.AsMemory()));
+
+        var result = await parser.Parse(path, default);
+
+        Assert.NotNull(result);
+        Assert.All(result, s => Assert.False(s.IsShader));
+        Assert.Equal(
+        [
+            "models/mapobjects/furniture/chairmetal.tga",
+            "models/mapobjects/furniture/sherman_s.tga",
         ], result!.Select(s => s.Value.ToString()));
     }
 }
