@@ -2,7 +2,7 @@
   "profiles": {
     "Pack3r.Console": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\void.pk3dir\\maps\\void_b2.map\" -d -s -i"
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\void.pk3dir\\maps\\void_b2.map\" -d -i"
     }
   }
 }

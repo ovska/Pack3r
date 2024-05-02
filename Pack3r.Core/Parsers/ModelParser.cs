@@ -4,6 +4,7 @@ using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
+using Pack3r.Progress;
 
 namespace Pack3r.Parsers;
 
@@ -16,21 +17,21 @@ public interface IModelParser
 
 public partial class ModelParser(
     ILogger<ModelParser> logger,
-    ILineReader reader/*,
-    IProgressManager progressManager*/) : IModelParser
+    ILineReader reader,
+    IProgressManager progressManager) : IModelParser
 {
     public async IAsyncEnumerable<ReadOnlyMemory<char>> ParseModelShaders(
         Map map,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        //using var progress = progressManager.Create("Parsing .ase models for shaders", null);
-        //int counter = 0;
+        using var progress = progressManager.Create("Parsing .ase models for shaders", null);
+        int counter = 0;
 
-        foreach (var resource in map.Resources)
+        foreach (var resource in map.ReferenceResources)
         {
             if (resource.Span.EndsWith(".ase", StringComparison.OrdinalIgnoreCase))
             {
-                //progress.Report(++counter);
+                progress.Report(++counter);
 
                 foreach (var source in map.AssetSources)
                 {

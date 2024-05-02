@@ -43,6 +43,7 @@ public class AssetService(
             Path = options.MapFile.FullName,
             ETMain = etmainDirectory,
             Resources = assets.Resources,
+            ReferenceResources = assets.ReferenceResources,
             Shaders = assets.Shaders,
             HasStyleLights = assets.HasStyleLights,
             RenamableResources = [],

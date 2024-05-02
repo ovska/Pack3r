@@ -376,7 +376,7 @@ public static class ModelParserTests
             }
             """);
 
-        var parser = new ModelParser(NullLogger<ModelParser>.Instance, reader, new NoOpProgressManager());
+        var parser = new ModelParser(NullLogger<ModelParser>.Instance, reader/*, new NoOpProgressManager()*/);
 
         var results = await parser.ParseAse(null!, default, reader.ReadLines("", default, default)).ToList();
 

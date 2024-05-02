@@ -191,6 +191,7 @@ public class MapFileParser(
         {
             Shaders = shaders,
             Resources = resources,
+            ReferenceResources = referenceResources,
             HasStyleLights = hasStyleLights,
         };
 
@@ -225,6 +226,8 @@ public class MapFileParser(
                 {
                     if (key.Length == 5)
                     {
+                        referenceResources.Add(value);
+
                         // include misc_model .ase and .md3 files in reference assets if dev files not included
                         if (!_devFiles && IsClassName("misc_model"))
                         {
@@ -237,6 +240,7 @@ public class MapFileParser(
                     }
                     else if (key.Length == 6 && key[5] == '2')
                     {
+                        referenceResources.Add(value);
                         resources.Add(value);
                     }
                 }
@@ -244,6 +248,7 @@ public class MapFileParser(
                 {
                     unsupSkins.Add(currentEntity);
                     resources.Add(value);
+                    referenceResources.Add(value);
                 }
                 else if (key.EqualsF("noise") || (key.EqualsF("sound") && IsClassName("dlight")))
                 {
