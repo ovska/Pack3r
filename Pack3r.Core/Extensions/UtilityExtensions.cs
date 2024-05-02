@@ -39,6 +39,14 @@ public static class UtilityExtensions
         return value.StartsWith(other, cmp);
     }
 
+    public static bool EndsWithF(this string value, ReadOnlySpan<char> other) => EndsWithF(value.AsSpan(), other);
+    public static bool EndsWithF(this ReadOnlyMemory<char> value, ReadOnlySpan<char> other) => EndsWithF(value.Span, other);
+
+    public static bool EndsWithF(this ReadOnlySpan<char> value, ReadOnlySpan<char> other)
+    {
+        return value.EndsWith(other, cmp);
+    }
+
     public static bool TryPickOne<TState, TItem>(
         TState state,
         TItem a,
