@@ -39,7 +39,7 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
 
         await using (var stream = entry.Open())
         {
-            await stream.CopyToAsync(stream, cancellationToken);
+            await stream.CopyToAsync(memoryStream, cancellationToken);
         }
 
         if (!memoryStream.TryGetBuffer(out ArraySegment<byte> buffer))
