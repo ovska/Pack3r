@@ -69,6 +69,10 @@ public sealed class Packager(
             {
                 progress.Report(count++);
 
+                // hack
+                if (shaderName.EqualsF("noshader"))
+                    continue;
+
                 // already handled
                 if (!handledShaders.Add(shaderName))
                     continue;

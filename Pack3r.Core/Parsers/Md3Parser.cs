@@ -63,9 +63,9 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
         [NotNullWhen(false)] out string? error)
     {
         if (Path.GetExtension(fileName).Equals(".mdc", StringComparison.OrdinalIgnoreCase))
-        return Impl<MdcHeader, MdcSurface>(bytes, out shadersHashSet, out error);
+            return Impl<MdcHeader, MdcSurface>(bytes, out shadersHashSet, out error);
 
-            return Impl<Md3Header, Md3Surface>(bytes, out shadersHashSet, out error);
+        return Impl<Md3Header, Md3Surface>(bytes, out shadersHashSet, out error);
     }
 
     private static bool Impl<THeader, TSurface>(
@@ -119,9 +119,17 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
 
             foreach (var shader in MemoryMarshal.Cast<byte, Md3Shader>(shaderSlice))
             {
-                string shaderName = shader.name.ToString().Replace('\\', '/');
-                bool isShader = shaderName.GetExtension().IsEmpty;
-                shadersHashSet.Add(new Resource(shaderName.AsMemory(), IsShader: isShader));
+                if (shader.name.TryGetString(out string? shaderName))
+                {
+                    bool isShader = shaderName.GetExtension().IsEmpty;
+                    shadersHashSet.Add(new Resource(shaderName.Replace('\\', '/').AsMemory(), IsShader: isShader));
+                }
+                else
+                {
+                    shadersHashSet = null;
+                    error = $"Invalid shader name on surf {i}, no null terminator found";
+                    return false;
+                }
             }
 
             surfaceOffset += surface.EndOffset;

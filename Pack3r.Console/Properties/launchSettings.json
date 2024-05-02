@@ -1,8 +1,12 @@
 {
   "profiles": {
-    "Pack3r.Console": {
+    "void d i": {
       "commandName": "Project",
       "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\void.pk3dir\\maps\\void_b2.map\" -d -i"
+    },
+    "sungilarity d": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\" -d -i"
     }
   }
 }

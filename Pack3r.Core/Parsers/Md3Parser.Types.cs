@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -18,7 +19,23 @@ public partial class Md3Parser
     private struct Q3Name
     {
         public byte _elem0;
-        public override readonly string ToString() => Encoding.ASCII.GetString(((ReadOnlySpan<byte>)this).TrimEnd((byte)0));
+
+        public override readonly string ToString() => throw new NotSupportedException();
+
+        public readonly bool TryGetString([NotNullWhen(true)] out string? value)
+        {
+            scoped ReadOnlySpan<byte> span = this;
+            int nullterm = span.IndexOf((byte)'\0');
+
+            if (nullterm == -1)
+            {
+                value = null;
+                return false;
+            }
+
+            value = Encoding.ASCII.GetString(span[..nullterm]);
+            return true;
+        }
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
