@@ -5,6 +5,7 @@ using System.Text;
 
 namespace Pack3r.Parsers;
 
+// https://mino-git.github.io/rtcw-wet-blender-model-tools/developer_guide.html
 public partial class Md3Parser
 {
     [InlineArray(4)]
