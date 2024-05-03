@@ -157,7 +157,30 @@ public class AssetService(
             logger.Info($"Arena skipped, file not found in '{arena.FullName}'");
         }
 
-        // TODO :levelshots
+        var levelshot = new FileInfo(Path.Combine(map.GetMapRoot(), "levelshots", $"{map.Name}.tga"));
+
+        if (!levelshot.Exists)
+        {
+            levelshot = new FileInfo(Path.ChangeExtension(levelshot.FullName, ".jpg"));
+        }
+
+        if (levelshot.Exists)
+        {
+            map.RenamableResources.Add(new()
+            {
+                AbsolutePath = levelshot.FullName,
+                ArchivePath = Path.Combine(
+                    "levelshots",
+                    Path.ChangeExtension(options.Rename ?? map.Name, Path.GetExtension(levelshot.FullName))),
+            });
+        }
+        else
+        {
+            logger.Info(
+                $"Levelshot skipped, file not found in '{Path.GetFileNameWithoutExtension(levelshot.FullName.AsSpan())}.tga/.jpg'");
+        }
+
+        // TODO: levelshots_cc
 
         return map;
     }

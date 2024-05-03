@@ -1,6 +1,4 @@
-﻿using Pack3r.IO;
-
-namespace Pack3r.Models;
+﻿namespace Pack3r.Models;
 
 public sealed class RenamableResource
 {
