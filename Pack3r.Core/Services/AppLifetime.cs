@@ -27,8 +27,6 @@ public sealed class AppLifetime : IDisposable
 
     public void HandleException(Exception? ex)
     {
-        bool dontDrain = false;
-
         try
         { _cts.Cancel(); }
         catch (AggregateException) { }
@@ -36,7 +34,7 @@ public sealed class AppLifetime : IDisposable
         if (ex is OperationCanceledException && _cts.IsCancellationRequested)
         {
             _logger.Exception(null, "Operation was canceled by the user");
-            dontDrain = true;
+            return; // don't drain log on cancellations
         }
         else if (ex is ControlledException)
         {
@@ -62,12 +60,7 @@ public sealed class AppLifetime : IDisposable
             _logger.Exception(ex, "Unhandled exception, aborting");
         }
 
-        if (!dontDrain)
-            _logger.Drain();
-
-#pragma warning disable RCS1214 // Unnecessary interpolated string
-        _logger.System($"Press Enter to exit");
-#pragma warning restore RCS1214 // Unnecessary interpolated string
+        _logger.Drain();
     }
 
     public void Dispose()

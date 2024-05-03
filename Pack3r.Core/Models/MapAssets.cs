@@ -43,6 +43,8 @@ public sealed class ReferenceMiscModel
 
         Remaps = new(ROMCharComparer.Instance);
 
+        Span<Range> ranges = stackalloc Range[16];
+
         foreach (var (key, value) in entitydata)
         {
             if (!key.StartsWithF("_remap"))
@@ -50,17 +52,13 @@ public sealed class ReferenceMiscModel
                 continue;
             }
 
-            int split = value.Span.IndexOf(';');
+            int count = value.Span.Split(ranges, ';', StringSplitOptions.TrimEntries);
 
-            if (split < 0)
-            {
+            if (count != 2)
                 continue;
-            }
 
-            if (!Remaps.TryAdd(value[..split].Trim(), value.Slice(split + 1).Trim()))
-            {
-
-            }
+            // TODO: check if the first or last key is preserved by Q3Map2
+            Remaps[value[ranges[0]]] = value[ranges[1]];
         }
     }
 }

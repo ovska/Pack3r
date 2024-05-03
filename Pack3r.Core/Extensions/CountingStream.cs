@@ -1,6 +1,7 @@
 ﻿
 namespace Pack3r.Extensions;
 
+// used for dry run size estimation
 public sealed class CountingStream : Stream
 {
     public override bool CanRead => Null.CanRead;

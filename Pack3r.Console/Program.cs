@@ -96,7 +96,7 @@ public class Program
 
                 if (!options.DryRun)
                 {
-                    app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
+                    app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms");
                 }
                 else
                 {
@@ -108,8 +108,8 @@ public class Program
                         ? $"{(double)written / megabyte:N} MB"
                         : $"{(double)written / kilobyte:N} KB";
 
-                    app.Logger.System($"Compressed size: {size} ({written:N0} bytes)");
-                    app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, press Enter to exit");
+                    app.Logger.System($"Estimated pk3 size: {size})");
+                    app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms");
                 }
             }
             catch (Exception e)
@@ -122,7 +122,6 @@ public class Program
             }
         }
 
-        System.Console.ReadLine();
         return retval;
     }
 }
