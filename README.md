@@ -1,6 +1,6 @@
 # Pack3r
 
-Create release-ready pk3 archives quickly. Pack3r uses NetRadiant `.map`-files, shaders, mapscripts and sound/speakerscripts for asset discovery and includes only files required to play the map in the pk3.
+Create release-ready pk3 archives quickly. Pack3r uses Radiant `.map`-files to read shaders, models, mapscripts, etc. for asset discovery and includes only files required to play the map in the pk3.
 
 ## Usage
 `Pack3r <map> <options>`
@@ -29,9 +29,9 @@ Example:
 
 ## Limitations
 - Only brush primitives map format is supported (NetRadiant default)
-- `.ase`, `.md3` and `.skin` files aren't parsed to see which textures and shaders they use.
-- `terrain` shaders (1to2 etc) are not supported.
-- `--rename` does not yet work for levelshots-shaders
+- Shaders/textures are parsed from `ase`, `md3`, `mdc` (and `skin`) files. Other model formats such as `obj` are not yet supported (open an issue).
+- `terrain` shaders (1to2 etc) are not supported (open an issue)
+- `--rename` does not yet work for levelshots-shaders. The `levelshots/mapname.tga/jpg` file is renamed correctly though
 
 ## File priority order
 1. `pak0.pk3`, if a file or shader is found in pak0, it won't be included in the release
