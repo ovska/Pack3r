@@ -1,4 +1,6 @@
 ﻿namespace Pack3r.Extensions;
 
-#pragma warning disable RCS1194 // Implement exception constructors
+/// <summary>
+/// Exception thrown by Pack3r for malformed data or setup.
+/// </summary>
 public sealed class ControlledException : Exception;

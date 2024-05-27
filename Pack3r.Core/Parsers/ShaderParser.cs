@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Xml.Linq;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -129,6 +130,13 @@ public class ShaderParser(
             duplicateShaders,
             included,
             cancellationToken);
+
+        // should not happen?
+        foreach (var (name, duplicates) in duplicateShaders)
+        {
+            var display = string.Join(", ", duplicates.Select(s => $"'{s.GetAbsolutePath()}'"));
+            logger.Warn($"Shader '{name}' found in multiple sources: {display}");
+        }
 
         return included;
     }

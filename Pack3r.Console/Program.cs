@@ -44,83 +44,80 @@ public class Program
 
     public static async Task<int> Execute(PackOptions options)
     {
-        int retval = 0;
+        using var composition = new Composition(options);
 
-        using (var composition = new Composition(options))
+        var app = composition.Application;
+        CancellationToken cancellationToken = app.Lifetime.CancellationToken;
+
+        try
         {
-            var app = composition.Application;
-            CancellationToken cancellationToken = app.CancellationToken;
+            string mapName = Path.GetFileNameWithoutExtension(options.MapFile.FullName);
 
-            try
+            if (!options.DryRun)
             {
-                string mapName = Path.GetFileNameWithoutExtension(options.MapFile.FullName);
+                if (options.Rename != null)
+                    mapName += "' as '" + options.Rename;
 
+                app.Logger.System($"Packaging '{mapName}' to '{options.Pk3File.FullName}'");
+            }
+            else
+            {
+                app.Logger.System($"Running dry run for '{mapName}' without creating a pk3");
+            }
+
+            Stream destination;
+            var timer = Stopwatch.StartNew();
+
+            using (Map map = await app.AssetService.GetPackingData(cancellationToken))
+            {
                 if (!options.DryRun)
                 {
-                    if (options.Rename != null)
-                        mapName += "' as '" + options.Rename;
-
-                    app.Logger.System($"Packaging '{mapName}' to '{options.Pk3File.FullName}'");
+                    destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
                 }
                 else
                 {
-                    app.Logger.System($"Running dry run for '{mapName}' without creating a pk3");
+                    options.Pk3File = null!;
+                    destination = new CountingStream();
                 }
 
-                Stream destination;
-                var timer = Stopwatch.StartNew();
-
-                using (Map map = await app.AssetService.GetPackingData(cancellationToken))
+                await using (destination)
                 {
-                    if (!options.DryRun)
-                    {
-                        destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
-                    }
-                    else
-                    {
-                        options.Pk3File = null!;
-                        destination = new CountingStream();
-                    }
-
-                    await using (destination)
-                    {
-                        await app.Packager.CreateZip(map, destination, cancellationToken);
-                    }
-                }
-
-                timer.Stop();
-
-                app.Logger.Drain();
-
-                if (!options.DryRun)
-                {
-                    app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms");
-                }
-                else
-                {
-                    long written = ((CountingStream)destination).Position;
-
-                    const int kilobyte = 1024;
-                    const int megabyte = 1024 * 1024;
-                    string size = written > megabyte
-                        ? $"{(double)written / megabyte:N} MB"
-                        : $"{(double)written / kilobyte:N} KB";
-
-                    app.Logger.System($"Estimated pk3 size: {size})");
-                    app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms");
+                    await app.Packager.CreateZip(map, destination, cancellationToken);
                 }
             }
-            catch (Exception e)
+
+            timer.Stop();
+
+            app.Logger.Drain();
+
+            if (!options.DryRun)
             {
-                if (!options.DryRun)
-                    File.Delete(options.Pk3File.FullName);
-
-                app.Lifetime.HandleException(e);
-                retval = 1;
+                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms");
             }
+            else
+            {
+                long written = ((CountingStream)destination).Position;
+
+                const int kilobyte = 1024;
+                const int megabyte = 1024 * 1024;
+                string size = written > megabyte
+                    ? $"{(double)written / megabyte:N} MB"
+                    : $"{(double)written / kilobyte:N} KB";
+
+                app.Logger.System($"Estimated pk3 size: {size})");
+                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms");
+            }
+
+            return 0;
         }
+        catch (Exception e)
+        {
+            if (!options.DryRun)
+                File.Delete(options.Pk3File.FullName);
 
-        return retval;
+            app.Lifetime.HandleException(e);
+            return -1;
+        }
     }
 }
 
@@ -131,7 +128,6 @@ internal sealed record App(
     AppLifetime Lifetime,
     [Tag("options")] PackOptionsWrapper Options) // <- required for DI to generate it
 {
-    public CancellationToken CancellationToken => Lifetime.CancellationToken;
 }
 
 // pureDI hack

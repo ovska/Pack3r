@@ -88,15 +88,12 @@ public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipAr
 
         foreach (var entry in _archive.Entries)
         {
-            if (skipPredicate(entry.FullName))
+            if (!entry.FullName.HasExtension(".shader") || skipPredicate(entry.FullName))
                 continue;
 
-            if (entry.FullName.HasExtension(".shader"))
+            await foreach (var shader in parser.Parse(this, entry, cancellationToken))
             {
-                await foreach (var shader in parser.Parse(this, entry, cancellationToken))
-                {
-                    yield return shader;
-                }
+                yield return shader;
             }
         }
     }

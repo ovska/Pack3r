@@ -12,13 +12,14 @@ namespace Pack3r.Console;
 public class RootCommand
 {
     [CliArgument(
-        Description = "Path to the .map file",
+        HelpName = "map path",
+        Description = "Path to the source .map file",
         Arity = CliArgumentArity.ExactlyOne,
         ValidationRules = CliValidationRules.ExistingFile)]
     public FileInfo Map { get; set; } = null!;
 
     [CliOption(
-        Description = "Path of destination directory or pk3 name, defaults to etmain",
+        Description = "Path to destination pk3 or directory, defaults to etmain",
         Required = false,
         ValidationRules = CliValidationRules.LegalPath)]
     public FileSystemInfo? Output { get; set; }
@@ -27,7 +28,7 @@ public class RootCommand
     public bool DryRun { get; set; }
 
     [CliOption(
-        Description = "Name of the map release, changes name of bsp, mapscript, etc.",
+        Description = "Map release name (bsp, lightmaps, mapscript, etc.)",
         Required = false,
         ValidationRules = CliValidationRules.LegalFileName)]
     public string? Rename { get; set; }
@@ -40,7 +41,8 @@ public class RootCommand
     [CliOption(Description = "Complete packing even if some files are missing")]
     public bool Loose { get; set; }
 
-    [CliOption(Description = "Pack source files such as .map, editorimages, misc_models")]
+    [CliOption(
+        Description = "Pack source files such as .map, editorimages, misc_models")]
     public bool Source { get; set; }
 
     [CliOption(
@@ -48,10 +50,12 @@ public class RootCommand
         Aliases = ["-sl"])]
     public bool Shaderlist { get; set; }
 
-    [CliOption(Description = "Overwrite existing files in the output path with impunity")]
+    [CliOption(
+        Description = "Overwrite existing files in the output path with impunity")]
     public bool Force { get; set; }
 
-    [CliOption(Description = "Include pk3 files and pk3dirs in etmain when indexing files")]
+    [CliOption(
+        Description = "Include pk3 files and pk3dirs in etmain when indexing files")]
     public bool IncludePk3 { get; set; }
 
     [CliOption(
