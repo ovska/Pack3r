@@ -8,7 +8,7 @@ public enum TextureExtension { Empty = 0, Other, Tga, Jpg }
 
 public static class StringExtensions
 {
-    public static string NormalizePath(this string path) => path.Replace("\\", "/");
+    public static string NormalizePath(this string path) => path.Replace(Path.DirectorySeparatorChar, '/');
 
     public static ReadOnlyMemory<char> ChangeExtension(this ReadOnlyMemory<char> file, ReadOnlySpan<char> extension)
     {
