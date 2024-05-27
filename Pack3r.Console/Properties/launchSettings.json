@@ -4,6 +4,10 @@
       "commandName": "Project",
       "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\void.pk3dir\\maps\\void_b2.map\" -d -i"
     },
+    "void i": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\void.pk3dir\\maps\\void_b2.map\" -i -o \"C:\\Temp\\voidtest.pk3\""
+    },
     "sungilarity d": {
       "commandName": "Project",
       "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\" -d -i"

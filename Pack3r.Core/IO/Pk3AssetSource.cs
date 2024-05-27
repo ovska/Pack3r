@@ -64,7 +64,7 @@ public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipAr
             }
             else
             {
-                entry = destination.CreateEntry(pk3entry.FullName, CompressionLevel.Optimal);
+                entry = destination.CreateEntry(pk3entry.FullName.NormalizePath(), CompressionLevel.Optimal);
                 entry.LastWriteTime = pk3entry.LastWriteTime;
 
                 using Stream destinationStream = entry.Open();

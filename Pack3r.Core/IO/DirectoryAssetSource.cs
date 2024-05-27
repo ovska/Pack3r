@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
+using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
 
@@ -32,7 +33,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory) : AssetSource<
             }
             else
             {
-                string archivePath = Path.GetRelativePath(Directory.FullName, file.FullName);
+                string archivePath = Path.GetRelativePath(Directory.FullName, file.FullName).NormalizePath();
                 entry = destination.CreateEntryFromFile(file.FullName, archivePath, CompressionLevel.Optimal);
             }
             return true;

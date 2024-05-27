@@ -11,8 +11,6 @@ using Pure.DI;
 
 namespace Pack3r.Console;
 
-#pragma warning disable RCS1102 // Make class static
-
 public class Program
 {
     internal static IConfiguration SetupDI()
@@ -39,9 +37,9 @@ public class Program
             .Arg<PackOptions>("options", "options");
     }
 
-    public static async Task Main(string[] args)
+    public static Task<int> Main(string[] args)
     {
-        await Cli.RunAsync<RootCommand>(args);
+        return Cli.RunAsync<RootCommand>(args);
     }
 
     public static async Task<int> Execute(PackOptions options)
