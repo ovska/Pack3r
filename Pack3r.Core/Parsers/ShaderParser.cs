@@ -56,7 +56,9 @@ public class ShaderParser(
 
                     string fileName = Path.GetFileNameWithoutExtension(name);
 
-                    if (whitelist?.Contains(fileName.AsMemory()) == false)
+                    if (whitelist is not null &&
+                        !fileName.StartsWithF("levelshots") &&
+                        !whitelist.Contains(fileName.AsMemory()))
                     {
                         logger.Debug($"Skipped parsing shaders from {getName()} (not in shaderlist)");
                         return true;
