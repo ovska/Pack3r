@@ -1,7 +1,8 @@
 ﻿using System.Buffers;
 using System.Collections.Concurrent;
-using System.Linq;
-using System.Numerics;
+using System.Diagnostics;
+using System.IO.Compression;
+using Microsoft.IO;
 using NAudio.Wave;
 using Pack3r.Extensions;
 using Pack3r.Logging;
@@ -33,28 +34,26 @@ internal static class IntegrityChecker
         }
     }
 
-    public static void CheckIntegrity(string archivePath, string entryPath, Stream stream)
+    public static void CheckIntegrity(string archivePath, ZipArchiveEntry entry)
     {
-        if (!CanCheckIntegrity(entryPath))
+        if (!CanCheckIntegrity(entry.FullName))
             return;
 
-        try
+        using Stream stream = entry.Open();
+
+        if (CheckIntegrityCore(entry.FullName.GetExtension(), stream) is string warning)
         {
-            if (CheckIntegrityCore(entryPath.GetExtension(), stream) is string warning)
-            {
-                _values.Enqueue((Path.Join(archivePath, entryPath).NormalizePath(), warning));
-            }
-        }
-        finally
-        {
-            stream.Position = 0;
+            _values.Enqueue((Path.Join(archivePath, entry.FullName).NormalizePath(), warning));
         }
     }
 
     private static bool CanCheckIntegrity(string path)
     {
         ReadOnlySpan<char> extension = path.GetExtension();
-        return extension.EqualsF(".tga") || extension.EqualsF(".wav");
+
+        return extension.EqualsF(".tga")
+            || extension.EqualsF(".jpg")
+            || extension.EqualsF(".wav");
     }
 
     private static string? CheckIntegrityCore(ReadOnlySpan<char> extension, Stream stream)
@@ -67,6 +66,11 @@ internal static class IntegrityChecker
             }
 
             return null;
+        }
+
+        if (extension.EqualsF(".jpg"))
+        {
+            return VerifyJpg();
         }
 
         if (extension.EqualsF(".wav"))
@@ -119,7 +123,7 @@ internal static class IntegrityChecker
                         buffer = toReturn;
                     }
 
-                    int read = stream.ReadAtLeast(buffer, index, throwOnEndOfStream: false);
+                    int read = stream.ReadAtLeast(buffer, minimumBytes: index, throwOnEndOfStream: false);
 
                     if (read >= index)
                     {
@@ -135,5 +139,36 @@ internal static class IntegrityChecker
 
             return -1;
         }
+
+        string? VerifyJpg()
+        {
+            using var ms = _manager.GetStream(null, requiredSize: 1024 * 1024);
+
+            stream.CopyTo(ms);
+
+            if (!ms.TryGetBuffer(out ArraySegment<byte> buffer))
+                return null;
+
+            ReadOnlySpan<byte> bytes = buffer;
+
+            // A progressive DCT-based JPEG can be identified by bytes “0xFF, 0xC2″
+            // Also, progressive JPEG images usually contain .. a couple of “Start of Scan” matches (bytes: “0xFF, 0xDA”)
+            // source: https://superuser.com/a/1010777
+            ReadOnlySpan<byte> DCTbytes = [0xFF, 0xC2];
+            ReadOnlySpan<byte> SOSbytes = [0xFF, 0xDA];
+
+            if (bytes.IndexOf(DCTbytes) >= 0 && bytes.Count(SOSbytes) >= 6)
+            {
+                return "is potentially a progressive JPG, which is not supported on 2.60b clients";
+            }
+
+            return null;
+        }
     }
+
+    private static readonly RecyclableMemoryStreamManager _manager = new(new RecyclableMemoryStreamManager.Options
+    {
+        AggressiveBufferReturn = true,
+        GenerateCallStacks = Debugger.IsAttached,
+    });
 }

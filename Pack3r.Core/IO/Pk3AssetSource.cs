@@ -64,14 +64,12 @@ public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipAr
             }
             else
             {
+                IntegrityChecker.CheckIntegrity(ArchivePath, pk3entry);
+
                 entry = destination.CreateEntry(pk3entry.FullName.NormalizePath(), CompressionLevel.Optimal);
                 entry.LastWriteTime = pk3entry.LastWriteTime;
-
-                using Stream destinationStream = entry.Open();
                 using Stream sourceStream = pk3entry.Open();
-
-                IntegrityChecker.CheckIntegrity(ArchivePath, pk3entry.FullName, sourceStream);
-
+                using Stream destinationStream = entry.Open();
                 sourceStream.CopyTo(destinationStream);
             }
 
