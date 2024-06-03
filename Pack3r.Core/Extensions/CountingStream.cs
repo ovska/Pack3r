@@ -4,10 +4,11 @@ namespace Pack3r.Extensions;
 // used for dry run size estimation
 public sealed class CountingStream : Stream
 {
-    public override bool CanRead => Null.CanRead;
-    public override bool CanSeek => Null.CanSeek;
+    public override bool CanRead => false;
+    public override bool CanSeek => false;
     public override bool CanWrite => Null.CanWrite;
-    public override long Length => Null.Length;
+    public override long Length => _written;
+
     public override long Position
     {
         get => _written;
@@ -46,10 +47,10 @@ public sealed class CountingStream : Stream
         Null.WriteByte(value);
     }
 
-    public override long Seek(long offset, SeekOrigin origin) => Null.Seek(offset, origin);
     public override void Flush() => Null.Flush();
     public override Task FlushAsync(CancellationToken cancellationToken) => Null.FlushAsync(cancellationToken);
 
-    public override int Read(byte[] buffer, int offset, int count) => throw new NotImplementedException();
-    public override void SetLength(long value) => throw new NotImplementedException();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
 }
