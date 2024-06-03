@@ -7,4 +7,8 @@
     <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="NAudio.Core" Version="2.2.1" />
+  </ItemGroup>
+
 </Project>

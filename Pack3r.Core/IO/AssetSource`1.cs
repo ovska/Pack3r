@@ -53,4 +53,14 @@ public abstract class AssetSource<TAsset> : AssetSource
 
         return dict;
     }
+
+    protected void VerifyIntegrity(string path, Stream stream)
+    {
+        stream.Position = 17;
+
+        if (stream.ReadByte() == 0x20)
+        {
+            Console.WriteLine("warning: " + path);
+        }
+    }
 }

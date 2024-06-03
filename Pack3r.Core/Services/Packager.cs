@@ -137,6 +137,8 @@ public sealed class Packager(
             }
         }
 
+        IntegrityChecker.Log(logger);
+
         // end
         logger.Info($"{includedFiles.Count} files included in pk3");
 

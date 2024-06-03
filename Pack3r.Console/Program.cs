@@ -104,8 +104,7 @@ public class Program
                     ? $"{(double)written / megabyte:N} MB"
                     : $"{(double)written / kilobyte:N} KB";
 
-                app.Logger.System($"Estimated pk3 size: {size})");
-                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms");
+                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, estimated pk3 size: {size}");
             }
 
             return 0;

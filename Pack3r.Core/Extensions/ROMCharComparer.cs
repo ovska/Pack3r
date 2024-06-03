@@ -11,7 +11,7 @@ public sealed class ROMCharComparer : IEqualityComparer<ReadOnlyMemory<char>>, I
 
     public bool Equals(ReadOnlyMemory<char> x, ReadOnlyMemory<char> y)
     {
-        return x.Length == y.Length && x.Span.Equals(y.Span, StringComparison.OrdinalIgnoreCase);
+        return x.Span.Equals(y.Span, StringComparison.OrdinalIgnoreCase);
     }
 
     public int GetHashCode([DisallowNull] ReadOnlyMemory<char> obj)

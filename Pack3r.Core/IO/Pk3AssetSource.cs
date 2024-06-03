@@ -69,6 +69,9 @@ public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipAr
 
                 using Stream destinationStream = entry.Open();
                 using Stream sourceStream = pk3entry.Open();
+
+                IntegrityChecker.CheckIntegrity(ArchivePath, pk3entry.FullName, sourceStream);
+
                 sourceStream.CopyTo(destinationStream);
             }
 
