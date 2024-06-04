@@ -45,7 +45,7 @@ public partial class AseParser(
             {
                 if (line.Value.TryReadPastWhitespace(out var token))
                 {
-                    resouces.Add(new(token.Trim('"'), IsShader: true));
+                    resouces.Add(new Resource(token.Trim('"'), isShader: true, in line));
                 }
             }
             else if (line.Value.Span.StartsWithF("*GEOMOBJECT"))

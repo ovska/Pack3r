@@ -1,6 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;

@@ -1,8 +1,6 @@
 ﻿using System.Buffers;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.IO.Compression;
-using Microsoft.IO;
 using NAudio.Wave;
 using Pack3r.Extensions;
 using Pack3r.Logging;
@@ -142,7 +140,7 @@ internal static class IntegrityChecker
 
         string? VerifyJpg()
         {
-            using var ms = _manager.GetStream(null, requiredSize: 1024 * 1024);
+            using var ms = Global.StreamManager.GetStream(nameof(VerifyJpg), requiredSize: 1024 * 1024);
 
             stream.CopyTo(ms);
 
@@ -166,9 +164,5 @@ internal static class IntegrityChecker
         }
     }
 
-    private static readonly RecyclableMemoryStreamManager _manager = new(new RecyclableMemoryStreamManager.Options
-    {
-        AggressiveBufferReturn = true,
-        GenerateCallStacks = Debugger.IsAttached,
-    });
+
 }

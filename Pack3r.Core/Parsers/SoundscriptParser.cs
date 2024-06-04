@@ -18,7 +18,7 @@ public class SoundscriptParser(
         {
             if (line.MatchPrefix("sound ", out var token))
             {
-                yield return new(token, false);
+                yield return new(token, false, in line);
             }
         }
     }

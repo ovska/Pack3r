@@ -57,7 +57,7 @@ public class MapscriptParser(
                 // first token is the sound file
                 if (enumerator.MoveNext())
                 {
-                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), IsShader: false);
+                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), isShader: false, in line);
                     return true;
                 }
 
@@ -67,7 +67,7 @@ public class MapscriptParser(
                 // second token is the target shader
                 if (enumerator.MoveNext() && enumerator.MoveNext())
                 {
-                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), IsShader: true);
+                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), isShader: true, in line);
                     return true;
                 }
             }

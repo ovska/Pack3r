@@ -2,7 +2,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO.Compression;
-using System.Xml.Linq;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;

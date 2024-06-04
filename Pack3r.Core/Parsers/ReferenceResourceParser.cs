@@ -1,5 +1,4 @@
 ﻿using System.IO.Compression;
-using System.Threading;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;

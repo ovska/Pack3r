@@ -18,7 +18,7 @@ public class SpeakerScriptParser(
         {
             if (line.MatchPrefix("noise ", out var token))
             {
-                yield return new(token.Trim('"').Trim(), false);
+                yield return new(token.Trim('"').Trim(), isShader: false, in line);
             }
         }
     }

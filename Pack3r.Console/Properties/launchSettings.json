@@ -11,6 +11,10 @@
     "sungilarity d": {
       "commandName": "Project",
       "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\" -d -i"
+    },
+    "sungilarity src": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\" -d -i -s"
     }
   }
 }

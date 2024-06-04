@@ -17,11 +17,22 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
         string path,
         CancellationToken cancellationToken)
     {
-        byte[] file = await File.ReadAllBytesAsync(path, cancellationToken);
+        using var memoryStream = Global.StreamManager.GetStream(
+            tag: "Md3ParseFile",
+            requiredSize: 4096,
+            asContiguousBuffer: true);
 
-        if (Impl(Path.GetExtension(path.AsSpan()), file, out var shaders, out var error))
+        await using (var fileStream = File.OpenRead(path))
         {
-            return shaders;
+            await fileStream.CopyToAsync(memoryStream, cancellationToken);
+        }
+
+        if (!memoryStream.TryGetBuffer(out ArraySegment<byte> buffer))
+            buffer = memoryStream.ToArray();
+
+        if (Impl(path, buffer, out var resources, out var error))
+        {
+            return resources;
         }
         else
         {
@@ -35,49 +46,54 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
         string archivePath,
         CancellationToken cancellationToken)
     {
-        MemoryStream memoryStream = new(capacity: 4096);
+        using var memoryStream = Global.StreamManager.GetStream(
+            tag: "Md3ParsePk3",
+            requiredSize: 4096,
+            asContiguousBuffer: true);
 
-        await using (var stream = entry.Open())
+        await using (var pk3stream = entry.Open())
         {
-            await stream.CopyToAsync(memoryStream, cancellationToken);
+            await pk3stream.CopyToAsync(memoryStream, cancellationToken);
         }
 
         if (!memoryStream.TryGetBuffer(out ArraySegment<byte> buffer))
             buffer = memoryStream.ToArray();
 
-        if (Impl(Path.GetExtension(entry.FullName.AsSpan()), buffer, out var shaders, out var error))
+        string fullPath = Path.Combine(archivePath, entry.FullName);
+
+        if (Impl(fullPath, buffer, out var resources, out var error))
         {
-            return shaders;
+            return resources;
         }
         else
         {
-            logger.Warn($"Failed to parse MD3 shader '{archivePath}/{entry.FullName}': {error}");
+            logger.Warn($"Failed to parse MD3 shader '{fullPath}': {error}");
             return null;
         }
     }
 
     private static bool Impl(
-        ReadOnlySpan<char> fileName,
+        string fileName,
         ReadOnlySpan<byte> bytes,
-        [NotNullWhen(true)] out HashSet<Resource>? shadersHashSet,
+        [NotNullWhen(true)] out HashSet<Resource>? resources,
         [NotNullWhen(false)] out string? error)
     {
-        if (Path.GetExtension(fileName).Equals(".mdc", StringComparison.OrdinalIgnoreCase))
-            return Impl<MdcHeader, MdcSurface>(bytes, out shadersHashSet, out error);
-
-        return Impl<Md3Header, Md3Surface>(bytes, out shadersHashSet, out error);
+        return Path.GetExtension(fileName).Equals(".mdc", StringComparison.OrdinalIgnoreCase)
+            ? Impl<MdcHeader, MdcSurface>(fileName, bytes, out resources, out error)
+            : Impl<Md3Header, Md3Surface>(fileName, bytes, out resources, out error);
     }
 
     private static bool Impl<THeader, TSurface>(
+        string path,
         ReadOnlySpan<byte> bytes,
-        [NotNullWhen(true)] out HashSet<Resource>? shadersHashSet,
+        [NotNullWhen(true)] out HashSet<Resource>? resources,
         [NotNullWhen(false)] out string? error)
         where THeader : struct, IModelFormatHeader
         where TSurface : struct, IModelSurfaceHeader
     {
         if (Unsafe.SizeOf<THeader>() > bytes.Length)
         {
-            shadersHashSet = null;
+            resources = null;
             error = "Cannot read header, file is too small";
             return false;
         }
@@ -87,19 +103,19 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
         Ident ident = header.Ident;
         if (!THeader.Magic.SequenceEqual(ident))
         {
-            shadersHashSet = null;
+            resources = null;
             error = $"Invalid {THeader.Name} ident, expected '{Encoding.ASCII.GetString(THeader.Magic)}' but got {ident}";
             return false;
         }
 
         if (header.Version != THeader.ExpectedVersion)
         {
-            shadersHashSet = null;
+            resources = null;
             error = $"Invalid version in header, expected {THeader.ExpectedVersion} but got {header.Version}";
             return false;
         }
 
-        shadersHashSet = [];
+        resources = [];
 
         int surfaceOffset = header.SurfaceOffset;
 
@@ -124,12 +140,12 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
                     if (!string.IsNullOrEmpty(shaderName))
                     {
                         bool isShader = shaderName.GetExtension().IsEmpty;
-                        shadersHashSet.Add(new Resource(shaderName.Replace('\\', '/').AsMemory(), IsShader: isShader));
+                        resources.Add(new Resource(shaderName.Replace('\\', '/').AsMemory(), isShader, path));
                     }
                 }
                 else
                 {
-                    shadersHashSet = null;
+                    resources = null;
                     error = $"Invalid shader name on surf {i}, no null terminator found";
                     return false;
                 }
