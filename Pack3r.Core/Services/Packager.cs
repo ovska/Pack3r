@@ -13,7 +13,8 @@ public sealed class Packager(
     ILogger<Packager> logger,
     PackOptions options,
     IProgressManager progressManager,
-    IShaderParser shaderParser)
+    IShaderParser shaderParser,
+    IIntegrityChecker integrityChecker)
 {
     public async Task CreateZip(
         Map map,
@@ -135,17 +136,14 @@ public sealed class Packager(
             }
         }
 
-        if (map.TryGetAllResources(out var all))
+        foreach (var resource in map.TryGetAllResources())
         {
-            foreach (var resource in all)
-            {
-                string title = resource.IsShader ? "shader" : "file";
-                string line = resource.Line.HasValue ? $":L{resource.Line}" : "";
-                logger.Info($"{resource.Source.NormalizePath()}{line} >> {title} >> {resource.Value}");
-            }
+            string title = resource.IsShader ? "shader" : "file";
+            string line = resource.Line.HasValue ? $":L{resource.Line}" : "";
+            logger.Info($"{resource.Source.NormalizePath()}{line} >> {title} >> {resource.Value}");
         }
 
-        IntegrityChecker.Log(logger);
+        integrityChecker.Log();
 
         // end
         logger.Info($"{includedFiles.Count} files included in pk3");

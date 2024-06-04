@@ -4,10 +4,11 @@ using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
+using Pack3r.Services;
 
 namespace Pack3r.IO;
 
-public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipArchiveEntry>
+public sealed class Pk3AssetSource(string path, bool isPak0, IIntegrityChecker checker) : AssetSource<ZipArchiveEntry>
 {
     public string ArchivePath { get; } = path;
     public ZipArchive Archive
@@ -64,7 +65,7 @@ public sealed class Pk3AssetSource(string path, bool isPak0) : AssetSource<ZipAr
             }
             else
             {
-                IntegrityChecker.CheckIntegrity(ArchivePath, pk3entry);
+                checker.CheckIntegrity(ArchivePath, pk3entry);
 
                 entry = destination.CreateEntry(pk3entry.FullName.NormalizePath(), CompressionLevel.Optimal);
                 entry.LastWriteTime = pk3entry.LastWriteTime;

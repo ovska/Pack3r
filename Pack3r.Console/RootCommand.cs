@@ -108,7 +108,7 @@ public class RootCommand
 
         if (!File.Exists(bspPath))
         {
-            Error($"Compiled bsp of the .map not found in '{bspPath}'");
+            Error($"BSP for the map file not found: '{bspPath}'");
         }
 
         return Map;

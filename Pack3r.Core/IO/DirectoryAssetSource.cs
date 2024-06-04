@@ -4,10 +4,11 @@ using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
+using Pack3r.Services;
 
 namespace Pack3r.IO;
 
-public sealed class DirectoryAssetSource(DirectoryInfo directory) : AssetSource<FileInfo>
+public sealed class DirectoryAssetSource(DirectoryInfo directory, IIntegrityChecker checker) : AssetSource<FileInfo>
 {
     public DirectoryInfo Directory { get; } = directory;
     public override string RootPath => Directory.FullName;
@@ -33,7 +34,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory) : AssetSource<
             }
             else
             {
-                IntegrityChecker.CheckIntegrity(file.FullName);
+                checker.CheckIntegrity(file.FullName);
 
                 string archivePath = Path.GetRelativePath(Directory.FullName, file.FullName).NormalizePath();
                 entry = destination.CreateEntryFromFile(file.FullName, archivePath, CompressionLevel.Optimal);

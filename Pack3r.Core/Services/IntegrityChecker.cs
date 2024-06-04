@@ -5,11 +5,18 @@ using NAudio.Wave;
 using Pack3r.Extensions;
 using Pack3r.Logging;
 
-namespace Pack3r;
+namespace Pack3r.Services;
 
-internal static class IntegrityChecker
+public interface IIntegrityChecker
 {
-    public static void Log(ILogger logger)
+    void Log();
+    void CheckIntegrity(string path);
+    void CheckIntegrity(string archivePath, ZipArchiveEntry entry);
+}
+
+public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegrityChecker
+{
+    public void Log()
     {
         if (!_jpgs.IsEmpty)
         {
@@ -29,14 +36,13 @@ internal static class IntegrityChecker
         }
     }
 
-    private static readonly ConcurrentQueue<(string path, string warning)> _wavs = [];
+    private readonly ConcurrentQueue<(string path, string warning)> _wavs = [];
+    private readonly ConcurrentBag<string> _jpgs = [];
+    private readonly ConcurrentBag<string> _tgas = [];
 
-    private static readonly ConcurrentBag<string> _jpgs = [];
-    private static readonly ConcurrentBag<string> _tgas = [];
+    private readonly ConcurrentDictionary<(string, string), object?> _handled = [];
 
-    private static ConcurrentDictionary<(string, string), object?> _handled = [];
-
-    public static void CheckIntegrity(string fullPath)
+    public void CheckIntegrity(string fullPath)
     {
         if (!CanCheckIntegrity(fullPath))
             return;
@@ -48,7 +54,7 @@ internal static class IntegrityChecker
         CheckIntegrityCore(fullPath, stream);
     }
 
-    public static void CheckIntegrity(string archivePath, ZipArchiveEntry entry)
+    public void CheckIntegrity(string archivePath, ZipArchiveEntry entry)
     {
         if (!CanCheckIntegrity(entry.FullName))
             return;
@@ -69,7 +75,7 @@ internal static class IntegrityChecker
             || extension.EqualsF(".wav");
     }
 
-    private static void CheckIntegrityCore(
+    private void CheckIntegrityCore(
         string fullPath,
         Stream stream)
     {
@@ -141,7 +147,7 @@ internal static class IntegrityChecker
         return -1;
     }
 
-    private static void VerifyJpg(string fullPath, Stream stream)
+    private void VerifyJpg(string fullPath, Stream stream)
     {
         using var ms = Global.StreamManager.GetStream(nameof(VerifyJpg), requiredSize: 1024 * 1024);
 

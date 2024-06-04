@@ -16,7 +16,8 @@ public class AssetService(
     ILogger<AssetService> logger,
     IMapFileParser mapFileParser,
     IResourceParser[] resourceParsers,
-    IReferenceResourceParser referenceParser)
+    IReferenceResourceParser referenceParser,
+    IIntegrityChecker integrityChecker)
     : IAssetService
 {
     public async Task<Map> GetPackingData(CancellationToken cancellationToken)
@@ -35,7 +36,7 @@ public class AssetService(
 
         MapAssets assets = await mapFileParser.ParseMapAssets(options.MapFile.FullName, cancellationToken).ConfigureAwait(false);
 
-        Map map = new(options)
+        Map map = new(options, integrityChecker)
         {
             Name = Path.GetFileNameWithoutExtension(options.MapFile.FullName),
             Path = options.MapFile.FullName,
@@ -45,7 +46,6 @@ public class AssetService(
             MiscModels = assets.MiscModels,
             Shaders = assets.Shaders,
             HasStyleLights = assets.HasStyleLights,
-            RenamableResources = [],
         };
 
         if (options.ReferenceDebug)

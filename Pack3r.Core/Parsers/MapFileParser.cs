@@ -163,8 +163,8 @@ public class MapFileParser(
                 {
                     continue;
                 }
-                // only non-paren starting line in a patchDef should be the texture
 
+                // only non-paren starting line in a patchDef should be the texture
                 if (nonPrefixedShaders.Add(line.Value))
                 {
                     shaders.Add($"textures/{line.Value}".AsMemory());

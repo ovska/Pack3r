@@ -31,6 +31,7 @@ public class Program
             .Bind<ILogger<TT>>().To<Logger<TT>>()
             .Bind<ILineReader>().To<FSLineReader>()
             .Bind<IProgressManager>().To<ConsoleProgressManager>()
+            .Bind<IIntegrityChecker>().To<IntegrityChecker>()
             .Bind<AppLifetime>().To<AppLifetime>()
             .Bind().To(ctx => { ctx.Inject<PackOptionsWrapper>(out var wrapper); return wrapper.Value; })
             .Root<App>("Application")
@@ -62,7 +63,8 @@ public class Program
             }
             else
             {
-                app.Logger.System($"Running dry run for '{mapName}' without creating a pk3");
+                string renameLog = options.Rename is null ? "" : " (rename is ignored)";
+                app.Logger.System($"Running dry run for '{mapName}' without creating a pk3{renameLog}");
             }
 
             Stream destination;

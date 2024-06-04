@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Pack3r.Extensions;
 using Pack3r.IO;
+using Pack3r.Services;
 using IOPath = System.IO.Path;
 
 namespace Pack3r.Models;
@@ -12,9 +13,10 @@ public sealed class Map : MapAssets, IDisposable
 {
     private bool _disposed;
 
-    public Map(PackOptions options)
+    public Map(PackOptions options, IIntegrityChecker integrityChecker)
     {
         _options = options;
+        _integrityChecker = integrityChecker;
         _assetDirs = new(() => InitAssetDirectories().ToImmutableArray(), LazyThreadSafetyMode.ExecutionAndPublication);
         _assetSrcs = new(InitAssetSources, LazyThreadSafetyMode.ExecutionAndPublication);
     }
@@ -39,12 +41,13 @@ public sealed class Map : MapAssets, IDisposable
     /// <summary>
     /// Renamable resources (mapscript etc)
     /// </summary>
-    public required ConcurrentBag<RenamableResource> RenamableResources { get; init; }
+    public ConcurrentBag<RenamableResource> RenamableResources { get; } = [];
 
     public ImmutableArray<DirectoryInfo> AssetDirectories => _assetDirs.Value;
     public ImmutableArray<AssetSource> AssetSources => _assetSrcs.Value;
 
     private readonly PackOptions _options;
+    private readonly IIntegrityChecker _integrityChecker;
     private string? _root;
     private readonly Lazy<ImmutableArray<DirectoryInfo>> _assetDirs;
     private readonly Lazy<ImmutableArray<AssetSource>> _assetSrcs;
@@ -57,20 +60,18 @@ public sealed class Map : MapAssets, IDisposable
             _allResources.Add(resource);
     }
 
-    public bool TryGetAllResources([NotNullWhen(true)] out IEnumerable<Resource>? values)
+    public IEnumerable<Resource> TryGetAllResources()
     {
         if (_options.ReferenceDebug)
         {
-            values = _allResources
-                .OrderBy(r => r.Source)
+            return _allResources
+                .OrderBy(r => r.Source, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(r => r.Line)
                 .ThenBy(r => r.IsShader)
                 .ThenBy(r => r.Value, ROMCharComparer.Instance);
-            return true;
         }
 
-        values = null;
-        return false;
+        return [];
     }
 
     /// <summary>
@@ -155,7 +156,7 @@ public sealed class Map : MapAssets, IDisposable
             }
 
             // is exclude support needed for dirs?
-            list.Add(new DirectoryAssetSource(dir));
+            list.Add(new DirectoryAssetSource(dir, _integrityChecker));
 
             if (_options.LoadPk3s || _options.ExcludeSources.Count > 0)
             {
@@ -167,7 +168,7 @@ public sealed class Map : MapAssets, IDisposable
                         continue;
 
                     if (_options.LoadPk3s || pk3Filter == SourceFilter.Excluded)
-                        list.Add(new Pk3AssetSource(file.FullName, pk3Filter == SourceFilter.Excluded));
+                        list.Add(new Pk3AssetSource(file.FullName, pk3Filter == SourceFilter.Excluded, _integrityChecker));
                 }
             }
         }
