@@ -48,6 +48,21 @@ public class AssetService(
             RenamableResources = [],
         };
 
+        if (options.ReferenceDebug)
+        {
+            foreach (var res in map.Resources)
+                map.LogResource(new Resource(res, false, options.MapFile.FullName));
+
+            foreach (var res in map.ReferenceResources)
+                map.LogResource(new Resource(res, false, options.MapFile.FullName));
+
+            foreach (var res in map.Shaders)
+                map.LogResource(new Resource(res, true, options.MapFile.FullName));
+
+            foreach (var (mm, _) in map.MiscModels)
+                map.LogResource(new Resource(mm, false, options.MapFile.FullName));
+        }
+
         logger.System($"Using directories for discovery: {string.Join(", ", map.AssetDirectories.Select(d => d.FullName))}");
 
         // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
@@ -72,6 +87,7 @@ public class AssetService(
             await foreach (var resource in parser.Parse(path, ct).ConfigureAwait(false))
             {
                 referencedResources.TryAdd(resource, null);
+                map.LogResource(in resource);
             }
         }).ConfigureAwait(false);
 

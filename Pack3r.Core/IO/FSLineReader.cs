@@ -13,7 +13,7 @@ public class FSLineReader() : ILineReader
         LineOptions options,
         CancellationToken cancellationToken)
     {
-        return ReadLinesCore(archivePath, entry.Open(), options, cancellationToken);
+        return ReadLinesCore(Path.Combine(archivePath, entry.FullName).NormalizePath(), entry.Open(), options, cancellationToken);
     }
 
     public IAsyncEnumerable<Line> ReadLines(
@@ -29,7 +29,7 @@ public class FSLineReader() : ILineReader
             bufferSize: path.HasExtension(".map") ? 4096 * 16 : 4096,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
 
-        return ReadLinesCore(path, stream, options, cancellationToken);
+        return ReadLinesCore(path.NormalizePath(), stream, options, cancellationToken);
     }
 
     private static async IAsyncEnumerable<Line> ReadLinesCore(

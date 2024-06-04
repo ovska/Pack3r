@@ -13,6 +13,10 @@ public class PackOptions
 
     public bool UseShaderlist { get; set; }
 
+    public bool ShaderDebug { get; set; }
+
+    public bool ReferenceDebug { get; set; }
+
     public bool IncludeSource { get; set; }
 
     public bool RequireAllAssets { get; set; }

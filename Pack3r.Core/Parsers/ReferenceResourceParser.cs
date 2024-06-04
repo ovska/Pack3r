@@ -43,7 +43,7 @@ public class ReferenceResourceParser(
         {
             progress.Report(++counter);
 
-            var result = await TryParse(map, resource, cancellationToken);
+            HashSet<Resource>? result = await TryParse(map, resource, cancellationToken);
 
             if (result is null)
             {
@@ -79,6 +79,7 @@ public class ReferenceResourceParser(
             foreach (var item in result)
             {
                 (item.IsShader ? map.Shaders : map.Resources).Add(item.Value);
+                map.LogResource(in item);
             }
         }
     }

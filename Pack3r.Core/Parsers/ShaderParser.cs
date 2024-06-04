@@ -60,19 +60,22 @@ public class ShaderParser(
                         !fileName.StartsWithF("levelshots") &&
                         !whitelist.Contains(fileName.AsMemory()))
                     {
-                        logger.Debug($"Skipped parsing shaders from {getName()} (not in shaderlist)");
+                        if (options.ShaderDebug)
+                            logger.Debug($"Skipped parsing shaders from {getName()} (not in shaderlist)");
                         return true;
                     }
 
                     if (fileName.EqualsF("q3shadersCopyForRadiant"))
                     {
-                        logger.Debug($"Skipped parsing Radiant specific file {getName()}");
+                        if (options.ShaderDebug)
+                            logger.Debug($"Skipped parsing Radiant specific file {getName()}");
                         return true;
                     }
 
                     if (fileName.StartsWithF("q3map_") || fileName.StartsWithF("q3map2_"))
                     {
-                        logger.Debug($"Skipped shader parsing from compiler generated file '{getName()}'");
+                        if (options.ShaderDebug)
+                            logger.Debug($"Skipped shader parsing from compiler generated file '{getName()}'");
                         return true;
                     }
 
@@ -88,7 +91,7 @@ public class ShaderParser(
                         addValueFactory: static (_, tuple) => tuple.shader,
                         updateValueFactory: static (_, a, tuple) =>
                         {
-                            var (b, logger, map, duplicate) = tuple;
+                            var (b, logger, map, duplicate, options) = tuple;
 
                             int cmp = map.AssetSources.IndexOf(a.Source).CompareTo(map.AssetSources.IndexOf(b.Source));
 
@@ -97,8 +100,10 @@ public class ShaderParser(
                                 var toReturn = cmp > 0 ? a : b;
                                 var other = cmp > 0 ? b : a;
 
-                                logger.Trace(
-                                    $"Shader {a.Name} resolved from '{toReturn.Source}' instead of '{other.Source}'");
+                                if (options.ShaderDebug)
+                                {
+                                    logger.Debug($"Shader {a.Name} resolved from '{toReturn.Source}' instead of '{other.Source}'");
+                                }
 
                                 return toReturn;
                             }
@@ -113,7 +118,7 @@ public class ShaderParser(
                             }
                             return a;
                         },
-                        factoryArgument: (shader, logger, map, duplicateShaders));
+                        factoryArgument: (shader, logger, map, duplicateShaders, options));
                 }
             }).ConfigureAwait(false);
         }

@@ -51,6 +51,16 @@ public class RootCommand
     public bool Shaderlist { get; set; }
 
     [CliOption(
+        Description = "Print shader resolution details (Debug verbosity needed)",
+        Aliases = ["-sd"])]
+    public bool ShaderDebug { get; set; }
+
+    [CliOption(
+        Description = "Print asset resolution details (Info verbosity needed)",
+        Aliases = ["-rd"])]
+    public bool ReferenceDebug { get; set; }
+
+    [CliOption(
         Description = "Overwrite existing files in the output path with impunity")]
     public bool Force { get; set; }
 
@@ -87,6 +97,8 @@ public class RootCommand
             Rename = Rename,
             RequireAllAssets = !Loose,
             UseShaderlist = Shaderlist,
+            ShaderDebug = ShaderDebug,
+            ReferenceDebug = ReferenceDebug,
         });
     }
 

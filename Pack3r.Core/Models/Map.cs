@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using IOPath = System.IO.Path;
@@ -47,6 +48,30 @@ public sealed class Map : MapAssets, IDisposable
     private string? _root;
     private readonly Lazy<ImmutableArray<DirectoryInfo>> _assetDirs;
     private readonly Lazy<ImmutableArray<AssetSource>> _assetSrcs;
+
+    private readonly ConcurrentBag<Resource> _allResources = [];
+
+    public void LogResource(in Resource resource)
+    {
+        if (_options.ReferenceDebug)
+            _allResources.Add(resource);
+    }
+
+    public bool TryGetAllResources([NotNullWhen(true)] out IEnumerable<Resource>? values)
+    {
+        if (_options.ReferenceDebug)
+        {
+            values = _allResources
+                .OrderBy(r => r.Source)
+                .ThenBy(r => r.Line)
+                .ThenBy(r => r.IsShader)
+                .ThenBy(r => r.Value, ROMCharComparer.Instance);
+            return true;
+        }
+
+        values = null;
+        return false;
+    }
 
     /// <summary>
     /// Gets the relative etmain of the map.<br/>
