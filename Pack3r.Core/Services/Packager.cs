@@ -193,7 +193,7 @@ public sealed class Packager(
                     return;
             }
 
-            OnFailedAddFile(false, $"File '{relativePath}' not found in etmain or pk3dirs");
+            OnFailedAddFile(false, $"File not found: {relativePath}");
         }
 
         bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath)

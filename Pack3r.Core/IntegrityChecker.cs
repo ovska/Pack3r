@@ -13,14 +13,14 @@ internal static class IntegrityChecker
     {
         if (!_jpgs.IsEmpty)
         {
-            string paths = string.Join('\n', _jpgs.Select(p => $"\t{p}"));
-            logger.Warn($"Found potentially progressive JPGs which are unsupported on 2.60b: \n{paths}");
+            string paths = string.Join(Environment.NewLine, _jpgs.Select(p => $"\t{p}"));
+            logger.Warn($"Found potentially progressive JPGs which are unsupported on 2.60b: {Environment.NewLine}{paths}");
         }
 
         if (!_tgas.IsEmpty)
         {
-            string paths = string.Join('\n', _tgas.Select(p => $"\t{p}"));
-            logger.Warn($"Found top-left pixel ordered TGAs which are drawn upside down on 2.60b clients: \n{paths}");
+            string paths = string.Join(Environment.NewLine, _tgas.Select(p => $"\t{p}"));
+            logger.Warn($"Found top-left pixel ordered TGAs which are drawn upside down on 2.60b clients: {Environment.NewLine}{paths}");
         }
 
         foreach (var (path, warning) in _wavs)

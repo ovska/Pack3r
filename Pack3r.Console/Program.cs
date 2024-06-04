@@ -112,7 +112,16 @@ public class Program
         catch (Exception e)
         {
             if (!options.DryRun)
-                File.Delete(options.Pk3File.FullName);
+            {
+                try
+                {
+                    File.Delete(options.Pk3File.FullName);
+                }
+                catch (Exception e2)
+                {
+                    e = new AggregateException("Failed to delete partial pk3", e, e2);
+                }
+            }
 
             app.Lifetime.HandleException(e);
             return -1;
