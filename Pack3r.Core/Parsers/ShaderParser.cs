@@ -363,7 +363,10 @@ public class ShaderParser(
                         if (line.MatchPrefix(prefix, out token))
                         {
                             if (!token.Span.StartsWith("$", StringComparison.Ordinal))
-                                shader.Resources.Add(token);
+                            {
+                                shader.Resources.Add(token.Trim('"')); // netradiant allows using doublequotes here
+                            }
+
                             found = true;
                             break;
                         }
