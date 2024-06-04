@@ -281,6 +281,8 @@ public sealed class Packager(
         RenamableResource resource,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (options.Rename is null || resource.Convert is null)
         {
             archive.CreateEntryFromFile(resource.AbsolutePath, resource.ArchivePath);

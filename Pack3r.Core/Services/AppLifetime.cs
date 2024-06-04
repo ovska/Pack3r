@@ -33,7 +33,13 @@ public sealed class AppLifetime : IDisposable
 
         if (ex is OperationCanceledException && _cts.IsCancellationRequested)
         {
-            _logger.Exception(null, "Operation was canceled by the user");
+            lock (Global.ConsoleLock)
+            {
+                var old = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Operation canceled by user");
+                Console.ForegroundColor = old;
+            }
             return; // don't drain log on cancellations
         }
         else if (ex is ControlledException)
