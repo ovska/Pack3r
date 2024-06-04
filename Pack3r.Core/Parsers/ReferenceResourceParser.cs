@@ -16,7 +16,7 @@ public interface IReferenceResourceParser
 
 public class ReferenceResourceParser(
     ILogger<ReferenceResourceParser> logger,
-    IEnumerable<IReferenceParser> parsers,
+    IReferenceParser[] parsers,
     IProgressManager progressManager)
     : IReferenceResourceParser
 {

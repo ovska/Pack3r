@@ -254,7 +254,7 @@ public sealed class Packager(
 
     private void OnFailedAddFile(bool required, ref DefaultInterpolatedStringHandler handler)
     {
-        if (required || options.RequireAllAssets)
+        if (!options.DryRun && (required || options.RequireAllAssets))
         {
             logger.Fatal(ref handler);
             throw new ControlledException();

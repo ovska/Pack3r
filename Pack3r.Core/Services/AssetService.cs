@@ -15,7 +15,7 @@ public class AssetService(
     PackOptions options,
     ILogger<AssetService> logger,
     IMapFileParser mapFileParser,
-    IEnumerable<IResourceParser> resourceParsers,
+    IResourceParser[] resourceParsers,
     IReferenceResourceParser referenceParser)
     : IAssetService
 {

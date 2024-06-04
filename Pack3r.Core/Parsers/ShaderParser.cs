@@ -78,7 +78,7 @@ public class ShaderParser(
 
                     return false;
 
-                    string getName() => Path.Combine(source.RootPath, "scripts", name);
+                    string getName() => Path.Combine(source.RootPath, "scripts", name).NormalizePath();
                 }
 
                 await foreach (var shader in source.EnumerateShaders(this, skipPredicate, ct))
@@ -120,7 +120,7 @@ public class ShaderParser(
 
         logger.Debug($"Parsed total of {allShaders.Count} shaders");
 
-        var included = new Dictionary<ReadOnlyMemory<char>, Shader>(ROMCharComparer.Instance);
+        Dictionary<ReadOnlyMemory<char>, Shader> included = new(ROMCharComparer.Instance);
 
         AddShaders(
             map,
@@ -130,7 +130,7 @@ public class ShaderParser(
             included,
             cancellationToken);
 
-        // should not happen?
+        // should not happen, duplicateShaders must be empty at this point
         foreach (var (name, duplicates) in duplicateShaders)
         {
             var display = string.Join(", ", duplicates.Select(s => $"'{s.GetAbsolutePath()}'"));
