@@ -83,12 +83,7 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
 
         if (extension.EqualsF(".tga"))
         {
-            if (ReadAt(stream, 17) == 0x20)
-            {
-                _tgas.Add(fullPath.NormalizePath());
-                //return "has top-left ordered TGA pixel format, which will cause the texture to be drawn upside down on 2.60b clients";
-            }
-
+            VerifyTga(fullPath, stream);
             return;
         }
 
@@ -100,51 +95,37 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
 
         if (extension.EqualsF(".wav"))
         {
-            if (VerifyWav(stream) is string error)
+            if (VerifyWav(fullPath, stream) is string error)
                 _wavs.Enqueue((fullPath.NormalizePath(), error));
         }
     }
 
-    private static int ReadAt(Stream stream, int index)
+    private void VerifyTga(string path, Stream stream)
     {
-        byte[]? toReturn = null;
+        const int index = 17;
+        int value = -1;
 
-        try
+        if (stream.CanSeek)
         {
-            if (stream.CanSeek)
+            stream.Position = index;
+            value = stream.ReadByte();
+        }
+        else if (stream.CanRead)
+        {
+            scoped Span<byte> buffer = stackalloc byte[256];
+
+            int read = stream.ReadAtLeast(buffer, minimumBytes: index, throwOnEndOfStream: false);
+
+            if (read >= index)
             {
-                stream.Position = index;
-                return stream.ReadByte();
-            }
-            else if (stream.CanRead)
-            {
-                scoped Span<byte> buffer;
-
-                if (index <= 256)
-                {
-                    buffer = stackalloc byte[256];
-                }
-                else
-                {
-                    toReturn = ArrayPool<byte>.Shared.Rent(index);
-                    buffer = toReturn;
-                }
-
-                int read = stream.ReadAtLeast(buffer, minimumBytes: index, throwOnEndOfStream: false);
-
-                if (read >= index)
-                {
-                    return buffer[index];
-                }
+                value = buffer[index];
             }
         }
-        finally
-        {
-            if (toReturn != null)
-                ArrayPool<byte>.Shared.Return(toReturn);
-        }
 
-        return -1;
+        if (value == 0x20)
+        {
+            _tgas.Add(path.NormalizePath());
+        }
     }
 
     private void VerifyJpg(string fullPath, Stream stream)
@@ -171,27 +152,34 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
         }
     }
 
-    private static string? VerifyWav(Stream stream)
+    private string? VerifyWav(string path, Stream stream)
     {
-        using var reader = new WaveFileReader(stream);
-        WaveFormat fmt = reader.WaveFormat;
+        try
+        {
+            using var reader = new WaveFileReader(stream);
+            WaveFormat fmt = reader.WaveFormat;
 
-        if (fmt.Encoding != WaveFormatEncoding.Pcm)
-            return $"has invalid encoding {fmt.Encoding} instead of PCM";
+            if (fmt.Encoding != WaveFormatEncoding.Pcm)
+                return $"has invalid encoding {fmt.Encoding} instead of PCM";
 
-        List<string>? errors = null;
+            List<string>? errors = null;
 
-        if (fmt.Channels != 1)
-            (errors ??= []).Add($"expected mono instead of {fmt.Channels} channels");
+            if (fmt.Channels != 1)
+                (errors ??= []).Add($"expected mono instead of {fmt.Channels} channels");
 
-        if (fmt.BitsPerSample != 16)
-            (errors ??= []).Add($"expected 16bit instead of {fmt.BitsPerSample}bit");
+            if (fmt.BitsPerSample != 16)
+                (errors ??= []).Add($"expected 16bit instead of {fmt.BitsPerSample}bit");
 
-        if (fmt.SampleRate is not 44100 and not 44100 / 2 and not 44100 / 4)
-            (errors ??= []).Add($"expected multiple of 44.1 kHz instead of {fmt.SampleRate}");
+            if (fmt.SampleRate is not 44100 and not 44100 / 2 and not 44100 / 4)
+                (errors ??= []).Add($"expected multiple of 44.1 kHz instead of {fmt.SampleRate}");
 
-        if (errors is { Count: > 0 })
-            return $"has invalid audio format: {string.Join(" | ", errors)}";
+            if (errors is { Count: > 0 })
+                return $"has invalid audio format: {string.Join(" | ", errors)}";
+        }
+        catch (Exception e)
+        {
+            logger.Exception(e, $"Could not verify WAV file integrity: {path}");
+        }
 
         return null;
     }
