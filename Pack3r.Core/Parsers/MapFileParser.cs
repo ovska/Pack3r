@@ -86,7 +86,7 @@ public class MapFileParser(
 
             if (state == State.None)
             {
-                if (!line.Value.Span.StartsWith("// entity ", StringComparison.Ordinal))
+                if (!line.Raw.StartsWith("// entity ", StringComparison.Ordinal))
                 {
                     logger.Fatal($"Expected line {line.Index} in file '{path}' to contain entity ID, actual value: {line.Raw}");
                     throw new ControlledException();
@@ -100,7 +100,7 @@ public class MapFileParser(
 
             if (state == State.Entity)
             {
-                if (line.FirstChar == '/' && line.FirstChar == '{')
+                if (line.FirstChar is '/' or '{')
                     continue;
 
                 if (line.FirstChar == '"')
@@ -126,6 +126,8 @@ public class MapFileParser(
                         continue;
                     }
                 }
+
+                continue;
             }
 
             if (state == State.BrushDef)
@@ -143,7 +145,7 @@ public class MapFileParser(
 
                         if (nonPrefixedShaders.Add(withoutPrefix))
                         {
-                            shaders.Add($"textures/{line.Raw.AsSpan(lastParen + 2, space)}".AsMemory());
+                            shaders.Add($"textures/{withoutPrefix}".AsMemory());
                         }
                     }
                     else
