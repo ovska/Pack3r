@@ -36,9 +36,17 @@ public readonly struct Line : IEquatable<Line>
         Raw = rawValue ?? "";
         Value = keepRaw ? Raw.AsMemory() : Raw.AsMemory().Trim();
 
-        if (!keepRaw && Raw.IndexOf("//") is int commentIndex and >= 0)
+        if (keepRaw)
         {
-            Value = Value[..commentIndex].Trim();
+            Value = Raw.AsMemory();
+        }
+        else if (Raw.IndexOf("//") is int commentIndex and >= 0)
+        {
+            Value = Raw.AsMemory(0, commentIndex).Trim();
+        }
+        else
+        {
+            Value = Raw.AsMemory().Trim();
         }
 
         if (!Value.IsEmpty)

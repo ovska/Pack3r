@@ -1,7 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -226,24 +225,21 @@ public class ShaderParser(
                 ReadOnlyMemory<char> shaderName = line.Value;
                 State next = State.AfterShaderName;
 
-                if (shaderName.Span.ContainsAny(Tokens.Braces))
+                // handle opening brace left on the previous line, e.g:
+                // textures/mymap/ice {
+                if (shaderName.Span[^1] == '{')
                 {
-                    // handle opening brace left on the wrong line
-                    if (shaderName.Span[^1] == '{')
-                    {
-                        shaderName = shaderName[..^1];
-                        next = State.Shader;
-                    }
-
-                    if (shaderName.Span.ContainsAny(Tokens.Braces))
-                    {
-                        throw new InvalidDataException(
-                            $"Expected shader name on line {line.Index} in file '{asset.FullPath}', got: '{line.Raw}'");
-                    }
+                    shaderName = shaderName[..^1];
+                    next = State.Shader;
                 }
 
-                // TODO
-                shader = new Shader(shaderName, asset.Name, asset.Source);
+                if (shaderName.Span.ContainsAny(Tokens.Braces))
+                {
+                    throw new InvalidDataException(
+                        $"Expected shader name on line {line.Index} in file '{asset.FullPath}', got: '{line.Raw}'");
+                }
+
+                shader = new Shader(shaderName, asset);
                 state = next;
                 continue;
             }
