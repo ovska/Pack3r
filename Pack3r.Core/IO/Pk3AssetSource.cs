@@ -1,5 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.Models;
@@ -8,77 +7,19 @@ using Pack3r.Services;
 
 namespace Pack3r.IO;
 
-public sealed class Pk3AssetSource(string path, bool isPak0, IIntegrityChecker checker) : AssetSource<ZipArchiveEntry>
+public sealed class Pk3AssetSource(string path, bool isPak0, IIntegrityChecker checker) : AssetSource(checker)
 {
     public string ArchivePath { get; } = path;
-    public ZipArchive Archive
-    {
-        get
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            return _archive;
-        }
-    }
-
     public override bool IsPak0 { get; } = isPak0;
     public override string RootPath => ArchivePath;
 
     private readonly ZipArchive _archive = ZipFile.OpenRead(path);
-    private bool _disposed;
 
     public override string ToString() => $"{{ Pk3: {ArchivePath} }}";
 
     public override bool Contains(ReadOnlyMemory<char> relativePath)
     {
         return Assets.ContainsKey(relativePath);
-    }
-
-    public override bool TryRead(
-        ReadOnlyMemory<char> resourcePath,
-        ILineReader reader,
-        LineOptions options,
-        CancellationToken cancellationToken,
-        [NotNullWhen(true)] out IAsyncEnumerable<Line>? lines)
-    {
-        if (Assets.TryGetValue(resourcePath, out var entry))
-        {
-            lines = reader.ReadLines(ArchivePath, entry, options, cancellationToken);
-            return true;
-        }
-
-        lines = null;
-        return false;
-    }
-
-    public override bool TryHandleAsset(
-        ZipArchive destination,
-        ReadOnlyMemory<char> relativePath,
-        out ZipArchiveEntry? entry)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        if (Assets.TryGetValue(relativePath, out var pk3entry))
-        {
-            if (IsPak0)
-            {
-                entry = null;
-            }
-            else
-            {
-                checker.CheckIntegrity(ArchivePath, pk3entry);
-
-                entry = destination.CreateEntry(pk3entry.FullName.NormalizePath(), CompressionLevel.Optimal);
-                entry.LastWriteTime = pk3entry.LastWriteTime;
-                using Stream sourceStream = pk3entry.Open();
-                using Stream destinationStream = entry.Open();
-                sourceStream.CopyTo(destinationStream);
-            }
-
-            return true;
-        }
-
-        entry = null;
-        return false;
     }
 
     public override async IAsyncEnumerable<Shader> EnumerateShaders(
@@ -93,7 +34,7 @@ public sealed class Pk3AssetSource(string path, bool isPak0, IIntegrityChecker c
             if (!entry.FullName.HasExtension(".shader") || skipPredicate(entry.FullName))
                 continue;
 
-            await foreach (var shader in parser.Parse(this, entry, cancellationToken))
+            await foreach (var shader in parser.Parse(new Pk3Asset(this, ArchivePath, entry), cancellationToken))
             {
                 yield return shader;
             }
@@ -104,18 +45,19 @@ public sealed class Pk3AssetSource(string path, bool isPak0, IIntegrityChecker c
     {
         if (!_disposed)
         {
-            _disposed = true;
             _archive.Dispose();
+            base.Dispose();
         }
     }
 
-    protected override IEnumerable<ZipArchiveEntry> EnumerateAssets()
+    protected override IEnumerable<IAsset> EnumerateAssets()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _archive.Entries.Where(entry => Tokens.PackableFile().IsMatch(entry.FullName.GetExtension()));
+        return _archive.Entries
+            .Where(entry => Tokens.PackableFile()
+            .IsMatch(entry.FullName.GetExtension()))
+            .Select(entry => new Pk3Asset(this, ArchivePath, entry));
     }
-
-    protected override ReadOnlyMemory<char> GetKey(ZipArchiveEntry asset) => asset.FullName.Replace('\\', '/').AsMemory();
 
     public override FileInfo? GetShaderlist()
     {

@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Pack3r.Parsers;
 
 namespace Pack3r.Tests;
@@ -24,7 +23,7 @@ public static class SkinParserTests
         Assert.True(parser.CanParse("test.skin".AsMemory()));
         Assert.False(parser.CanParse("test.md3".AsMemory()));
 
-        var result = await parser.Parse("", default);
+        var result = await parser.Parse(new MockAsset(), default);
 
         Assert.NotNull(result);
         Assert.Equal(

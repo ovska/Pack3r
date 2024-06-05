@@ -134,7 +134,7 @@ public class RootCommand
             {
                 if (Map.Directory?.Parent is not { Exists: true } etmain)
                 {
-                    Error("Could not determine output pk3 location");
+                    Error("Could not find output pk3 location");
                     return null!; // shut up compiler
                 }
 

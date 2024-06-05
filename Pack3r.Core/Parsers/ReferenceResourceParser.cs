@@ -1,6 +1,4 @@
-﻿using System.IO.Compression;
-using Pack3r.Extensions;
-using Pack3r.IO;
+﻿using Pack3r.Extensions;
 using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Progress;
@@ -108,23 +106,13 @@ public class ReferenceResourceParser(
 
         foreach (var source in map.AssetSources)
         {
-            if (source is DirectoryAssetSource dirSource)
+            if (source.Assets.TryGetValue(resource, out IAsset? asset))
             {
-                if (dirSource.Assets.TryGetValue(resource, out FileInfo? file))
-                {
-                    return parser.Parse(file.FullName, cancellationToken);
-                }
-            }
-            else if (source is Pk3AssetSource pk3Source)
-            {
-                if (pk3Source.Assets.TryGetValue(resource, out ZipArchiveEntry? entry))
-                {
-                    return parser.Parse(entry, pk3Source.ArchivePath, cancellationToken);
-                }
+                return parser.Parse(asset, cancellationToken);
             }
         }
 
-        logger.Warn($"Reference resource not found in source(s): '{resource}'");
+        logger.Warn($"File not found in sources: '{resource}'");
         return Task.FromResult(default(HashSet<Resource>));
     }
 }

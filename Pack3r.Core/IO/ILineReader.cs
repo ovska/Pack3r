@@ -1,4 +1,4 @@
-﻿using System.IO.Compression;
+﻿using Pack3r.Models;
 
 namespace Pack3r.IO;
 
@@ -9,13 +9,12 @@ public readonly record struct LineOptions(
 public interface ILineReader
 {
     IAsyncEnumerable<Line> ReadLines(
-        string archivePath,
-        ZipArchiveEntry entry,
+        string path,
         LineOptions options,
         CancellationToken cancellationToken);
 
     IAsyncEnumerable<Line> ReadLines(
-        string path,
+        IAsset asset,
         LineOptions options,
         CancellationToken cancellationToken);
 }

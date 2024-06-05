@@ -1,17 +1,15 @@
-﻿using System.Buffers;
-using System.Collections.Concurrent;
-using System.IO.Compression;
+﻿using System.Collections.Concurrent;
 using NAudio.Wave;
 using Pack3r.Extensions;
 using Pack3r.Logging;
+using Pack3r.Models;
 
 namespace Pack3r.Services;
 
 public interface IIntegrityChecker
 {
     void Log();
-    void CheckIntegrity(string path);
-    void CheckIntegrity(string archivePath, ZipArchiveEntry entry);
+    void CheckIntegrity(IAsset asset);
 }
 
 public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegrityChecker
@@ -42,28 +40,15 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
 
     private readonly ConcurrentDictionary<(string, string), object?> _handled = [];
 
-    public void CheckIntegrity(string fullPath)
+    public void CheckIntegrity(IAsset asset)
     {
-        if (!CanCheckIntegrity(fullPath))
+        if (!CanCheckIntegrity(asset.FullPath))
             return;
 
-        if (!_handled.TryAdd((fullPath, ""), null))
+        if (!_handled.TryAdd((asset.Name, ""), null))
             return;
 
-        using FileStream stream = File.OpenRead(fullPath);
-        CheckIntegrityCore(fullPath, stream);
-    }
-
-    public void CheckIntegrity(string archivePath, ZipArchiveEntry entry)
-    {
-        if (!CanCheckIntegrity(entry.FullName))
-            return;
-
-        if (!_handled.TryAdd((archivePath, entry.FullName), null))
-            return;
-
-        using Stream stream = entry.Open();
-        CheckIntegrityCore(Path.Combine(archivePath, entry.FullName).NormalizePath(), stream);
+        CheckIntegrityCore(asset);
     }
 
     private static bool CanCheckIntegrity(string path)
@@ -75,10 +60,10 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
             || extension.EqualsF(".wav");
     }
 
-    private void CheckIntegrityCore(
-        string fullPath,
-        Stream stream)
+    private void CheckIntegrityCore(IAsset asset)
     {
+        using Stream stream = asset.OpenRead();
+        string fullPath = asset.FullPath;
         ReadOnlySpan<char> extension = fullPath.GetExtension();
 
         if (extension.EqualsF(".tga"))
@@ -162,18 +147,18 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
             if (fmt.Encoding != WaveFormatEncoding.Pcm)
                 return $"has invalid encoding {fmt.Encoding} instead of PCM";
 
-            List<string>? errors = null;
+            List<string> errors = [];
 
             if (fmt.Channels != 1)
-                (errors ??= []).Add($"expected mono instead of {fmt.Channels} channels");
+                errors.Add($"expected mono instead of {fmt.Channels} channels");
 
             if (fmt.BitsPerSample != 16)
-                (errors ??= []).Add($"expected 16bit instead of {fmt.BitsPerSample}bit");
+                errors.Add($"expected 16bit instead of {fmt.BitsPerSample}bit");
 
             if (fmt.SampleRate is not 44100 and not 44100 / 2 and not 44100 / 4)
-                (errors ??= []).Add($"expected multiple of 44.1 kHz instead of {fmt.SampleRate}");
+                errors.Add($"expected multiple of 44.1 kHz instead of {fmt.SampleRate}");
 
-            if (errors is { Count: > 0 })
+            if (errors.Count > 0)
                 return $"has invalid audio format: {string.Join(" | ", errors)}";
         }
         catch (Exception e)

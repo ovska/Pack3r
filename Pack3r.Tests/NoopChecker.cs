@@ -1,16 +1,14 @@
 ﻿using System.IO.Compression;
+using Pack3r.Models;
 using Pack3r.Services;
 
 namespace Pack3r.Tests;
 
 public sealed class NoopChecker : IIntegrityChecker
 {
-    public void CheckIntegrity(string path)
+    public void CheckIntegrity(IAsset asset)
     {
-    }
-
-    public void CheckIntegrity(string archivePath, ZipArchiveEntry entry)
-    {
+        throw new NotImplementedException();
     }
 
     public void Log()

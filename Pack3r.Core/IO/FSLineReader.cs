@@ -1,21 +1,12 @@
-﻿using System.IO.Compression;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text;
 using Pack3r.Extensions;
+using Pack3r.Models;
 
 namespace Pack3r.IO;
 
 public class FSLineReader() : ILineReader
 {
-    public IAsyncEnumerable<Line> ReadLines(
-        string archivePath,
-        ZipArchiveEntry entry,
-        LineOptions options,
-        CancellationToken cancellationToken)
-    {
-        return ReadLinesCore(Path.Combine(archivePath, entry.FullName).NormalizePath(), entry.Open(), options, cancellationToken);
-    }
-
     public IAsyncEnumerable<Line> ReadLines(
         string path,
         LineOptions options,
@@ -30,6 +21,11 @@ public class FSLineReader() : ILineReader
             FileOptions.Asynchronous | FileOptions.SequentialScan);
 
         return ReadLinesCore(path.NormalizePath(), stream, options, cancellationToken);
+    }
+
+    public IAsyncEnumerable<Line> ReadLines(IAsset asset, LineOptions options, CancellationToken cancellationToken)
+    {
+        return ReadLinesCore(asset.FullPath, asset.OpenRead(), options, cancellationToken);
     }
 
     private static async IAsyncEnumerable<Line> ReadLinesCore(

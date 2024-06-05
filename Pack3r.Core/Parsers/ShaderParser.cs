@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -17,13 +18,7 @@ public interface IShaderParser
         CancellationToken cancellationToken);
 
     IAsyncEnumerable<Shader> Parse(
-        DirectoryAssetSource source,
-        string absolutePath,
-        CancellationToken cancellationToken);
-
-    IAsyncEnumerable<Shader> Parse(
-        Pk3AssetSource source,
-        ZipArchiveEntry archiveEntry,
+        IAsset asset,
         CancellationToken cancellationToken);
 }
 
@@ -187,36 +182,17 @@ public class ShaderParser(
         }
     }
 
-    public IAsyncEnumerable<Shader> Parse(DirectoryAssetSource source, string absolutePath, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<Shader> Parse(
+        IAsset asset,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        return ParseCore(
-            Path.GetRelativePath(source.RootPath, absolutePath),
-            source,
-            reader.ReadLines(absolutePath, default, cancellationToken));
-    }
-
-    public IAsyncEnumerable<Shader> Parse(Pk3AssetSource source, ZipArchiveEntry archiveEntry, CancellationToken cancellationToken)
-    {
-        return ParseCore(
-            relativePath: archiveEntry.FullName,
-            source,
-            reader.ReadLines(source.ArchivePath, archiveEntry, default, cancellationToken));
-    }
-
-    internal async IAsyncEnumerable<Shader> ParseCore(
-        string relativePath,
-        AssetSource source,
-        IAsyncEnumerable<Line> lines)
-    {
-        string absPath() => Path.Combine(source.RootPath, relativePath);
-
         State state = State.None;
 
         Shader? shader = null;
         ReadOnlyMemory<char> token;
         bool inComment = false;
 
-        await foreach (var line in lines.ConfigureAwait(false))
+        await foreach (var line in reader.ReadLines(asset, default, cancellationToken).ConfigureAwait(false))
         {
             if (inComment)
             {
@@ -238,7 +214,7 @@ public class ShaderParser(
                 if (!line.IsOpeningBrace)
                 {
                     throw new InvalidDataException(
-                        $"Expected {{ on line {line.Index} in file '{absPath()}', but line was: {line.Raw}");
+                        $"Expected {{ on line {line.Index} in file '{asset.FullPath}', but line was: {line.Raw}");
                 }
 
                 state = State.Shader;
@@ -262,11 +238,12 @@ public class ShaderParser(
                     if (shaderName.Span.ContainsAny(Tokens.Braces))
                     {
                         throw new InvalidDataException(
-                            $"Expected shader name on line {line.Index} in file '{absPath()}', got: '{line.Raw}'");
+                            $"Expected shader name on line {line.Index} in file '{asset.FullPath}', got: '{line.Raw}'");
                     }
                 }
 
-                shader = new Shader(shaderName, relativePath.Replace('\\', '/'), source);
+                // TODO
+                shader = new Shader(shaderName, asset.Name, asset.Source);
                 state = next;
                 continue;
             }
@@ -278,7 +255,7 @@ public class ShaderParser(
                 if (line.IsOpeningBrace)
                 {
                     throw new InvalidDataException(
-                        $"Invalid token '{line.Raw}' on line {line.Index} in file {absPath()}");
+                        $"Invalid token '{line.Raw}' on line {line.Index} in file {asset.FullPath}");
                 }
 
                 if (line.IsClosingBrace)
@@ -312,7 +289,7 @@ public class ShaderParser(
                     }
                     else
                     {
-                        logger.UnparsableKeyword(absPath(), line.Index, "animMap", line.Raw);
+                        logger.UnparsableKeyword(asset.FullPath, line.Index, "animMap", line.Raw);
                     }
                 }
                 else if (line.MatchPrefix("videomap ", out token))
@@ -380,7 +357,7 @@ public class ShaderParser(
                 {
                     if (!token.TryReadPastWhitespace(out token))
                     {
-                        logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{absPath()}'");
+                        logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{asset.FullPath}'");
                     }
                     else
                     {
@@ -398,7 +375,7 @@ public class ShaderParser(
                 {
                     if (!token.TryReadUpToWhitespace(out token))
                     {
-                        logger.UnparsableKeyword(absPath(), line.Index, "skyparms", line.Raw);
+                        logger.UnparsableKeyword(asset.FullPath, line.Index, "skyparms", line.Raw);
                         continue;
                     }
 
@@ -424,7 +401,7 @@ public class ShaderParser(
                     }
                     else
                     {
-                        logger.UnparsableKeyword(absPath(), line.Index, "q3map_surfaceModel", line.Raw);
+                        logger.UnparsableKeyword(asset.FullPath, line.Index, "q3map_surfaceModel", line.Raw);
                     }
                 }
                 else if (!shader.HasLightStyles && line.MatchPrefix("q3map_lightstyle ", out _))
@@ -436,7 +413,7 @@ public class ShaderParser(
 
         if (state != State.None)
         {
-            logger.Fatal($"Shader '{absPath()}' ended in an invalid state: {state}");
+            logger.Fatal($"Shader '{asset.FullPath}' ended in an invalid state: {state}");
             throw new ControlledException();
         }
     }

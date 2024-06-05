@@ -378,7 +378,7 @@ public static class ModelParserTests
 
         var parser = new AseParser(NullLogger<AseParser>.Instance, reader);
 
-        var results = await parser.Parse("", default);
+        var results = await parser.Parse(new MockAsset(), default);
 
         Assert.NotNull(results);
         Assert.Single(results);

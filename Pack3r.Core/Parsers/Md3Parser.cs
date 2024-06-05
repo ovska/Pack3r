@@ -14,7 +14,7 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".md3") || resource.EndsWithF(".mdc");
 
     public async Task<HashSet<Resource>?> Parse(
-        string path,
+        IAsset asset,
         CancellationToken cancellationToken)
     {
         using var memoryStream = Global.StreamManager.GetStream(
@@ -22,7 +22,7 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
             requiredSize: 4096,
             asContiguousBuffer: true);
 
-        await using (var fileStream = File.OpenRead(path))
+        await using (var fileStream = asset.OpenRead())
         {
             await fileStream.CopyToAsync(memoryStream, cancellationToken);
         }
@@ -30,44 +30,13 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
         if (!memoryStream.TryGetBuffer(out ArraySegment<byte> buffer))
             buffer = memoryStream.ToArray();
 
-        if (Impl(path, buffer, out var resources, out var error))
+        if (Impl(asset.FullPath, buffer, out var resources, out var error))
         {
             return resources;
         }
         else
         {
-            logger.Warn($"Failed to parse MD3 shader '{path}': {error}");
-            return null;
-        }
-    }
-
-    public async Task<HashSet<Resource>?> Parse(
-        ZipArchiveEntry entry,
-        string archivePath,
-        CancellationToken cancellationToken)
-    {
-        using var memoryStream = Global.StreamManager.GetStream(
-            tag: "Md3ParsePk3",
-            requiredSize: 4096,
-            asContiguousBuffer: true);
-
-        await using (var pk3stream = entry.Open())
-        {
-            await pk3stream.CopyToAsync(memoryStream, cancellationToken);
-        }
-
-        if (!memoryStream.TryGetBuffer(out ArraySegment<byte> buffer))
-            buffer = memoryStream.ToArray();
-
-        string fullPath = Path.Combine(archivePath, entry.FullName);
-
-        if (Impl(fullPath, buffer, out var resources, out var error))
-        {
-            return resources;
-        }
-        else
-        {
-            logger.Warn($"Failed to parse MD3 shader '{fullPath}': {error}");
+            logger.Warn($"Failed to parse MD3 shader '{asset.FullPath}': {error}");
             return null;
         }
     }

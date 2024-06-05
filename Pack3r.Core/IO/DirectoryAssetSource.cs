@@ -1,14 +1,11 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.IO.Compression;
-using System.Runtime.CompilerServices;
-using Pack3r.Extensions;
+﻿using System.Runtime.CompilerServices;
 using Pack3r.Models;
 using Pack3r.Parsers;
 using Pack3r.Services;
 
 namespace Pack3r.IO;
 
-public sealed class DirectoryAssetSource(DirectoryInfo directory, IIntegrityChecker checker) : AssetSource<FileInfo>
+public sealed class DirectoryAssetSource(DirectoryInfo directory, IIntegrityChecker checker) : AssetSource(checker)
 {
     public DirectoryInfo Directory { get; } = directory;
     public override string RootPath => Directory.FullName;
@@ -19,48 +16,6 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, IIntegrityChec
     public override bool Contains(ReadOnlyMemory<char> relativePath)
     {
         return Assets.ContainsKey(relativePath);
-    }
-
-    public override bool TryHandleAsset(
-        ZipArchive destination,
-        ReadOnlyMemory<char> relativePath,
-        out ZipArchiveEntry? entry)
-    {
-        if (Assets.TryGetValue(relativePath, out var file))
-        {
-            if (IsPak0)
-            {
-                entry = null;
-            }
-            else
-            {
-                checker.CheckIntegrity(file.FullName);
-
-                string archivePath = Path.GetRelativePath(Directory.FullName, file.FullName).NormalizePath();
-                entry = destination.CreateEntryFromFile(file.FullName, archivePath, CompressionLevel.Optimal);
-            }
-            return true;
-        }
-
-        entry = null;
-        return false;
-    }
-
-    public override bool TryRead(
-        ReadOnlyMemory<char> resourcePath,
-        ILineReader reader,
-        LineOptions options,
-        CancellationToken cancellationToken,
-        [NotNullWhen(true)] out IAsyncEnumerable<Line>? lines)
-    {
-        if (Assets.TryGetValue(resourcePath, out var file))
-        {
-            lines = reader.ReadLines(file.FullName, options, cancellationToken);
-            return true;
-        }
-
-        lines = null;
-        return false;
     }
 
     public override async IAsyncEnumerable<Shader> EnumerateShaders(
@@ -75,7 +30,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, IIntegrityChec
                 if (skipPredicate(shaderFile.FullName))
                     continue;
 
-                await foreach (var shader in parser.Parse(this, shaderFile.FullName, cancellationToken))
+                await foreach (var shader in parser.Parse(new FileAsset(this, shaderFile), cancellationToken))
                 {
                     yield return shader;
                 }
@@ -83,16 +38,12 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, IIntegrityChec
         }
     }
 
-    protected override ReadOnlyMemory<char> GetKey(FileInfo asset)
-    {
-        return Path.GetRelativePath(Directory.FullName, asset.FullName).Replace('\\', '/').AsMemory();
-    }
-
-    protected override IEnumerable<FileInfo> EnumerateAssets()
+    protected override IEnumerable<IAsset> EnumerateAssets()
     {
         return Directory
             .EnumerateFiles("*", SearchOption.AllDirectories)
-            .Where(f => Tokens.PackableFile().IsMatch(f.FullName));
+            .Where(f => Tokens.PackableFile().IsMatch(f.FullName))
+            .Select(f => new FileAsset(this, f));
     }
 
     public override FileInfo? GetShaderlist()

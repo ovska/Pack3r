@@ -1,19 +1,20 @@
 ﻿using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.IO;
+using Pack3r.Models;
 
 namespace Pack3r.Tests;
 
 internal sealed class StringLineReader(string data) : ILineReader
 {
-    public IAsyncEnumerable<Line> ReadLines(string archivePath, ZipArchiveEntry entry, LineOptions options, CancellationToken cancellationToken)
-    {
-        return ReadLinesCore(Path.Combine(archivePath, entry.FullName), options, cancellationToken);
-    }
-
     public IAsyncEnumerable<Line> ReadLines(string path, LineOptions options, CancellationToken cancellationToken)
     {
         return ReadLinesCore(path, options, cancellationToken);
+    }
+
+    public IAsyncEnumerable<Line> ReadLines(IAsset asset, LineOptions options, CancellationToken cancellationToken)
+    {
+        return ReadLinesCore(asset.FullPath, options, cancellationToken);
     }
 
     private async IAsyncEnumerable<Line> ReadLinesCore(

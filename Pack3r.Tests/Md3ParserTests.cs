@@ -13,7 +13,7 @@ public static class Md3ParserTests
 
         Assert.True(parser.CanParse(path.AsMemory()));
 
-        var result = await parser.Parse(path, default);
+        var result = await parser.Parse(new FileAsset(path), default);
 
         Assert.NotNull(result);
         Assert.All(result, s => Assert.True(s.IsShader));
@@ -39,7 +39,7 @@ public static class Md3ParserTests
 
         Assert.True(parser.CanParse(path.AsMemory()));
 
-        var result = await parser.Parse(path, default);
+        var result = await parser.Parse(new FileAsset(path), default);
 
         Assert.NotNull(result);
         Assert.All(result, s => Assert.False(s.IsShader));

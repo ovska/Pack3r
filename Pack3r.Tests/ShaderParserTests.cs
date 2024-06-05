@@ -12,7 +12,7 @@ public class ShaderParserTests
     private static async Task<Shader> ParseSingle(string data, bool includeDevFiles = false)
     {
         var parser = GetParser(data, includeDevFiles);
-        var results = await parser.Parse(Source, "C:\\test.shader",default).ToList();
+        var results = await parser.Parse(new MockAsset(), default).ToList();
 
         Assert.Single(results);
         return results[0];
@@ -47,7 +47,7 @@ public class ShaderParserTests
             }
             """);
 
-        var results = await parser.Parse(Source, "C:\\test.shader", default).ToList();
+        var results = await parser.Parse(new MockAsset(), default).ToList();
 
         Assert.Equal(2, results.Count);
 
