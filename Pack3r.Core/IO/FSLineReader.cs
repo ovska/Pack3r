@@ -36,26 +36,26 @@ public class FSLineReader() : ILineReader
     {
         int index = 0;
 
-        await using (source)
+        using var reader = new StreamReader(
+            source,
+            Encoding.UTF8,
+            detectEncodingFromByteOrderMarks: false,
+            bufferSize: 4096,
+            leaveOpen: false);
+
+        string? line;
+
+        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
         {
-            using var reader = new StreamReader(
-                source,
-                Encoding.UTF8,
-                detectEncodingFromByteOrderMarks: true,
-                bufferSize: 4096);
+            index++;
 
-            string? line;
+            if (line.Length == 0 && !options.KeepEmpty)
+                continue;
 
-            while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
-            {
-                if (line.Length == 0 && !options.KeepEmpty)
-                    continue;
+            var obj = new Line(path, index, line, options.KeepRaw);
 
-                var obj = new Line(path, ++index, line, options.KeepRaw);
-
-                if (obj.HasValue || options.KeepEmpty)
-                    yield return obj;
-            }
+            if (obj.HasValue || options.KeepEmpty)
+                yield return obj;
         }
     }
 }
