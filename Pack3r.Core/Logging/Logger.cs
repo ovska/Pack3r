@@ -43,7 +43,6 @@ public sealed class LoggerBase : ILogger
     }
 
     private readonly LogLevel _minimumLogLevel;
-
     private readonly ConcurrentBag<LogMessage> _messages = [];
 
     public LoggerBase(PackOptions options)
@@ -85,11 +84,13 @@ public sealed class LoggerBase : ILogger
 
     public void Drain()
     {
+        Span<LogMessage> messages = _messages.ToArray();
+        messages.Sort();
+
+        _messages.Clear();
+
         lock (Global.ConsoleLock)
         {
-            Span<LogMessage> messages = [.._messages];
-            messages.Sort();
-
             foreach (var message in messages)
             {
                 LogInternalNoLock(message.Level, message.Message, message.Context);

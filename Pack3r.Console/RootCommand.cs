@@ -24,7 +24,7 @@ public class RootCommand
         ValidationRules = CliValidationRules.LegalPath)]
     public FileSystemInfo? Output { get; set; }
 
-    [CliOption(Description = "Print files that would be packed, without creating a pk3")]
+    [CliOption(Description = "Discover packed files and estimate file size without creating a pk3")]
     public bool DryRun { get; set; }
 
     [CliOption(

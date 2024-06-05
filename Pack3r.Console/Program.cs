@@ -63,7 +63,7 @@ public class Program
             }
             else
             {
-                string renameLog = options.Rename is null ? "" : " (rename is ignored)";
+                string renameLog = options.Rename is null ? "" : ", rename is ignored";
                 app.Logger.System($"Running dry run for '{mapName}' without creating a pk3{renameLog}");
             }
 

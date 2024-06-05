@@ -115,7 +115,8 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
 
     private void VerifyJpg(string fullPath, Stream stream)
     {
-        using var ms = Global.StreamManager.GetStream(nameof(VerifyJpg), requiredSize: 1024 * 1024);
+        // some light testing determined the average jpg to be <85kb
+        using var ms = Global.StreamManager.GetStream(nameof(VerifyJpg), requiredSize: 1024 * 128);
 
         stream.CopyTo(ms);
 
