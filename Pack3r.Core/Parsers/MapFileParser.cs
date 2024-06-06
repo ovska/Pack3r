@@ -214,17 +214,14 @@ public class MapFileParser(
                 {
                     if (key.Length == 5)
                     {
-                        if (!options.IncludeSource && IsClassName("misc_model"))
-                        {
-                            ref var list = ref CollectionsMarshal.GetValueRefOrAddDefault(miscModels, value, out _);
-                            list ??= [];
-                            list.Add(new ReferenceMiscModel(value, entitydata));
-                        }
-                        else
+                        if (options.IncludeSource || !IsClassName("misc_model"))
                         {
                             referenceResources.Add(value);
                             resources.Add(value);
                         }
+
+                        ref var list = ref CollectionsMarshal.GetValueRefOrAddDefault(miscModels, value, out _);
+                        (list ??= []).Add(new ReferenceMiscModel(value, entitydata));
                     }
                     else if (key.Length == 6 && key[5] == '2')
                     {

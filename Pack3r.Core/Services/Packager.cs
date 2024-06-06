@@ -1,5 +1,6 @@
 ﻿using System.IO.Compression;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -37,13 +38,13 @@ public sealed class Packager(
             int i = 0;
             foreach (var res in map.RenamableResources)
             {
-                await CreateRenamable(archive, options, res, cancellationToken);
+                CreateRenamable(archive, options, res, cancellationToken);
                 includedFiles.Add((res.AbsolutePath, res.ArchivePath.AsMemory()));
                 progress.Report(++i);
             }
         }
 
-        using (var progress = progressManager.Create("Compressing resources", map.Resources.Count))
+        using (var progress = progressManager.Create("Compressing misc resources", map.Resources.Count))
         {
             int count = 1;
 
@@ -279,7 +280,7 @@ public sealed class Packager(
         }
     }
 
-    private static async ValueTask CreateRenamable(
+    private static void CreateRenamable(
         ZipArchive archive,
         PackOptions options,
         RenamableResource resource,
@@ -304,23 +305,15 @@ public sealed class Packager(
 
         entry.LastWriteTime = lastWrite;
 
-        using var reader = new StreamReader(resource.AbsolutePath, new FileStreamOptions
-        {
-            Access = FileAccess.Read,
-            Mode = FileMode.Open,
-            Share = FileShare.Read,
-        });
-
-        await using var writer = new StreamWriter(
-            entry.Open(),
-            System.Text.Encoding.UTF8,
-            leaveOpen: false);
+        using var reader = new StreamReader(File.OpenRead(resource.AbsolutePath), Encoding.UTF8, leaveOpen: false);
+        using var writer = new StreamWriter(entry.Open(), Encoding.UTF8, leaveOpen: false);
 
         string? line;
 
-        while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
+        while ((line = reader.ReadLine()) != null)
         {
-            await writer.WriteLineAsync(resource.Convert(line, options).AsMemory(), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            writer.WriteLine(resource.Convert(line, options));
         }
     }
 }

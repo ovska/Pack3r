@@ -23,23 +23,28 @@ public class ReferenceResourceParser(
         CancellationToken cancellationToken)
     {
         // remove all misc_models that are referenced elsewhere, as all their assets are 100% needed in that case
-        if (map.MiscModels.Count > 0)
+/*        if (map.MiscModels.Count > 0)
         {
             foreach (var res in map.ReferenceResources.Concat(map.Resources))
             {
                 if (map.MiscModels.Remove(res) && map.MiscModels.Count == 0)
                     break;
             }
-        }
+        }*/
 
         int counter = 0;
         using var progress = progressManager.Create(
             "Parsing md3, ase and skin files for assets",
             map.ReferenceResources.Count + map.MiscModels.Count);
 
+        HashSet<ReadOnlyMemory<char>> handled = new(ROMCharComparer.Instance);
+
         foreach (var resource in map.ReferenceResources.Concat(map.MiscModels.Keys))
         {
             progress.Report(++counter);
+
+            if (!handled.Add(resource))
+                continue;
 
             HashSet<Resource>? result = await TryParse(map, resource, cancellationToken);
 

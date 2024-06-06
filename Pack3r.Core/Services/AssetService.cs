@@ -168,11 +168,21 @@ public class AssetService(
 
         if (arena.Exists)
         {
+            string lineToReplace = $"map \"{map.Name}\"";
+
             map.RenamableResources.Add(new()
             {
                 AbsolutePath = arena.FullName,
                 ArchivePath = Path.Combine("scripts", $"{options.Rename ?? map.Name}.arena"),
-                Convert = static (line, options) => Tokens.ArenaMapName().IsMatch(line) ? $"map \"{options.Rename}\"" : line,
+                Convert = (line, options) =>
+                {
+                    if (line.AsSpan().Trim().EqualsF(lineToReplace))
+                    {
+                        return line.Replace(lineToReplace, $"map \"{options.Rename}\"");
+                    }
+
+                    return line;
+                },
             });
         }
         else
@@ -180,11 +190,11 @@ public class AssetService(
             logger.Info($"Arena skipped, file not found in '{arena.FullName}'");
         }
 
-        var levelshot = new FileInfo(Path.Combine(map.GetMapRoot(), "levelshots", $"{map.Name}.tga"));
+        FileInfo levelshot = new(Path.Combine(map.GetMapRoot(), "levelshots", $"{map.Name}.tga"));
 
         if (!levelshot.Exists)
         {
-            levelshot = new FileInfo(Path.ChangeExtension(levelshot.FullName, ".jpg"));
+            levelshot = new(Path.ChangeExtension(levelshot.FullName, ".jpg"));
         }
 
         if (levelshot.Exists)
