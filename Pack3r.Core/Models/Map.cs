@@ -160,7 +160,7 @@ public sealed class Map : MapAssets, IDisposable
                 continue;
             }
 
-            list.Add(new DirectoryAssetSource(dir, isPak0: dirFilter == SourceFilter.Excluded, _integrityChecker));
+            list.Add(new DirectoryAssetSource(dir, isExcluded: dirFilter == SourceFilter.Excluded, _integrityChecker));
 
             // TODO: exclude all child pk3s in a pk3dir?
             if (_options.LoadPk3s || _options.ExcludeSources.Count > 0)
@@ -196,22 +196,7 @@ public sealed class Map : MapAssets, IDisposable
 
     private SourceFilter IsExcluded(FileSystemInfo item)
     {
-        scoped ReadOnlySpan<char> dirOrPk3;
-
-        if (item is FileInfo file)
-        {
-            dirOrPk3 = IOPath.GetFileName(file.FullName.AsSpan());
-        }
-        else if (item is DirectoryInfo dir)
-        {
-            dirOrPk3 = dir.FullName.GetExtension().IsEmpty
-                ? IOPath.GetDirectoryName(dir.FullName.AsSpan())
-                : IOPath.GetFileName(dir.FullName.AsSpan());
-        }
-        else
-        {
-            return SourceFilter.Ignored;
-        }
+        ReadOnlySpan<char> dirOrPk3 = IOPath.GetFileName(item.FullName.AsSpan());
 
         foreach (var value in _options.IgnoreSources)
         {

@@ -5,11 +5,11 @@ using Pack3r.Services;
 
 namespace Pack3r.IO;
 
-public sealed class DirectoryAssetSource(DirectoryInfo directory, bool isPak0, IIntegrityChecker checker) : AssetSource(checker)
+public sealed class DirectoryAssetSource(DirectoryInfo directory, bool isExcluded, IIntegrityChecker checker) : AssetSource(checker)
 {
     public DirectoryInfo Directory => directory;
     public override string RootPath => directory.FullName;
-    public override bool IsExcluded => isPak0;
+    public override bool IsExcluded => isExcluded;
 
     public override string ToString() => $"{{ Dir: {Directory.FullName} }}";
 
