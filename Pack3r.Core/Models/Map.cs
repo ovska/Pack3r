@@ -136,6 +136,9 @@ public sealed class Map : MapAssets, IDisposable
             .EnumerateDirectories("*.pk3dir", SearchOption.TopDirectoryOnly)
             .OrderByDescending(dir => dir.Name, StringComparer.OrdinalIgnoreCase))
         {
+            if (IsExcluded(pk3dir) == SourceFilter.Ignored)
+                continue;
+
             if (unique.Add(pk3dir.FullName))
                 yield return pk3dir;
         }
@@ -149,15 +152,17 @@ public sealed class Map : MapAssets, IDisposable
 
         foreach (var dir in AssetDirectories)
         {
+            var dirFilter = IsExcluded(dir);
+
             // never ignore etmain
-            if (!dir.FullName.EqualsF(ETMain.FullName) && IsExcluded(dir) == SourceFilter.Ignored)
+            if (dirFilter == SourceFilter.Ignored && !dir.FullName.EqualsF(ETMain.FullName))
             {
                 continue;
             }
 
-            // is exclude support needed for dirs?
-            list.Add(new DirectoryAssetSource(dir, _integrityChecker));
+            list.Add(new DirectoryAssetSource(dir, isPak0: dirFilter == SourceFilter.Excluded, _integrityChecker));
 
+            // TODO: exclude all child pk3s in a pk3dir?
             if (_options.LoadPk3s || _options.ExcludeSources.Count > 0)
             {
                 foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
@@ -175,14 +180,14 @@ public sealed class Map : MapAssets, IDisposable
 
         /*
             Same ordering as in AssetDirectories, but:
-            1. pak0 is always first
+            1. pak0 is always first (and other excluded sources)
             2. all other pk3s are always last, in reverse alphabetical order
         */
         return list
             .OrderBy(s => s switch
             {
                 DirectoryAssetSource d => AssetDirectories.IndexOf(d.Directory),
-                Pk3AssetSource p => p.IsPak0 ? int.MinValue : int.MaxValue,
+                Pk3AssetSource p => p.IsExcluded ? int.MinValue : int.MaxValue,
                 _ => 0,
             })
             .ThenByDescending(s => IOPath.GetFileNameWithoutExtension(s.RootPath))
@@ -199,7 +204,9 @@ public sealed class Map : MapAssets, IDisposable
         }
         else if (item is DirectoryInfo dir)
         {
-            dirOrPk3 = IOPath.GetDirectoryName(dir.FullName.AsSpan());
+            dirOrPk3 = dir.FullName.GetExtension().IsEmpty
+                ? IOPath.GetDirectoryName(dir.FullName.AsSpan())
+                : IOPath.GetFileName(dir.FullName.AsSpan());
         }
         else
         {

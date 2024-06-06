@@ -102,7 +102,7 @@ public class ShaderParser(
                                 return toReturn;
                             }
 
-                            if (!a.Source.IsPak0 || !b.Source.IsPak0)
+                            if (!a.Source.IsExcluded || !b.Source.IsExcluded)
                             {
                                 duplicate.AddOrUpdate(
                                     key: a.Name,

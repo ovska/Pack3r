@@ -52,7 +52,7 @@ public class AssetService(
         {
             string srcMsg = string.Join(
                 Environment.NewLine,
-                map.AssetSources.Select(src => $"\t{src.RootPath}{(src.IsPak0 ? " (not packed)" : "")}"));
+                map.AssetSources.Select(src => $"\t{src.RootPath}{(src.IsExcluded ? " (not packed)" : "")}"));
             logger.System($"Using source(s) for discovery: {Environment.NewLine}{srcMsg}");
 
             foreach (var res in map.Resources)
