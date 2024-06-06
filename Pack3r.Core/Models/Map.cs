@@ -129,6 +129,7 @@ public sealed class Map : MapAssets, IDisposable
         unique.Add(GetMapRoot());
         yield return new DirectoryInfo(GetMapRoot());
 
+        // try to add etmain second in case .map was in a pk3dir
         if (unique.Add(ETMain.FullName))
             yield return ETMain;
 

@@ -7,7 +7,7 @@ namespace Pack3r.Tests;
 
 public class ShaderParserTests
 {
-    private static DirectoryAssetSource Source => new(new DirectoryInfo("~/"), new NoopChecker());
+    private static DirectoryAssetSource Source => new(new DirectoryInfo("~/"), false, new NoopChecker());
 
     private static async Task<Shader> ParseSingle(string data, bool includeDevFiles = false)
     {
