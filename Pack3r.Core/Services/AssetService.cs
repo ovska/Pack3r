@@ -50,6 +50,11 @@ public class AssetService(
 
         if (options.ReferenceDebug)
         {
+            string srcMsg = string.Join(
+                Environment.NewLine,
+                map.AssetSources.Select(src => $"\t{src.RootPath}{(src.IsPak0 ? " (not packed)" : "")}"));
+            logger.System($"Using source(s) for discovery: {Environment.NewLine}{srcMsg}");
+
             foreach (var res in map.Resources)
                 map.LogResource(new Resource(res, false, options.MapFile.FullName));
 
@@ -62,8 +67,12 @@ public class AssetService(
             foreach (var (mm, _) in map.MiscModels)
                 map.LogResource(new Resource(mm, false, options.MapFile.FullName));
         }
-
-        logger.System($"Using directories for discovery: {string.Join(", ", map.AssetDirectories.Select(d => d.FullName))}");
+        else
+        {
+            string pk3msg = options.LoadPk3s ? " and pk3s" : "";
+            string dirMsg = string.Join(", ", map.AssetDirectories.Select(d => FormatDir(etmainDirectory, d)));
+            logger.System($"Using directories{pk3msg} for discovery: {dirMsg}");
+        }
 
         // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
         ConcurrentDictionary<Resource, object?> referencedResources = [];
@@ -197,5 +206,13 @@ public class AssetService(
         // TODO: levelshots_cc
 
         return map;
+    }
+
+    private static string FormatDir(DirectoryInfo etmain, DirectoryInfo directory)
+    {
+        if (etmain.Parent is { } parent)
+            return Path.GetRelativePath(parent.FullName, directory.FullName).NormalizePath();
+
+        return directory.FullName.NormalizePath();
     }
 }

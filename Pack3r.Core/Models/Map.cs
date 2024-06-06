@@ -174,20 +174,19 @@ public sealed class Map : MapAssets, IDisposable
         }
 
         /*
-        Same ordering as in AssetDirectories, but:
-        1. pak0 is always first
-        2. all other pk3s are always last, in reverse alphabetical order
+            Same ordering as in AssetDirectories, but:
+            1. pak0 is always first
+            2. all other pk3s are always last, in reverse alphabetical order
         */
-        return
-        [..list
+        return list
             .OrderBy(s => s switch
             {
                 DirectoryAssetSource d => AssetDirectories.IndexOf(d.Directory),
                 Pk3AssetSource p => p.IsPak0 ? int.MinValue : int.MaxValue,
-                _ => -1,
+                _ => 0,
             })
-            .ThenByDescending(s => IOPath.GetFileNameWithoutExtension((s as Pk3AssetSource)?.ArchivePath))
-        ];
+            .ThenByDescending(s => IOPath.GetFileNameWithoutExtension(s.RootPath))
+            .ToImmutableArray();
     }
 
     private SourceFilter IsExcluded(FileSystemInfo item)

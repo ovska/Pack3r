@@ -16,11 +16,13 @@ public sealed class Packager(
     IShaderParser shaderParser,
     IIntegrityChecker integrityChecker)
 {
-    public async Task CreateZip(
+    public async Task<int> CreateZip(
         Map map,
         Stream destination,
         CancellationToken cancellationToken)
     {
+        int missingFiles = 0;
+
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
 
         var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
@@ -148,6 +150,8 @@ public sealed class Packager(
         // end
         logger.Info($"{includedFiles.Count} files included in pk3");
 
+        return missingFiles;
+
         bool IsHandledOrExcluded(ReadOnlyMemory<char> relativePath)
         {
             if (handledFiles.Contains(relativePath))
@@ -258,18 +262,20 @@ public sealed class Packager(
 
             return false;
         }
-    }
 
-    private void OnFailedAddFile(bool required, ref DefaultInterpolatedStringHandler handler)
-    {
-        if (!options.DryRun && (required || options.RequireAllAssets))
+        void OnFailedAddFile(bool required, ref DefaultInterpolatedStringHandler handler)
         {
-            logger.Fatal(ref handler);
-            throw new ControlledException();
-        }
-        else
-        {
-            logger.Error(ref handler);
+            missingFiles++;
+
+            if (!options.DryRun && (required || options.RequireAllAssets))
+            {
+                logger.Fatal(ref handler);
+                throw new ControlledException();
+            }
+            else
+            {
+                logger.Error(ref handler);
+            }
         }
     }
 

@@ -70,6 +70,8 @@ public class Program
             Stream destination;
             var timer = Stopwatch.StartNew();
 
+            int missingCount;
+
             using (Map map = await app.AssetService.GetPackingData(cancellationToken))
             {
                 if (!options.DryRun)
@@ -84,7 +86,7 @@ public class Program
 
                 await using (destination)
                 {
-                    await app.Packager.CreateZip(map, destination, cancellationToken);
+                    missingCount = await app.Packager.CreateZip(map, destination, cancellationToken);
                 }
             }
 
@@ -92,9 +94,13 @@ public class Program
 
             app.Logger.Drain();
 
+            string missingMsg = missingCount > 0
+                ? $" with {missingCount} file(s) not found"
+                : "";
+
             if (!options.DryRun)
             {
-                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms");
+                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms{missingMsg}");
             }
             else
             {
@@ -106,7 +112,7 @@ public class Program
                     ? $"{(double)written / megabyte:N} MB"
                     : $"{(double)written / kilobyte:N} KB";
 
-                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, estimated pk3 size: {size}");
+                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, estimated pk3 size: {size}{missingMsg}");
             }
 
             return 0;
