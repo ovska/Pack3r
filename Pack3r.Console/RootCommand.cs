@@ -71,15 +71,16 @@ public class RootCommand
     [CliOption(
         Description = "Ignore some pk3 files or pk3dir directories",
         Arity = CliArgumentArity.ZeroOrMore,
-        ValidationRules = CliValidationRules.LegalPath)]
+        ValidationRules = CliValidationRules.LegalPath,
+        AllowMultipleArgumentsPerToken = true)]
     public List<string> Ignore { get; set; } = ["pak1.pk3", "pak2.pk3", "mp_bin.pk3"];
 
     [CliOption(
-        Description = "Include pk3 files and pk3dirs in etmain in index, but never pack their contents",
+        Description = "Never pack files found in these pk3s or directories",
         Arity = CliArgumentArity.ZeroOrMore,
         ValidationRules = CliValidationRules.LegalPath,
-        Hidden = true)]
-    public List<string> Exclude { get; set; } = ["pak0.pk3"];
+        AllowMultipleArgumentsPerToken = true)]
+    public List<string> Exclude { get; set; } = ["pak0.pk3", "pak0.pk3dir"];
 
     public Task<int> RunAsync()
     {
