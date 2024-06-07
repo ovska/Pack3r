@@ -70,10 +70,7 @@ jobs:
     - name: Publish
       run: dotnet publish Pack3r.Console --self-contained -c Release -o release_dir -r ${{ matrix.config.rid }}
     - name: Create Zip File
-      uses: papeloto/action-zip@v1
-      with:
-        files: ./release_dir
-        dest: ./pack3r-release.zip
+      run: 7z a -r pack3r-release.zip ./release_dir
     - name: Upload release asset
       id: upload-release-asset
       uses: actions/upload-release-asset@v1
