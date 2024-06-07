@@ -34,7 +34,7 @@ public static class MapParserTests
         if (include)
         {
             Assert.Single(map.Resources);
-            Assert.Equal("path/to/model.md3", map.Resources.First().ToString());
+            Assert.Equal("path/to/model.md3", map.Resources.First().Value.ToString());
         }
         else
         {
@@ -70,7 +70,7 @@ public static class MapParserTests
         var map = await parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         Assert.Single(map.Shaders);
-        Assert.Equal("textures/pgm_props/crate_01", map.Shaders.First().ToString());
+        Assert.Equal("textures/pgm_props/crate_01", map.Shaders.First().Value.ToString());
     }
 
     [Fact]
@@ -463,6 +463,6 @@ public static class MapParserTests
         var map = await parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         Assert.Single(map.Shaders);
-        Assert.Equal("textures/pgm/holo", map.Shaders.First().ToString());
+        Assert.Equal("textures/pgm/holo", map.Shaders.First().Value.ToString());
     }
 }

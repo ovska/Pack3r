@@ -1,4 +1,6 @@
-﻿namespace Pack3r.IO;
+﻿using Pack3r.Extensions;
+
+namespace Pack3r.IO;
 
 public readonly struct Line : IEquatable<Line>
 {

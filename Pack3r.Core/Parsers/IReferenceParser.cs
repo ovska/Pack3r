@@ -6,7 +6,7 @@ public interface IReferenceParser
 {
     bool CanParse(ReadOnlyMemory<char> resource);
 
-    Task<HashSet<Resource>?> Parse(
+    Task<ResourceList?> Parse(
         IAsset asset,
         CancellationToken cancellationToken);
 }

@@ -2,6 +2,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Services;
@@ -52,28 +53,6 @@ public sealed class Map : MapAssets, IDisposable
     private readonly Lazy<ImmutableArray<DirectoryInfo>> _assetDirs;
     private readonly Lazy<ImmutableArray<AssetSource>> _assetSrcs;
 
-    private readonly ConcurrentBag<Resource> _allResources = [];
-
-    public void LogResource(in Resource resource)
-    {
-        if (_options.ReferenceDebug)
-            _allResources.Add(resource);
-    }
-
-    public IEnumerable<Resource> TryGetAllResources()
-    {
-        if (_options.ReferenceDebug)
-        {
-            return _allResources
-                .OrderBy(r => r.Source, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(r => r.Line)
-                .ThenBy(r => r.IsShader)
-                .ThenBy(r => r.Value, ROMCharComparer.Instance);
-        }
-
-        return [];
-    }
-
     /// <summary>
     /// Gets the relative etmain of the map.<br/>
     /// <c>ET/etmain/maps/file.map</c> -> <c>ET/etmain/</c>
@@ -101,7 +80,7 @@ public sealed class Map : MapAssets, IDisposable
         throw new UnreachableException($"Could not get map root: {Path}");
     }
 
-    public string GetRelativeToRoot(string path) => IOPath.GetRelativePath(GetMapRoot(), path);
+    public string GetRelativeToRoot(string path) => IOPath.GetRelativePath(GetMapRoot(), path).NormalizePath();
 
     /// <summary>
     /// Returns path <strong>relative to ETMain</strong>.
@@ -184,15 +163,15 @@ public sealed class Map : MapAssets, IDisposable
             1. pak0 is always first (and other excluded sources)
             2. all other pk3s are always last, in reverse alphabetical order
         */
+#pragma warning disable IDE0305 // Simplify collection initialization
+        byte[] sortKeys = new byte[512];
+
         return list
-            .OrderBy(s => s switch
-            {
-                DirectoryAssetSource d => AssetDirectories.IndexOf(d.Directory),
-                Pk3AssetSource p => p.IsExcluded ? int.MinValue : int.MaxValue,
-                _ => 0,
-            })
+            .OrderByDescending(s => (s.IsExcluded, s.Name.EqualsF("pak0.pk3")))
+            .ThenBy(s => s is DirectoryAssetSource d ? AssetDirectories.IndexOf(d.Directory) : int.MaxValue)
             .ThenByDescending(s => IOPath.GetFileNameWithoutExtension(s.RootPath))
             .ToImmutableArray();
+#pragma warning restore IDE0305 // Simplify collection initialization
     }
 
     private SourceFilter IsExcluded(FileSystemInfo item)

@@ -7,22 +7,22 @@ public class MapAssets
     /// <summary>
     /// Shaders referenced by the .map (and possibly its mapscript etc.)
     /// </summary>
-    public required HashSet<ReadOnlyMemory<char>> Shaders { get; init; }
+    public required ResourceList Shaders { get; init; }
 
     /// <summary>
     /// Model/audio/video files referenced by the .map (and possibly its mapscript etc.)
     /// </summary>
-    public required HashSet<ReadOnlyMemory<char>> Resources { get; init; }
+    public required ResourceList Resources { get; init; }
 
     /// <summary>
     /// Models and skins that may reference other files.
     /// </summary>
-    public required HashSet<ReadOnlyMemory<char>> ReferenceResources { get; init; }
+    public required ResourceList ReferenceResources { get; init; }
 
     /// <summary>
     /// misc_models which may have remaps
     /// </summary>
-    public required Dictionary<ReadOnlyMemory<char>, List<ReferenceMiscModel>> MiscModels { get; init; }
+    public required Dictionary<Resource, List<ReferenceMiscModel>> MiscModels { get; init; }
 
     /// <summary>
     /// Whether the map has stylelights, and the q3map_mapname.shader file needs to be included.
@@ -37,7 +37,7 @@ public sealed class ReferenceMiscModel
 
     public ReferenceMiscModel(
         ReadOnlyMemory<char> model,
-        Dictionary<ReadOnlyMemory<char>, ReadOnlyMemory<char>> entitydata)
+        IEnumerable<(ReadOnlyMemory<char>, ReadOnlyMemory<char>)> entitydata)
     {
         Model = model;
 

@@ -53,19 +53,7 @@ public class AssetService(
             string srcMsg = string.Join(
                 Environment.NewLine,
                 map.AssetSources.Select(src => $"\t{src.RootPath}{(src.IsExcluded ? " (not packed)" : "")}"));
-            logger.System($"Using source(s) for discovery: {Environment.NewLine}{srcMsg}");
-
-            foreach (var res in map.Resources)
-                map.LogResource(new Resource(res, false, options.MapFile.FullName));
-
-            foreach (var res in map.ReferenceResources)
-                map.LogResource(new Resource(res, false, options.MapFile.FullName));
-
-            foreach (var res in map.Shaders)
-                map.LogResource(new Resource(res, true, options.MapFile.FullName));
-
-            foreach (var (mm, _) in map.MiscModels)
-                map.LogResource(new Resource(mm, false, options.MapFile.FullName));
+            logger.System($"Using sources for discovery: {Environment.NewLine}{srcMsg}");
         }
         else
         {
@@ -96,13 +84,12 @@ public class AssetService(
             await foreach (var resource in parser.Parse(path, ct).ConfigureAwait(false))
             {
                 referencedResources.TryAdd(resource, null);
-                map.LogResource(in resource);
             }
         }).ConfigureAwait(false);
 
         foreach (var (resource, _) in referencedResources)
         {
-            (resource.IsShader ? map.Shaders : map.Resources).Add(resource.Value);
+            (resource.IsShader ? map.Shaders : map.Resources).Add(resource);
         }
 
         await referenceParser.ParseReferences(map, cancellationToken);

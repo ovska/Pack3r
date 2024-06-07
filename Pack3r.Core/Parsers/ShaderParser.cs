@@ -102,6 +102,11 @@ public class ShaderParser(
                                 return toReturn;
                             }
 
+                            if (!options.IncludeSource && (!a.NeededInPk3 || !b.NeededInPk3))
+                            {
+                                return a.NeededInPk3 ? b : a;
+                            }
+
                             if (!a.Source.IsExcluded || !b.Source.IsExcluded)
                             {
                                 duplicate.AddOrUpdate(
@@ -123,7 +128,7 @@ public class ShaderParser(
 
         AddShaders(
             map,
-            map.Shaders,
+            map.Shaders.Select(r => r.Value),
             allShaders,
             duplicateShaders,
             included,
@@ -337,7 +342,7 @@ public class ShaderParser(
                         {
                             if (!token.Span.StartsWith("$", StringComparison.Ordinal))
                             {
-                                shader.Resources.Add(token.Trim('"')); // netradiant allows using doublequotes here
+                                shader.DevResources.Add(token.Trim('"')); // netradiant allows using doublequotes here
                             }
 
                             found = true;

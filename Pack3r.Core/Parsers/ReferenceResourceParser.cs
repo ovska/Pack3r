@@ -13,6 +13,7 @@ public interface IReferenceResourceParser
 }
 
 public class ReferenceResourceParser(
+    PackOptions options,
     ILogger<ReferenceResourceParser> logger,
     IReferenceParser[] parsers,
     IProgressManager progressManager)
@@ -32,12 +33,14 @@ public class ReferenceResourceParser(
             }
         }*/
 
+        // TODO: fix remapped textures on misc_models not showing as source-only textures
+
         int counter = 0;
         using var progress = progressManager.Create(
             "Parsing md3, ase and skin files for assets",
             map.ReferenceResources.Count + map.MiscModels.Count);
 
-        HashSet<ReadOnlyMemory<char>> handled = new(ROMCharComparer.Instance);
+        HashSet<Resource> handled = [];
 
         foreach (var resource in map.ReferenceResources.Concat(map.MiscModels.Keys))
         {
@@ -46,7 +49,7 @@ public class ReferenceResourceParser(
             if (!handled.Add(resource))
                 continue;
 
-            HashSet<Resource>? result = await TryParse(map, resource, cancellationToken);
+            ResourceList? result = await TryParse(map, resource, cancellationToken);
 
             if (result is null)
             {
@@ -55,7 +58,8 @@ public class ReferenceResourceParser(
 
             // if the misc_model is still present, this resource is ONLY a misc_model
             // and we can try to trim the values
-            if (map.MiscModels.TryGetValue(resource, out var instances))
+            if (!options.IncludeSource &&
+                map.MiscModels.TryGetValue(resource, out var instances))
             {
                 foreach (var item in result.ToArray()) // loop over a copy
                 {
@@ -81,22 +85,21 @@ public class ReferenceResourceParser(
 
             foreach (var item in result)
             {
-                (item.IsShader ? map.Shaders : map.Resources).Add(item.Value);
-                map.LogResource(in item);
+                (item.IsShader ? map.Shaders : map.Resources).Add(item);
             }
         }
     }
 
-    private Task<HashSet<Resource>?> TryParse(
+    private Task<ResourceList?> TryParse(
         Map map,
-        ReadOnlyMemory<char> resource,
+        Resource resource,
         CancellationToken cancellationToken)
     {
         IReferenceParser? parser = null;
 
         foreach (var item in parsers)
         {
-            if (item.CanParse(resource))
+            if (item.CanParse(resource.Value))
             {
                 parser = item;
                 break;
@@ -106,18 +109,18 @@ public class ReferenceResourceParser(
         if (parser is null)
         {
             logger.Warn($"Unsupported reference resource type: {resource}");
-            return Task.FromResult(default(HashSet<Resource>));
+            return Task.FromResult(default(ResourceList));
         }
 
         foreach (var source in map.AssetSources)
         {
-            if (source.Assets.TryGetValue(resource, out IAsset? asset))
+            if (source.Assets.TryGetValue(resource.Value, out IAsset? asset))
             {
                 return parser.Parse(asset, cancellationToken);
             }
         }
 
         logger.Warn($"File not found in sources: '{resource}'");
-        return Task.FromResult(default(HashSet<Resource>));
+        return Task.FromResult(default(ResourceList));
     }
 }

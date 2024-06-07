@@ -13,6 +13,10 @@ public abstract class AssetSource : IDisposable
     public abstract string RootPath { get; }
     public abstract FileInfo? GetShaderlist();
 
+    public string Name => _name ??= Path.GetFileName(RootPath);
+
+    private string? _name;
+
     internal protected Dictionary<ReadOnlyMemory<char>, IAsset> Assets => _assetsLazy.Value;
 
     private readonly Lazy<Dictionary<ReadOnlyMemory<char>, IAsset>> _assetsLazy;
@@ -36,6 +40,7 @@ public abstract class AssetSource : IDisposable
     public bool TryHandleAsset(
         ZipArchive destination,
         ReadOnlyMemory<char> relativePath,
+        Resource resource,
         out ZipArchiveEntry? entry)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -48,7 +53,9 @@ public abstract class AssetSource : IDisposable
             }
             else
             {
-                _checker.CheckIntegrity(asset);
+                if (!resource.SourceOnly)
+                    _checker.CheckIntegrity(asset);
+
                 entry = asset.CreateEntry(destination);
             }
 
