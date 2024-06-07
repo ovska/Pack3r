@@ -202,6 +202,12 @@ public class ShaderParser(
             {
                 included.Add(name, cc);
                 map.Shaders.Add(new Resource(name, isShader: true, new Line(map.Path, -1, "", true), sourceOnly: false));
+
+                if (options.Rename is not null)
+                {
+                    logger.Warn(
+                        $"Renaming levelshots shaders is not yet supported, please manually rename {name} appropriately in '{cc.DestinationPath}'");
+                }
             }
         }
     }
