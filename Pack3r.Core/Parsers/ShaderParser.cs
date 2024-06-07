@@ -132,6 +132,7 @@ public class ShaderParser(
             allShaders,
             duplicateShaders,
             included,
+            0,
             cancellationToken);
 
         // should not happen, duplicateShaders must be empty at this point
@@ -150,8 +151,15 @@ public class ShaderParser(
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders,
         ConcurrentDictionary<ReadOnlyMemory<char>, List<Shader>> duplicateShaders,
         Dictionary<ReadOnlyMemory<char>, Shader> included,
+        int depth,
         CancellationToken cancellationToken)
     {
+        if (depth == 0)
+        {
+            HandleCC("automap");
+            HandleCC("trans");
+        }
+
         foreach (var name in shaders)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -181,7 +189,19 @@ public class ShaderParser(
                     allShaders,
                     duplicateShaders,
                     included,
+                    depth + 1,
                     cancellationToken);
+            }
+        }
+
+        void HandleCC(string type)
+        {
+            var name = $"levelshots/{map.Name}_cc_{type}".AsMemory();
+
+            if (allShaders.TryGetValue(name, out Shader? cc))
+            {
+                included.Add(name, cc);
+                map.Shaders.Add(new Resource(name, isShader: true, new Line(map.Path, -1, "", true), sourceOnly: false));
             }
         }
     }
