@@ -9,7 +9,7 @@ namespace Pack3r.IO;
 
 public abstract class AssetSource : IDisposable
 {
-    public abstract bool IsPak0 { get; }
+    public abstract bool IsExcluded { get; }
     public abstract string RootPath { get; }
     public abstract FileInfo? GetShaderlist();
 
@@ -42,7 +42,7 @@ public abstract class AssetSource : IDisposable
 
         if (Assets.TryGetValue(relativePath, out IAsset? asset))
         {
-            if (IsPak0)
+            if (IsExcluded)
             {
                 entry = null;
             }

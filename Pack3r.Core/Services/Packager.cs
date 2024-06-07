@@ -160,7 +160,7 @@ public sealed class Packager(
 
             foreach (var source in map.AssetSources)
             {
-                if (source.IsPak0 && source.Contains(relativePath))
+                if (source.IsExcluded && source.Contains(relativePath))
                     return true;
             }
 
@@ -179,7 +179,7 @@ public sealed class Packager(
 
         void AddShaderFile(Shader shader)
         {
-            if (shader.Source is Pk3AssetSource { IsPak0: true })
+            if (shader.Source is Pk3AssetSource { IsExcluded: true })
                 return;
 
             if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory()))
