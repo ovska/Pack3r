@@ -180,10 +180,8 @@ public sealed class Packager(
 
         void AddCompileFile(string absolutePath)
         {
-            absolutePath = absolutePath.NormalizePath();
-
             if (!TryAddFileAbsolute(
-                archivePath: map.GetArchivePath(absolutePath),
+                archivePath: map.GetArchivePath(absolutePath).NormalizePath(),
                 absolutePath))
             {
                 OnFailedAddFile(required: true, $"File '{absolutePath}' not found");
