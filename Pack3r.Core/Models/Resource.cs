@@ -1,11 +1,14 @@
-﻿using Pack3r.Extensions;
+﻿using System.Diagnostics;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r.Models;
 
+[DebuggerDisplay("{DebuggerDisplay,nq}")]
 public class IncludedFile
 {
     public AssetSource? Source { get; }
+    public Shader? Shader { get; }
     public ReadOnlyMemory<char> SourcePath { get; init; }
     public ReadOnlyMemory<char> ArchivePath { get; init; }
     public bool SourceOnly { get; init; }
@@ -26,7 +29,7 @@ public class IncludedFile
         ArchivePath = resource.ArchivePath.AsMemory();
     }
 
-    public IncludedFile(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource)
+    public IncludedFile(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null)
     {
         Source = source;
         SourcePath = Path.Combine(source.RootPath, relativePath.ToString()).NormalizePath().AsMemory();
@@ -34,7 +37,10 @@ public class IncludedFile
         SourceOnly = resource.SourceOnly;
         ReferencedIn = resource.Line.Path;
         ReferencedLine = resource.Line.Index is int i and >= 0 ? i : null;
+        Shader = shader;
     }
+
+    internal string DebuggerDisplay => $"{{ File: {SourcePath} }}";
 }
 
 /// <summary>
@@ -42,6 +48,7 @@ public class IncludedFile
 /// </summary>
 /// <param name="Value">Path to the resource</param>
 /// <param name="IsShader">Whether the path is to a shader and not a file</param>
+[DebuggerDisplay("{DebuggerDisplay,nq}")]
 public sealed class Resource(
     ReadOnlyMemory<char> value,
     bool isShader,
@@ -80,5 +87,7 @@ public sealed class Resource(
     {
         return obj is Resource resource && Equals(resource);
     }
+
+    internal string DebuggerDisplay => $"{{ Resource: {Value} ({(IsShader ? "shader" : "file")}) }}";
 }
 

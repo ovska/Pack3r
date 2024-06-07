@@ -248,6 +248,7 @@ public class ShaderParser(
             if (state == State.None)
             {
                 ReadOnlyMemory<char> shaderName = line.Value;
+
                 State next = State.AfterShaderName;
 
                 // handle opening brace left on the previous line, e.g:
@@ -264,7 +265,7 @@ public class ShaderParser(
                         $"Expected shader name on line {line.Index} in file '{asset.FullPath}', got: '{line.Raw}'");
                 }
 
-                shader = new Shader(shaderName, asset);
+                shader = new Shader(shaderName, asset, line.Index);
                 state = next;
                 continue;
             }
