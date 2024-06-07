@@ -95,7 +95,7 @@ public class Program
             app.Logger.Drain();
 
             string missingMsg = missingCount > 0
-                ? $" with {missingCount} file(s) not found"
+                ? $", with {missingCount} file{(missingCount != 1 ? "s" : "")} missing"
                 : "";
 
             if (!options.DryRun)

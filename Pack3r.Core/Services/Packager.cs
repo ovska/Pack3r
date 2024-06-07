@@ -31,7 +31,7 @@ public sealed class Packager(
         // contains both actual and alternate files added
         HashSet<ReadOnlyMemory<char>> handledFiles = new(ROMCharComparer.Instance);
         HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
-        List<(string source, ReadOnlyMemory<char> relative)> includedFiles = [];
+        List<IncludedFile> includedFiles = [];
 
         using (var progress = progressManager.Create("Compressing bsp, lightmaps, mapscript etc.", map.RenamableResources.Count))
         {
@@ -39,8 +39,9 @@ public sealed class Packager(
             foreach (var res in map.RenamableResources)
             {
                 CreateRenamable(archive, options, res, cancellationToken);
-                includedFiles.Add((res.AbsolutePath, res.ArchivePath.AsMemory()));
                 progress.Report(++i);
+
+                includedFiles.Add(new IncludedFile(res));
             }
         }
 
@@ -52,12 +53,12 @@ public sealed class Packager(
             {
                 progress.Report(count++);
 
-                if (IsHandledOrExcluded(resource))
+                if (IsHandledOrExcluded(resource.Value))
                 {
                     continue;
                 }
 
-                AddFileRelative(resource);
+                AddFileRelative(resource.Value, resource);
             }
         }
 
@@ -67,9 +68,11 @@ public sealed class Packager(
         {
             int count = 1;
 
-            foreach (var shaderName in map.Shaders)
+            foreach (var shaderResource in map.Shaders)
             {
                 progress.Report(count++);
+
+                var shaderName = shaderResource.Value;
 
                 // hack
                 if (shaderName.EqualsF("noshader"))
@@ -82,7 +85,7 @@ public sealed class Packager(
                 if (!shadersByName.TryGetValue(shaderName, out Shader? shader))
                 {
                     // might just be a texture without a shader
-                    AddFileRelative(shaderName);
+                    AddFileRelative(shaderName, shaderResource);
                     continue;
                 }
 
@@ -92,11 +95,11 @@ public sealed class Packager(
                     continue;
 
                 if (!handledFiles.Contains(shader.DestinationPath.AsMemory()))
-                    AddShaderFile(shader);
+                    AddShaderFile(shader, shaderResource);
 
                 if (shader.ImplicitMapping is { } implicitMapping)
                 {
-                    AddFileRelative(implicitMapping);
+                    AddFileRelative(implicitMapping, shaderResource);
                 }
 
                 foreach (var file in shader.Resources)
@@ -104,7 +107,15 @@ public sealed class Packager(
                     if (IsHandledOrExcluded(file))
                         continue;
 
-                    AddFileRelative(file);
+                    AddFileRelative(file, shaderResource);
+                }
+
+                foreach (var file in shader.DevResources)
+                {
+                    if (IsHandledOrExcluded(file))
+                        continue;
+
+                    AddFileRelative(file, shaderResource, devResource: true);
                 }
             }
         }
@@ -131,19 +142,19 @@ public sealed class Packager(
             }
         }
 
-        if (options.LogLevel == LogLevel.Debug)
+        if (options.LogLevel >= LogLevel.Info && options.ReferenceDebug)
         {
-            foreach (var (abs, arch) in includedFiles.OrderBy(x => x.relative, ROMCharComparer.Instance))
+            foreach (var file in includedFiles.OrderBy(x => x.ArchivePath, ROMCharComparer.Instance))
             {
-                logger.Debug($"File packed: '{arch}' from '{abs}'");
-            }
-        }
+                var lineref = file.ReferencedLine != null ? $" line {file.ReferencedLine}" : "";
+                var fileref = file.ReferencedIn != null
+                    ? $" (referenced in: '{map.GetRelativeToRoot(file.ReferencedIn)}'{lineref})"
+                    : "";
+                var srcOnly = file.SourceOnly ? " (source only)" : "";
 
-        foreach (var resource in map.TryGetAllResources())
-        {
-            string title = resource.IsShader ? "shader" : "file";
-            string line = resource.Line.HasValue ? $":L{resource.Line}" : "";
-            logger.Info($"{resource.Source.NormalizePath()}{line} >> {title} >> {resource.Value}");
+                var src = file.Source != null ? file.Source.Name : $"'{file.SourcePath.ToString().NormalizePath()}'";
+                logger.Info($"File packed: {file.ArchivePath} from {src}{fileref}{srcOnly}");
+            }
         }
 
         integrityChecker.Log();
@@ -169,6 +180,8 @@ public sealed class Packager(
 
         void AddCompileFile(string absolutePath)
         {
+            absolutePath = absolutePath.NormalizePath();
+
             if (!TryAddFileAbsolute(
                 archivePath: map.GetArchivePath(absolutePath),
                 absolutePath))
@@ -177,42 +190,43 @@ public sealed class Packager(
             }
         }
 
-        void AddShaderFile(Shader shader)
+        void AddShaderFile(Shader shader, Resource resource)
         {
             if (shader.Source is Pk3AssetSource { IsExcluded: true })
                 return;
 
-            if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory()))
+            if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory(), resource))
                 return;
 
             OnFailedAddFile(false, $"Shader file '{shader.GetAbsolutePath()}' not found");
         }
 
-        void AddFileRelative(ReadOnlyMemory<char> relativePath)
+        void AddFileRelative(ReadOnlyMemory<char> relativePath, Resource resource, bool devResource = false)
         {
             foreach (var source in map.AssetSources)
             {
-                if (TryAddFileFromSource(source, relativePath))
+                if (TryAddFileFromSource(source, relativePath, resource))
                     return;
             }
 
-            OnFailedAddFile(false, $"File not found: {relativePath}");
+            string sourceOnly = devResource ? " (source file)" : "";
+            OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly}");
         }
 
-        bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath)
+        bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             try
             {
-                if (!source.TryHandleAsset(archive, relativePath, out var entry))
+                if (!source.TryHandleAsset(archive, relativePath, resource, out var entry))
                     return false;
 
                 handledFiles.Add(relativePath);
 
                 if (entry is not null)
                 {
-                    includedFiles.Add((source.ToString()!, relativePath));
+                    includedFiles.Add(new IncludedFile(source, relativePath, resource));
                 }
 
                 return true;
@@ -247,7 +261,7 @@ public sealed class Packager(
             {
                 archive.CreateEntryFromFile(absolutePath, archivePath);
                 handledFiles.Add(archivePath.AsMemory());
-                includedFiles.Add((absolutePath, archivePath.AsMemory()));
+                includedFiles.Add(new IncludedFile(sourcePath: absolutePath.AsMemory(), archivePath: archivePath.AsMemory()));
                 return true;
             }
             catch (IOException ioex) { ex = ioex; }
@@ -264,11 +278,11 @@ public sealed class Packager(
             return false;
         }
 
-        void OnFailedAddFile(bool required, ref DefaultInterpolatedStringHandler handler)
+        void OnFailedAddFile(bool required, ref DefaultInterpolatedStringHandler handler, bool devResource = false)
         {
             missingFiles++;
 
-            if (!options.DryRun && (required || options.RequireAllAssets))
+            if (!devResource && !options.DryRun && (required || options.RequireAllAssets))
             {
                 logger.Fatal(ref handler);
                 throw new ControlledException();

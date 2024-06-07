@@ -17,6 +17,9 @@ public sealed class Shader(
     /// <summary>References to textures, models, videos etc</summary>
     public List<ReadOnlyMemory<char>> Resources { get; } = [];
 
+    /// <summary>References to editorimages, lightimages etc</summary>
+    public List<ReadOnlyMemory<char>> DevResources { get; } = [];
+
     /// <summary>References to other shaders</summary>
     public List<ReadOnlyMemory<char>> Shaders { get; } = [];
 

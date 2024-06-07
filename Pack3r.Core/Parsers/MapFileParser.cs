@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -28,12 +27,12 @@ public class MapFileParser(
         State state = State.None;
         char expect = default;
 
-        Dictionary<ROMC, ROMC> entitydata = new(ROMCharComparer.Instance);
+        Dictionary<ROMC, (ROMC value, Line line)> entitydata = new(ROMCharComparer.Instance);
         HashSet<ROMC> nonPrefixedShaders = new(ROMCharComparer.Instance);
-        HashSet<ROMC> shaders = new(ROMCharComparer.Instance);
-        HashSet<ROMC> resources = new(ROMCharComparer.Instance);
-        HashSet<ROMC> referenceResources = new(ROMCharComparer.Instance);
-        Dictionary<ROMC, List<ReferenceMiscModel>> miscModels = new(ROMCharComparer.Instance);
+        ResourceList shaders = [];
+        ResourceList resources = [];
+        ResourceList referenceResources = [];
+        Dictionary<Resource, List<ReferenceMiscModel>> miscModels = [];
 
         ROMC currentEntity = default;
         bool hasStyleLights = false;
@@ -106,7 +105,7 @@ public class MapFileParser(
                 if (line.FirstChar == '"')
                 {
                     var (key, value) = line.ReadKeyValue();
-                    entitydata[key] = value;
+                    entitydata[key] = (value, line);
                 }
                 else if (line.FirstChar == 'b')
                 {
@@ -141,12 +140,7 @@ public class MapFileParser(
 
                     if (space > 1)
                     {
-                        var withoutPrefix = line.Raw.AsMemory(lastParen + 2, space);
-
-                        if (nonPrefixedShaders.Add(withoutPrefix))
-                        {
-                            shaders.Add($"textures/{withoutPrefix}".AsMemory());
-                        }
+                        AddTexture(line.Raw.AsMemory(lastParen + 2, space));
                     }
                     else
                     {
@@ -167,10 +161,13 @@ public class MapFileParser(
                 }
 
                 // only non-paren starting line in a patchDef should be the texture
-                if (nonPrefixedShaders.Add(line.Value))
-                {
-                    shaders.Add($"textures/{line.Value}".AsMemory());
-                }
+                AddTexture(line.Value);
+            }
+
+            void AddTexture(ROMC value)
+            {
+                if (nonPrefixedShaders.Add(value))
+                    shaders.Add(Resource.Shader($"textures/{value}", in line));
             }
         }
 
@@ -193,7 +190,7 @@ public class MapFileParser(
 
         void HandleKeysAndClear()
         {
-            foreach (var (_key, value) in entitydata)
+            foreach (var (_key, (value, line)) in entitydata)
             {
                 var key = _key.Span;
 
@@ -204,40 +201,49 @@ public class MapFileParser(
 
                 if (key.EqualsF("_fog"))
                 {
-                    shaders.Add(value);
+                    shaders.Add(new Resource(value, isShader: true, in line));
                 }
                 else if (key.EqualsF("_celshader"))
                 {
-                    shaders.Add($"textures/{value}".AsMemory());
+                    shaders.Add(new Resource($"textures/{value}".AsMemory(), isShader: true, in line));
                 }
                 else if (key.StartsWithF("model"))
                 {
                     if (key.Length == 5)
                     {
-                        if (options.IncludeSource || !IsClassName("misc_model"))
+                        bool isMiscModel = IsClassName("misc_model");
+                        var res = new Resource(value, isShader: false, in line, sourceOnly: isMiscModel);
+
+                        if (options.IncludeSource || !isMiscModel)
                         {
-                            referenceResources.Add(value);
-                            resources.Add(value);
+                            referenceResources.Add(res);
+                            resources.Add(res);
                         }
 
-                        ref var list = ref CollectionsMarshal.GetValueRefOrAddDefault(miscModels, value, out _);
-                        (list ??= []).Add(new ReferenceMiscModel(value, entitydata));
+                        if (!miscModels.TryGetValue(res, out var list))
+                            miscModels[res] = list = [];
+
+                        list.Add(new ReferenceMiscModel(
+                            value,
+                            entitydata.Select(kvp => (kvp.Key, kvp.Value.value))));
                     }
                     else if (key.Length == 6 && key[5] == '2')
                     {
-                        referenceResources.Add(value);
-                        resources.Add(value);
+                        var res = Resource.File(value, in line);
+                        referenceResources.Add(res);
+                        resources.Add(res);
                     }
                 }
                 else if (key.EqualsF("skin") || key.EqualsF("_skin"))
                 {
-                    resources.Add(value);
-                    referenceResources.Add(value);
+                    var res = Resource.File(value, in line);
+                    resources.Add(res);
+                    referenceResources.Add(res);
                 }
                 else if (key.EqualsF("noise") || (key.EqualsF("sound") && IsClassName("dlight")))
                 {
                     if (!value.Span.EqualsF("NOSOUND"))
-                        resources.Add(value);
+                        resources.Add(Resource.File(value, in line));
                 }
                 else if (key.EqualsF("shader"))
                 {
@@ -250,19 +256,19 @@ public class MapFileParser(
                         unsupTerrains.Add(currentEntity);
                     }
 
-                    shaders.Add(val);
+                    shaders.Add(Resource.Shader(val, in line));
                 }
                 else if (key.StartsWithF("targetShader"))
                 {
                     if (key.EqualsF("targetShaderName") ||
                         key.EqualsF("targetShaderNewName"))
                     {
-                        shaders.Add(value);
+                        shaders.Add(Resource.Shader(value, in line));
                     }
                 }
                 else if (key.EqualsF("sun"))
                 {
-                    shaders.Add(value);
+                    shaders.Add(Resource.Shader(value, in line));
                 }
                 else if (!hasStyleLights && key.EqualsF("style") && IsClassName("light"))
                 {
@@ -276,7 +282,7 @@ public class MapFileParser(
 
         bool IsClassName(string className)
         {
-            return entitydata.GetValueOrDefault("classname".AsMemory()).EqualsF(className);
+            return entitydata.GetValueOrDefault("classname".AsMemory()).value.EqualsF(className);
         }
     }
 

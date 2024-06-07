@@ -8,9 +8,9 @@ public class SkinParser(ILineReader reader) : IReferenceParser
 {
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".skin");
 
-    public async Task<HashSet<Resource>?> Parse(IAsset asset, CancellationToken cancellationToken)
+    public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)
     {
-        var result = new HashSet<Resource>();
+        ResourceList result = [];
 
         await foreach (var line in reader.ReadLines(asset, default, cancellationToken).WithCancellation(cancellationToken))
         {

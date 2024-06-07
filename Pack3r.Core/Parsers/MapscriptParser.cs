@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -27,7 +28,7 @@ public class MapscriptParser(
                 continue;
             }
 
-            if (TryRead(in line, out Resource resource))
+            if (TryRead(in line, out Resource? resource))
             {
                 yield return resource;
             }
@@ -44,7 +45,7 @@ public class MapscriptParser(
         }
     }
 
-    private static bool TryRead(in Line line, out Resource resource)
+    private static bool TryRead(in Line line, [NotNullWhen(true)] out Resource? resource)
     {
         var enumerator = Tokens.WhitespaceSeparatedTokens().EnumerateMatches(line.Value.Span);
 

@@ -1,5 +1,4 @@
-﻿using System.IO.Compression;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -13,9 +12,9 @@ public partial class AseParser(
 {
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".ase");
 
-    public async Task<HashSet<Resource>?> Parse(IAsset asset, CancellationToken cancellationToken)
+    public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)
     {
-        var resouces = new HashSet<Resource>();
+        ResourceList resouces = [];
 
         await foreach (var line in reader.ReadLines(asset, default, cancellationToken))
         {
@@ -29,9 +28,11 @@ public partial class AseParser(
             }
             else if (line.Value.Span.StartsWithF("*MAP_NAME"))
             {
-                if (line.Value.TryReadPastWhitespace(out var token))
+                if (line.Value.TryReadPastWhitespace(out var token) &&
+                    !token.EqualsF("\"NOSHADER\"") &&
+                    !token.EqualsF("\"textures/common/nodraw\""))
                 {
-                    resouces.Add(new Resource(token.Trim('"'), isShader: true, in line));
+                    resouces.Add(Resource.Shader(token.Trim('"'), in line));
                 }
             }
             else if (line.Value.Span.StartsWithF("*GEOMOBJECT"))
