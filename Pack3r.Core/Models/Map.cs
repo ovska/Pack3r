@@ -142,7 +142,7 @@ public sealed class Map : MapAssets, IDisposable
 
             list.Add(new DirectoryAssetSource(dir, isExcluded: dirFilter == SourceFilter.Excluded, _integrityChecker));
 
-            // TODO: exclude all child pk3s in a pk3dir?
+            // pk3s need to be loaded always if there are pk3/dir excludes
             if (_options.LoadPk3s || _options.ExcludeSources.Count > 0)
             {
                 foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
@@ -152,8 +152,13 @@ public sealed class Map : MapAssets, IDisposable
                     if (pk3Filter == SourceFilter.Ignored)
                         continue;
 
-                    if (_options.LoadPk3s || pk3Filter == SourceFilter.Excluded)
-                        list.Add(new Pk3AssetSource(file.FullName, pk3Filter == SourceFilter.Excluded, _integrityChecker));
+                    // exclude all pk3s in an excluded pk3dir
+                    bool pk3isExcluded = dir.FullName.HasExtension("pk3dir")
+                        ? (dirFilter == SourceFilter.Excluded || pk3Filter == SourceFilter.Excluded)
+                        : pk3Filter == SourceFilter.Excluded;
+
+                    if (_options.LoadPk3s || pk3isExcluded)
+                        list.Add(new Pk3AssetSource(file.FullName, isExcluded: pk3isExcluded, _integrityChecker));
                 }
             }
         }
@@ -167,7 +172,7 @@ public sealed class Map : MapAssets, IDisposable
         byte[] sortKeys = new byte[512];
 
         return list
-            .OrderByDescending(s => (s.IsExcluded, s.Name.EqualsF("pak0.pk3")))
+            .OrderByDescending(s => (s.IsExcluded, s.Name.EqualsF("pak0.pk3"))) // pak0 first, then other excludes
             .ThenBy(s => s is DirectoryAssetSource d ? AssetDirectories.IndexOf(d.Directory) : int.MaxValue)
             .ThenByDescending(s => IOPath.GetFileNameWithoutExtension(s.RootPath))
             .ToImmutableArray();

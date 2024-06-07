@@ -28,7 +28,9 @@ public partial class AseParser(
             }
             else if (line.Value.Span.StartsWithF("*MAP_NAME"))
             {
-                if (line.Value.TryReadPastWhitespace(out var token))
+                if (line.Value.TryReadPastWhitespace(out var token) &&
+                    !token.EqualsF("\"NOSHADER\"") &&
+                    !token.EqualsF("\"textures/common/nodraw\""))
                 {
                     resouces.Add(Resource.Shader(token.Trim('"'), in line));
                 }
