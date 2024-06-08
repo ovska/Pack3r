@@ -1,8 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Services;
@@ -52,6 +50,11 @@ public sealed class Map : MapAssets, IDisposable
     private string? _root;
     private readonly Lazy<ImmutableArray<DirectoryInfo>> _assetDirs;
     private readonly Lazy<ImmutableArray<AssetSource>> _assetSrcs;
+
+    /// <summary>
+    /// Contains conversion functions to rename levelshots shaders
+    /// </summary>
+    public Dictionary<IAsset, List<Func<string, int, string>>> ShaderConvert { get; } = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Gets the relative etmain of the map.<br/>

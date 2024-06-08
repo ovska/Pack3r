@@ -14,6 +14,8 @@ public sealed class Shader(
     public AssetSource Source { get; } = asset.Source;
     public int Line { get; } = line;
 
+    public IAsset Asset { get; } = asset;
+
     public ReadOnlyMemory<char> Name { get; } = name;
 
     /// <summary>References to textures, models, videos etc</summary>

@@ -1,5 +1,6 @@
 ﻿using System.IO.Compression;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -215,15 +216,29 @@ public sealed class Packager(
             string sourceOnly = devResource ? " (source file)" : "";
             OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly}");
         }
-        ;
+
         bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             try
             {
-                if (!source.TryHandleAsset(archive, relativePath, resource, out var entry))
-                    return false;
+                ZipArchiveEntry? entry;
+
+                if (shader is not null &&
+                    map.ShaderConvert.Count > 0 &&
+                    map.ShaderConvert.TryGetValue(shader.Asset, out var convertList))
+                {
+                    if (!source.Assets.TryGetValue(relativePath, out IAsset? asset))
+                        return false;
+
+                    entry = CreateRenamableShader(archive, asset, convertList, cancellationToken);
+                }
+                else
+                {
+                    if (!source.TryHandleAsset(archive, relativePath, resource, out entry))
+                        return false;
+                }
 
                 handledFiles.Add(relativePath);
 
@@ -295,6 +310,38 @@ public sealed class Packager(
                 logger.Error(ref handler);
             }
         }
+    }
+
+    private static ZipArchiveEntry CreateRenamableShader(
+        ZipArchive archive,
+        IAsset asset,
+        List<Func<string, int, string>> convertList,
+        CancellationToken cancellationToken)
+    {
+        ZipArchiveEntry entry = archive.CreateEntry(asset.Name, CompressionLevel.Optimal);
+
+        using var reader = new StreamReader(asset.OpenRead(), Encoding.UTF8);
+        using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
+
+        string? line;
+        int index = 1;
+
+        ReadOnlySpan<Func<string, int, string>> span = CollectionsMarshal.AsSpan(convertList);
+
+        while ((line = reader.ReadLine()) != null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (var func in span)
+            {
+                line = func(line, index);
+            }
+
+            writer.WriteLine(line);
+            index++;
+        }
+
+        return entry;
     }
 
     private static void CreateRenamable(
