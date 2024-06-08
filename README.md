@@ -1,6 +1,12 @@
-# Pack3r
-
-Create release-ready pk3 archives quickly. Pack3r uses Radiant `.map`-files to read shaders, models, mapscripts, etc. for asset discovery and includes only files required to play the map in the pk3.
+<p align="center">
+  <img
+    width="256"
+    height="305"
+    title="Zip icon created by Flat Icons"
+    src="https://github.com/ovska/Pack3r/assets/68028366/5c628e71-bf3f-47e6-9a95-963144fcaa3e" />
+  <h1 align="center">Pack3r</h1>
+  <p align="center">Create release-ready pk3 archives quickly from Radiant `.map`-files</p>
+</p>
 
 ## Features
 
