@@ -1,7 +1,5 @@
 ﻿namespace Pack3r.Extensions;
 
-#pragma warning disable RCS1194 // Implement exception constructors
-
 /// <summary>
 /// Exception for invalid mapping environment.
 /// </summary>

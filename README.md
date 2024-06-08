@@ -2,6 +2,14 @@
 
 Create release-ready pk3 archives quickly. Pack3r uses Radiant `.map`-files to read shaders, models, mapscripts, etc. for asset discovery and includes only files required to play the map in the pk3.
 
+## Features
+
+- Parses through your map, shaders, mapscript, etc. and discovers files are needed for the map, while leaving out editorimages, lightimages and other files not needed for release (unless `-s` specified)
+- Performs compression in-memory, does not create or leave intermediate files, and never modifies the original files (see below)
+- Support for renaming the map to create release versions such as `b1`, with automatic renaming of bsp, mapscript, levelshots, arena and more, while the original files are left untouched (`-r`)
+- Extensive logging to trace why each file was included in the pk3, including the exact line in a source file / shader where the file was referenced (`-sd` and `-rd`)
+- Support for file discovery from pk3's and pk3dirs, such as `sd-mapobjects.pk3` or a texture/model pack extracted into a separate pk3dir to keep etmain clean
+
 ## Usage
 `Pack3r <map> [options]`
 
@@ -33,10 +41,10 @@ Example:
 ```
 
 ## Limitations
+- Usable only through CLI, no GUI application is planned
 - Only brush primitives map format is supported (NetRadiant default)
-- Shaders/textures are parsed from `ase`, `md3`, `mdc` (and `skin`) files. Other model formats such as `obj` are not yet supported (open an issue).
+- Shaders/textures are parsed from `ase`, `md3`, `mdc`, `skin` files. Other model formats such as `obj` are not yet supported (open an issue).
 - `terrain` shaders (1to2 etc) are not supported (open an issue)
-- `--rename` does not yet work for levelshots-shaders. The `levelshots/mapname.tga/jpg` file is renamed correctly though
 
 ## File priority order
 1. `pak0.pk3` (and other `--exclude` pk3s/directories), if a file or shader is found there, it won't be included in the release

@@ -6,7 +6,7 @@ public sealed class CountingStream : Stream
 {
     public override bool CanRead => false;
     public override bool CanSeek => false;
-    public override bool CanWrite => Null.CanWrite;
+    public override bool CanWrite => true;
     public override long Length => _written;
 
     public override long Position
