@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
@@ -130,8 +131,17 @@ public abstract class AssetSource : IDisposable
             {
                 dict[key] = asset;
 
-                // try to add extensionless asset for textures without shader
-                dict.TryAdd(key.ChangeExtension(""), asset);
+                ref IAsset? entry = ref CollectionsMarshal.GetValueRefOrAddDefault(
+                    dict,
+                    key.ChangeExtension(""),
+                    out _);
+
+                // try to add extensionless asset for textures without shader.
+                // tga should also have priority over same named jpg
+                if (entry is null || entry.FullPath.EqualsF(key.ChangeExtension(".jpg").Span))
+                {
+                    entry = asset;
+                }
             }
         }
 

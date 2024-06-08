@@ -16,9 +16,6 @@ public sealed class ROMCharComparer : IEqualityComparer<ReadOnlyMemory<char>>, I
 
     public int GetHashCode([DisallowNull] ReadOnlyMemory<char> obj)
     {
-        if (obj.IsEmpty)
-            return 0;
-
         return CultureInfo.InvariantCulture.CompareInfo.GetHashCode(obj.Span, CompareOptions.OrdinalIgnoreCase);
     }
 
