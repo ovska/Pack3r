@@ -171,6 +171,11 @@ public class AssetService(
                     return line;
                 },
             });
+
+            if (options.Rename is not null)
+            {
+                logger.Info($"Name and contents of {arena.Name} will be changed to account for renaming");
+            }
         }
         else
         {

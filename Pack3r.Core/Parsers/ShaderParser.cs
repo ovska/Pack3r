@@ -132,6 +132,7 @@ public class ShaderParser(
             allShaders,
             duplicateShaders,
             included,
+            0,
             cancellationToken);
 
         // should not happen, duplicateShaders must be empty at this point
@@ -150,8 +151,15 @@ public class ShaderParser(
         ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders,
         ConcurrentDictionary<ReadOnlyMemory<char>, List<Shader>> duplicateShaders,
         Dictionary<ReadOnlyMemory<char>, Shader> included,
+        int depth,
         CancellationToken cancellationToken)
     {
+        if (depth == 0)
+        {
+            HandleCC("automap");
+            HandleCC("trans");
+        }
+
         foreach (var name in shaders)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -181,7 +189,25 @@ public class ShaderParser(
                     allShaders,
                     duplicateShaders,
                     included,
+                    depth + 1,
                     cancellationToken);
+            }
+        }
+
+        void HandleCC(string type)
+        {
+            var name = $"levelshots/{map.Name}_cc_{type}".AsMemory();
+
+            if (allShaders.TryGetValue(name, out Shader? cc))
+            {
+                included.Add(name, cc);
+                map.Shaders.Add(new Resource(name, isShader: true, new Line(map.Path, -1, "", true), sourceOnly: false));
+
+                if (options.Rename is not null)
+                {
+                    logger.Warn(
+                        $"Renaming levelshots shaders is not yet supported, please manually rename {name} appropriately in '{cc.DestinationPath}'");
+                }
             }
         }
     }
@@ -228,6 +254,7 @@ public class ShaderParser(
             if (state == State.None)
             {
                 ReadOnlyMemory<char> shaderName = line.Value;
+
                 State next = State.AfterShaderName;
 
                 // handle opening brace left on the previous line, e.g:
@@ -244,7 +271,7 @@ public class ShaderParser(
                         $"Expected shader name on line {line.Index} in file '{asset.FullPath}', got: '{line.Raw}'");
                 }
 
-                shader = new Shader(shaderName, asset);
+                shader = new Shader(shaderName, asset, line.Index);
                 state = next;
                 continue;
             }

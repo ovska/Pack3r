@@ -99,7 +99,7 @@ public sealed class Packager(
 
                 if (shader.ImplicitMapping is { } implicitMapping)
                 {
-                    AddFileRelative(implicitMapping, shaderResource);
+                    AddFileRelative(implicitMapping, shaderResource, shader);
                 }
 
                 foreach (var file in shader.Resources)
@@ -107,7 +107,7 @@ public sealed class Packager(
                     if (IsHandledOrExcluded(file))
                         continue;
 
-                    AddFileRelative(file, shaderResource);
+                    AddFileRelative(file, shaderResource, shader);
                 }
 
                 foreach (var file in shader.DevResources)
@@ -115,7 +115,7 @@ public sealed class Packager(
                     if (IsHandledOrExcluded(file))
                         continue;
 
-                    AddFileRelative(file, shaderResource, devResource: true);
+                    AddFileRelative(file, shaderResource, shader, devResource: true);
                 }
             }
         }
@@ -147,12 +147,17 @@ public sealed class Packager(
             foreach (var file in includedFiles.OrderBy(x => x.ArchivePath, ROMCharComparer.Instance))
             {
                 var lineref = file.ReferencedLine != null ? $" line {file.ReferencedLine}" : "";
+                var shaderref = file.Shader != null
+                    ? $" shader '{file.Shader.DestinationPath}' line {file.Shader.Line} in"
+                    : "";
                 var fileref = file.ReferencedIn != null
-                    ? $" (referenced in: '{map.GetRelativeToRoot(file.ReferencedIn)}'{lineref})"
+                    ? $" (referenced in{shaderref} file: '{map.GetRelativeToRoot(file.ReferencedIn)}'{lineref})"
                     : "";
                 var srcOnly = file.SourceOnly ? " (source only)" : "";
+                var src = file.Source != null
+                    ? file.Source.Name
+                    : $"'{map.GetRelativeToRoot(file.SourcePath.ToString()).NormalizePath()}'";
 
-                var src = file.Source != null ? file.Source.Name : $"'{file.SourcePath.ToString().NormalizePath()}'";
                 logger.Info($"File packed: {file.ArchivePath} from {src}{fileref}{srcOnly}");
             }
         }
@@ -180,10 +185,8 @@ public sealed class Packager(
 
         void AddCompileFile(string absolutePath)
         {
-            absolutePath = absolutePath.NormalizePath();
-
             if (!TryAddFileAbsolute(
-                archivePath: map.GetArchivePath(absolutePath),
+                archivePath: map.GetArchivePath(absolutePath).NormalizePath(),
                 absolutePath))
             {
                 OnFailedAddFile(required: true, $"File '{absolutePath}' not found");
@@ -195,25 +198,25 @@ public sealed class Packager(
             if (shader.Source is Pk3AssetSource { IsExcluded: true })
                 return;
 
-            if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory(), resource))
+            if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory(), resource, shader))
                 return;
 
             OnFailedAddFile(false, $"Shader file '{shader.GetAbsolutePath()}' not found");
         }
 
-        void AddFileRelative(ReadOnlyMemory<char> relativePath, Resource resource, bool devResource = false)
+        void AddFileRelative(ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null, bool devResource = false)
         {
             foreach (var source in map.AssetSources)
             {
-                if (TryAddFileFromSource(source, relativePath, resource))
+                if (TryAddFileFromSource(source, relativePath, resource, shader))
                     return;
             }
 
             string sourceOnly = devResource ? " (source file)" : "";
             OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly}");
         }
-
-        bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource)
+        ;
+        bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -226,7 +229,7 @@ public sealed class Packager(
 
                 if (entry is not null)
                 {
-                    includedFiles.Add(new IncludedFile(source, relativePath, resource));
+                    includedFiles.Add(new IncludedFile(source, relativePath, resource, shader));
                 }
 
                 return true;

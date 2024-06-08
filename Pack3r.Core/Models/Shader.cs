@@ -6,11 +6,13 @@ namespace Pack3r.Models;
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
 public sealed class Shader(
     ReadOnlyMemory<char> name,
-    IAsset asset)
+    IAsset asset,
+    int line)
     : IEquatable<Shader>
 {
     public string DestinationPath { get; } = asset.Name;
     public AssetSource Source { get; } = asset.Source;
+    public int Line { get; } = line;
 
     public ReadOnlyMemory<char> Name { get; } = name;
 
