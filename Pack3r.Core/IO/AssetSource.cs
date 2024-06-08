@@ -17,7 +17,7 @@ public abstract class AssetSource : IDisposable
 
     private string? _name;
 
-    internal protected Dictionary<ReadOnlyMemory<char>, IAsset> Assets => _assetsLazy.Value;
+    public Dictionary<ReadOnlyMemory<char>, IAsset> Assets => _assetsLazy.Value;
 
     private readonly Lazy<Dictionary<ReadOnlyMemory<char>, IAsset>> _assetsLazy;
     private readonly IIntegrityChecker _checker;

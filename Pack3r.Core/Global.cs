@@ -13,4 +13,6 @@ internal static class Global
         GenerateCallStacks = Debugger.IsAttached,
         ThrowExceptionOnToArray = false,
     });
+
+    public static string GetVersion() => typeof(Global).Assembly.GetName().Version?.ToString(3) ?? "?.?.?";
 }

@@ -198,15 +198,29 @@ public class ShaderParser(
         {
             var name = $"levelshots/{map.Name}_cc_{type}".AsMemory();
 
-            if (allShaders.TryGetValue(name, out Shader? cc))
+            if (allShaders.TryGetValue(name, out Shader? shader))
             {
-                included.Add(name, cc);
+                included.Add(name, shader);
                 map.Shaders.Add(new Resource(name, isShader: true, new Line(map.Path, -1, "", true), sourceOnly: false));
 
                 if (options.Rename is not null)
                 {
-                    logger.Warn(
-                        $"Renaming levelshots shaders is not yet supported, please manually rename {name} appropriately in '{cc.DestinationPath}'");
+                    logger.Warn($"Shader '{name}' in '{shader.Asset.Name}' will be modified to account for rename");
+
+                    string convert(string line, int index)
+                    {
+                        if (index == shader.Line)
+                        {
+                            return $"levelshots/{options.Rename}_cc_{type} // Modified by Pack3r {Global.GetVersion()}, was: {line}";
+                        }
+
+                        return line;
+                    }
+
+                    if (!map.ShaderConvert.TryGetValue(shader.Asset, out var list))
+                        map.ShaderConvert[shader.Asset] = list = [];
+
+                    list.Add(convert);
                 }
             }
         }
