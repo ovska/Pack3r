@@ -39,12 +39,13 @@ Example:
 - `--rename` does not yet work for levelshots-shaders. The `levelshots/mapname.tga/jpg` file is renamed correctly though
 
 ## File priority order
-1. `pak0.pk3`, if a file or shader is found in pak0, it won't be included in the release
+1. `pak0.pk3` (and other `--exclude` pk3s/directories), if a file or shader is found there, it won't be included in the release
 2. Files inside the _relative_ `etmain` of your map file (directory contaning `/maps`)
 3. `etmain`, if the map is for example in `some.pk3dir/maps/mymap.map`
 4. `pk3dir`-folders in `etmain`, in reverse alphabetical order
 BSP, lightmaps, mapscript, speakerscript, soundscript, etc. are always assumed to be in the same _relative_ etmain as your map file.
 
 #### Example
-Map is `etmain/void.pk3dir/void_b1.map`, the priority is:
+Map is `etmain/void.pk3dir/maps/void_b1.map`, the priority is:
   `pak0.pk3` -> `etmain/void.pk3dir/` -> `etmain/` -> any pk3 files in etmain
+Mapscript must be in `etmain/void.pk3dir/maps/` in this case and not directly in etmain
