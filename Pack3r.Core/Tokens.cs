@@ -15,15 +15,9 @@ public static partial class Tokens
     public static partial Regex UnsupportedMapscript();
 
     /// <summary>
-    /// Matches scripts/*something*.shader
-    /// </summary>
-    [GeneratedRegex("""^scripts[/\\][^\.]+.shader$""", Options, Timeout)]
-    public static partial Regex ShaderPath();
-
-    /// <summary>
     /// Matches filetypes that should be packaged.
     /// </summary>
-    [GeneratedRegex("""\.(tga|jp[e]?g|md3|mdc|ase|obj|fbx|shader|wav|roq|skin)$""", Options, Timeout)]
+    [GeneratedRegex("""\.(tga|jp[e]?g|md3|mdc|mdm|ase|obj|fbx|shader|wav|roq|skin)$""", Options, Timeout)]
     public static partial Regex PackableFile();
 
     /// <summary>

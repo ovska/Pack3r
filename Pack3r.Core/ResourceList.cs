@@ -25,17 +25,7 @@ public sealed class ResourceList : ICollection<Resource>
     void ICollection<Resource>.Add(Resource item)
     {
         Key key = new(item);
-
-        ref Resource? value = ref CollectionsMarshal.GetValueRefOrAddDefault(_resources, key, out _);
-
-        if (value is null)
-        {
-            value = item;
-        }
-        else if (value.SourceOnly && !item.SourceOnly)
-        {
-            value = item;
-        }
+        AddInternal(key, item);
     }
 
     public void AddRange(ResourceList other)

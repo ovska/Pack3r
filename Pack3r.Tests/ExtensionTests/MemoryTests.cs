@@ -43,20 +43,6 @@ public static class MemoryTests
     }
 
     [Theory]
-    [InlineData("scripts/common.shader", true)]
-    [InlineData("scripts/medieval_soc.shader", true)]
-    [InlineData("scripts/shaderlist.txt", false)]
-    [InlineData("wrongfolder/common.shader", false)]
-    [InlineData("scripts\\common.shader", true)]
-    [InlineData("scripts\\medieval_soc.shader", true)]
-    [InlineData("scripts\\shaderlist.txt", false)]
-    [InlineData("wrongfolder\\common.shader", false)]
-    public static void Should_Check_For_Shader_File(string input, bool expected)
-    {
-        Assert.Equal(expected, Tokens.ShaderPath().IsMatch(input));
-    }
-
-    [Theory]
     [InlineData("test.tga", true)]
     [InlineData("test.jpg", true)]
     [InlineData("test.mdc", true)]

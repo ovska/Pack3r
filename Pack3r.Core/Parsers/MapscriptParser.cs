@@ -41,7 +41,7 @@ public class MapscriptParser(
         if (unsupported.Count > 0)
         {
             var keywords = string.Join(", ", unsupported.Select(l => $"'{l}'"));
-            logger.Warn($"Mapscript has keyword(s) ({keywords}) that can include undiscoverable resources, please manually ensure they are included");
+            logger.Warn($"Mapscript has keyword(s) ({keywords}) that can include undiscoverable resources such as dynamically loaded models, please manually ensure they are included");
         }
     }
 
