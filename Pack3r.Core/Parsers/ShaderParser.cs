@@ -102,6 +102,7 @@ public class ShaderParser(
                                 return toReturn;
                             }
 
+                            // cases such as common shaders, if they are compile only we don't care
                             if (!options.IncludeSource && (!a.NeededInPk3 || !b.NeededInPk3))
                             {
                                 return a.NeededInPk3 ? b : a;

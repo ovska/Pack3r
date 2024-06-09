@@ -8,7 +8,7 @@ namespace Pack3r;
 public sealed class ResourceList : ICollection<Resource>
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1067")]
-    private readonly struct Key(Resource resource) : IEquatable<Key>
+    public readonly struct Key(Resource resource) : IEquatable<Key>
     {
         public ReadOnlyMemory<char> Value => resource.Value;
         public bool IsShader => resource.IsShader;
@@ -58,7 +58,8 @@ public sealed class ResourceList : ICollection<Resource>
     public void Clear() => _resources.Clear();
     public bool Contains(Resource item) => _resources.ContainsKey(new Key(item));
     public void CopyTo(Resource[] array, int arrayIndex) => _resources.Values.CopyTo(array, arrayIndex);
-    public IEnumerator<Resource> GetEnumerator() => _resources.Values.GetEnumerator();
     public bool Remove(Resource item) => _resources.Remove(new Key(item));
+    public Dictionary<Key, Resource>.ValueCollection.Enumerator GetEnumerator() => _resources.Values.GetEnumerator();
+    IEnumerator<Resource> IEnumerable<Resource>.GetEnumerator() => GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => _resources.GetEnumerator();
 }
