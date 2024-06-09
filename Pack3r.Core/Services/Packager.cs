@@ -41,16 +41,16 @@ public sealed class Packager(
     {
         int missingFiles = 0;
 
-        using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
-
         var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
+
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
 
         // contains both actual and alternate files added
         HashSet<ReadOnlyMemory<char>> handledFiles = new(ROMCharComparer.Instance);
         HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
         List<IncludedFile> includedFiles = [];
 
-        var renamable = map.RenamableResources.ToArray();
+        RenamableResource[] renamable = [.. map.RenamableResources];
         string renamableMsg = string.Join(", ", renamable.Select(r => r.Name).OfType<string>().Distinct());
 
         using (var progress = progressManager.Create($"Compressing {renamableMsg}", renamable.Length))
