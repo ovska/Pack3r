@@ -14,6 +14,8 @@ public sealed class ConsoleProgressMeter : IProgressMeter
     private long _lastPrint;
     private uint _lastSpin;
 
+    private readonly long _timestamp = Stopwatch.GetTimestamp();
+
     private static readonly char[] _spinner = ['-', '\\', '|', '/'];
     private static readonly TimeSpan _frequency = TimeSpan.FromMilliseconds(100);
 
@@ -77,6 +79,12 @@ public sealed class ConsoleProgressMeter : IProgressMeter
         lock (Global.ConsoleLock)
         {
             var foreground = Console.ForegroundColor;
+
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Out.Write(" (");
+            Console.Out.Write((int)Stopwatch.GetElapsedTime(_timestamp).TotalMilliseconds);
+            Console.Out.Write("ms)");
+
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Out.Write("\r   DONE ");
             Console.ForegroundColor = foreground;
