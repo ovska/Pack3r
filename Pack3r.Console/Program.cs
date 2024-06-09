@@ -70,8 +70,7 @@ public class Program
             Stream destination;
             var timer = Stopwatch.StartNew();
 
-            long written;
-            int missingCount;
+            PackResult result;
 
             using (Map map = await app.AssetService.GetPackingData(cancellationToken))
             {
@@ -88,8 +87,7 @@ public class Program
 
                 using (destination)
                 {
-                    missingCount = await app.Packager.CreateZip(map, destination, cancellationToken);
-                    written = destination.Position;
+                    result = await app.Packager.CreateZip(map, destination, cancellationToken);
                 }
             }
 
@@ -99,11 +97,11 @@ public class Program
 
             if (!options.DryRun)
             {
-                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, pk3 size: {Size(written)}{Missing(missingCount)}");
+                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, {result}, pk3 size: {result.Size()}");
             }
             else
             {
-                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, estimated pk3 size: {Size(written)}{Missing(missingCount)}");
+                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, {result}, estimated pk3 size: {result.Size()}");
             }
 
             return 0;
@@ -124,22 +122,6 @@ public class Program
 
             app.Lifetime.HandleException(e);
             return -1;
-        }
-
-        static string Size(long written)
-        {
-            const long kilobyte = 1024;
-            const long megabyte = 1024 * 1024;
-            return written > megabyte
-                ? $"{(double)written / megabyte:N} MB"
-                : $"{(double)written / kilobyte:N} KB";
-        }
-
-        static string Missing(int missingCount)
-        {
-            return missingCount > 0
-                ? $", with {missingCount} file{(missingCount != 1 ? "s" : "")} missing"
-                : "";
         }
     }
 }

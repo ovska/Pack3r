@@ -62,55 +62,25 @@ public class AssetService(
             logger.System($"Using directories{pk3msg} for discovery: {dirMsg}");
         }
 
-        // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
-        ConcurrentDictionary<Resource, object?> referencedResources = [];
-
-        await Parallel.ForEachAsync(resourceParsers, cancellationToken, async (parser, ct) =>
+        // add bsp
+        FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
+        map.RenamableResources.Enqueue(new()
         {
-            string path = parser.GetPath(map);
-
-            if (!File.Exists(path))
-            {
-                logger.Debug($"Skipped {parser.Description}, file '{path}' not found");
-                return;
-            }
-
-            map.RenamableResources.Add(new()
-            {
-                AbsolutePath = path,
-                ArchivePath = map.GetRelativeToRoot(parser.GetPath(map, options.Rename))
-            });
-
-            await foreach (var resource in parser.Parse(path, ct).ConfigureAwait(false))
-            {
-                referencedResources.TryAdd(resource, null);
-            }
-        }).ConfigureAwait(false);
-
-        foreach (var (resource, _) in referencedResources)
-        {
-            (resource.IsShader ? map.Shaders : map.Resources).Add(resource);
-        }
-
-        await referenceParser.ParseReferences(map, cancellationToken);
+            Name = "bsp",
+            AbsolutePath = bsp.FullName,
+            ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.bsp")
+        });
 
         // add .map
         if (options.IncludeSource)
         {
-            map.RenamableResources.Add(new()
+            map.RenamableResources.Enqueue(new()
             {
+                Name = "map source",
                 AbsolutePath = map.Path,
                 ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.map"),
             });
         }
-
-        // add bsp
-        FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
-        map.RenamableResources.Add(new()
-        {
-            AbsolutePath = bsp.FullName,
-            ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.bsp")
-        });
 
         var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
 
@@ -124,8 +94,9 @@ public class AssetService(
                 FileInfo? file = lmFiles[i];
                 timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmaps", bsp, file);
 
-                map.RenamableResources.Add(new()
+                map.RenamableResources.Enqueue(new()
                 {
+                    Name = "lightmaps",
                     AbsolutePath = file.FullName,
                     ArchivePath = Path.Combine("maps", options.Rename ?? map.Name, file.Name)
                 });
@@ -140,8 +111,9 @@ public class AssetService(
 
         if (objdata.Exists)
         {
-            map.RenamableResources.Add(new()
+            map.RenamableResources.Enqueue(new()
             {
+                Name = "objdata",
                 AbsolutePath = objdata.FullName,
                 ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.objdata")
             });
@@ -157,8 +129,9 @@ public class AssetService(
         {
             string lineToReplace = $"map \"{map.Name}\"";
 
-            map.RenamableResources.Add(new()
+            map.RenamableResources.Enqueue(new()
             {
+                Name = "arena",
                 AbsolutePath = arena.FullName,
                 ArchivePath = Path.Combine("scripts", $"{options.Rename ?? map.Name}.arena"),
                 Convert = (line, options) =>
@@ -191,8 +164,9 @@ public class AssetService(
 
         if (levelshot.Exists)
         {
-            map.RenamableResources.Add(new()
+            map.RenamableResources.Enqueue(new()
             {
+                Name = null,
                 AbsolutePath = levelshot.FullName,
                 ArchivePath = Path.Combine(
                     "levelshots",
@@ -205,9 +179,45 @@ public class AssetService(
                 $"Levelshot skipped, file not found in '{Path.GetFileNameWithoutExtension(levelshot.FullName.AsSpan())}.tga/.jpg'");
         }
 
-        // TODO: levelshots_cc
+        await ParseResources(map, cancellationToken);
 
         return map;
+    }
+
+    private async Task ParseResources(Map map, CancellationToken cancellationToken)
+    {
+        // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
+        ConcurrentDictionary<Resource, object?> referencedResources = [];
+
+        await Parallel.ForEachAsync(resourceParsers, cancellationToken, async (parser, ct) =>
+        {
+            string path = parser.GetPath(map);
+
+            if (!File.Exists(path))
+            {
+                logger.Debug($"Skipped {parser.Description}, file '{path}' not found");
+                return;
+            }
+
+            map.RenamableResources.Enqueue(new()
+            {
+                Name = parser.Description,
+                AbsolutePath = path,
+                ArchivePath = map.GetRelativeToRoot(parser.GetPath(map, options.Rename))
+            });
+
+            await foreach (var resource in parser.Parse(path, ct).ConfigureAwait(false))
+            {
+                referencedResources.TryAdd(resource, null);
+            }
+        }).ConfigureAwait(false);
+
+        foreach (var (resource, _) in referencedResources)
+        {
+            (resource.IsShader ? map.Shaders : map.Resources).Add(resource);
+        }
+
+        await referenceParser.ParseReferences(map, cancellationToken);
     }
 
     private static string FormatDir(DirectoryInfo etmain, DirectoryInfo directory)

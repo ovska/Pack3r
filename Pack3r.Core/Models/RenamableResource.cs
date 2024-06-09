@@ -4,6 +4,8 @@ namespace Pack3r.Models;
 
 public sealed class RenamableResource
 {
+    public required string? Name { get; set; }
+
     public required string AbsolutePath
     {
         get => _absolutePath;

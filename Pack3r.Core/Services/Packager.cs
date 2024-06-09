@@ -11,6 +11,22 @@ using Pack3r.Progress;
 
 namespace Pack3r.Services;
 
+public readonly record struct PackResult(int Packed, int Missing, long Bytes)
+{
+    public override string ToString() => Missing == 0
+        ? $"{Packed} files"
+        : $"{Packed}/{Packed + Missing} files ({Missing} missing)";
+
+    public string Size()
+    {
+        const long kilobyte = 1024;
+        const long megabyte = 1024 * 1024;
+        return Bytes > megabyte
+            ? $"{(double)Bytes / megabyte:N} MB"
+            : $"{(double)Bytes / kilobyte:N} KB";
+    }
+}
+
 public sealed class Packager(
     ILogger<Packager> logger,
     PackOptions options,
@@ -18,15 +34,14 @@ public sealed class Packager(
     IShaderParser shaderParser,
     IIntegrityChecker integrityChecker)
 {
-    public async Task<int> CreateZip(
+    public async Task<PackResult> CreateZip(
         Map map,
         Stream destination,
         CancellationToken cancellationToken)
     {
         int missingFiles = 0;
 
-        // leave open so we can get Position
-        using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: true);
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
 
         var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
 
@@ -35,10 +50,13 @@ public sealed class Packager(
         HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
         List<IncludedFile> includedFiles = [];
 
-        using (var progress = progressManager.Create("Compressing bsp, lightmaps, mapscript etc.", map.RenamableResources.Count))
+        var renamable = map.RenamableResources.ToArray();
+        string renamableMsg = string.Join(", ", renamable.Select(r => r.Name).OfType<string>().Distinct());
+
+        using (var progress = progressManager.Create($"Compressing {renamableMsg}", renamable.Length))
         {
             int i = 0;
-            foreach (var res in map.RenamableResources)
+            foreach (var res in renamable)
             {
                 CreateRenamable(archive, options, res, cancellationToken);
                 progress.Report(++i);
@@ -47,7 +65,7 @@ public sealed class Packager(
             }
         }
 
-        using (var progress = progressManager.Create("Compressing misc resources", map.Resources.Count))
+        using (var progress = progressManager.Create("Compressing models, model textures, sounds etc.", map.Resources.Count))
         {
             int count = 1;
 
@@ -169,7 +187,7 @@ public sealed class Packager(
         // end
         logger.Info($"{includedFiles.Count} files included in pk3");
 
-        return missingFiles;
+        return new PackResult(Packed: includedFiles.Count, Missing: missingFiles, Bytes: destination.Position);
 
         bool IsHandledOrExcluded(ReadOnlyMemory<char> relativePath)
         {
