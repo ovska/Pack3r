@@ -32,4 +32,6 @@ public class PackOptions
     public List<string> IgnoreSources { get; init; } = null!;
 
     public List<string> ExcludeSources { get; init; } = null!;
+
+    public List<string> ModFolders { get; init; } = null!;
 } 

@@ -14,7 +14,7 @@
     },
     "sungilarity src": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\" -d -i -rd"
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\" -d -i -rd -m etjump_stable"
     }
   }
 }

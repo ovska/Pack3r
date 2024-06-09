@@ -82,6 +82,13 @@ public class RootCommand
         AllowMultipleArgumentsPerToken = true)]
     public List<string> Exclude { get; set; } = ["pak0.pk3", "pak0.pk3dir"];
 
+    [CliOption(
+        Description = "Adds pk3s in these mod folders to exclude-list",
+        Arity = CliArgumentArity.ZeroOrMore,
+        ValidationRules = CliValidationRules.LegalPath,
+        AllowMultipleArgumentsPerToken = true)]
+    public List<string> Mods { get; set; } = [];
+
     public Task<int> RunAsync()
     {
         return Program.Execute(new PackOptions
@@ -91,6 +98,7 @@ public class RootCommand
             Overwrite = Force,
             ExcludeSources = Exclude,
             IgnoreSources = Ignore,
+            ModFolders = Mods,
             DryRun = DryRun,
             IncludeSource = Source,
             LoadPk3s = IncludePk3,

@@ -36,6 +36,7 @@
 - `-i, --includepk3` Include pk3 files and pk3dirs in etmain when indexing files [default: False]
 - `--ignore` Ignore some pk3 files or pk3dir directories [default: pak1.pk3|pak2.pk3|mp_bin.pk3]
 - `-e, --exclude` Never pack files found in these pk3s or directories [default: pak0.pk3|pak0.pk3dir]
+- `-m --mods` Adds pk3s in these mod folders to exclude-list
 - `-?, -h, --help` Show help and usage information
 - `-v, --version` Show version information
 
@@ -44,6 +45,7 @@ Example:
 ```bash
 .\Pack3r.exe 'C:\Temp\ET\map\ET\etmain\maps\sungilarity.map' --o 'C:\Temp\test.pk3'
 .\Pack3r.exe 'C:\Temp\ET\map\ET\etmain\maps\sungilarity.map' --dryrun --includepk3
+.\Pack3r.exe 'C:\Temp\ET\map\ET\etmain\maps\sungilarity.map' --output 'C:\releases\' --rename sungilarity_b1 --mods etjump --verbosity debug_
 ```
 
 ## Limitations

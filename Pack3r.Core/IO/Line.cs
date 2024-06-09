@@ -1,7 +1,9 @@
-﻿using Pack3r.Extensions;
+﻿using System.Diagnostics;
+using Pack3r.Extensions;
 
 namespace Pack3r.IO;
 
+[DebuggerDisplay("{DebuggerDisplay,nq}")]
 public readonly struct Line : IEquatable<Line>
 {
     /// <summary>
@@ -57,8 +59,8 @@ public readonly struct Line : IEquatable<Line>
         }
     }
 
-    public bool IsOpeningBrace => FirstChar == '{' && Value.Length == 1;
-    public bool IsClosingBrace => FirstChar == '}' && Value.Length == 1;
+    public bool IsOpeningBrace => FirstChar == '{';
+    public bool IsClosingBrace => FirstChar == '}';
 
     public override bool Equals(object? obj) => obj is Line other && Equals(other);
 
@@ -80,4 +82,6 @@ public readonly struct Line : IEquatable<Line>
     }
 
     public override int GetHashCode() => HashCode.Combine(Index, Raw, Path);
+
+    internal string DebuggerDisplay => $"{{ Line: '{Value}' in L{Index} {Path} }}";
 }

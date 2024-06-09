@@ -166,6 +166,28 @@ public sealed class Map : MapAssets, IDisposable
             }
         }
 
+        if (_options.ModFolders.Count > 0 &&
+            ETMain.Parent is { Exists: true } etDir)
+        {
+            foreach (var dir in etDir.EnumerateDirectories("*", SearchOption.TopDirectoryOnly))
+            {
+                foreach (var mod in _options.ModFolders)
+                {
+                    if (mod.EqualsF(dir.Name))
+                    {
+                        //list.Add(new DirectoryAssetSource(dir, isExcluded: true, _integrityChecker));
+
+                        foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
+                        {
+                            list.Add(new Pk3AssetSource(file.FullName, isExcluded: true, _integrityChecker));
+                        }
+
+                        break;
+                    }
+                }
+            }
+        }
+
         /*
             Same ordering as in AssetDirectories, but:
             1. pak0 is always first (and other excluded sources)
