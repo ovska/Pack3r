@@ -127,7 +127,15 @@ public class Program
                 }
                 catch (Exception e2)
                 {
-                    e = new AggregateException("Failed to delete partial pk3", e, e2);
+                    if (e is IOException && e2 is IOException && e.Message == e2.Message)
+                    {
+                        // The process cannot access the file '...' because it is being used by another process.
+                        // No need to duplicate this exception
+                    }
+                    else
+                    {
+                        e = new AggregateException("Failed to delete partial pk3", e, e2);
+                    }
                 }
             }
 
