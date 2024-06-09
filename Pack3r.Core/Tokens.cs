@@ -20,7 +20,7 @@ public static partial class Tokens
     /// <summary>
     /// Matches filetypes that should be packaged.
     /// </summary>
-    [GeneratedRegex("""\.(tga|jpg|mdc|md3|ase|shader|wav|roq|skin)$""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
+    [GeneratedRegex("""\.(tga|jp[e]?g|md3|mdc|ase|obj|shader|wav|roq|skin)$""", RegexOptions.IgnoreCase | RegexOptions.Singleline, 1000)]
     public static partial Regex PackableFile();
 
     /// <summary>
