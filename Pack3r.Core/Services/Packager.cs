@@ -25,7 +25,8 @@ public sealed class Packager(
     {
         int missingFiles = 0;
 
-        using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
+        // leave open so we can get Position
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: true);
 
         var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
 

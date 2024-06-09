@@ -64,13 +64,13 @@ public class Program
             }
             else
             {
-                string renameLog = options.Rename is null ? "" : ", rename is ignored";
-                app.Logger.System($"Running dry run for '{mapName}' without creating a pk3{renameLog}");
+                app.Logger.System($"Running dry run for '{mapName}' without creating a pk3");
             }
 
             Stream destination;
             var timer = Stopwatch.StartNew();
 
+            long written;
             int missingCount;
 
             using (Map map = await app.AssetService.GetPackingData(cancellationToken))
@@ -86,9 +86,10 @@ public class Program
                     destination = new CountingStream();
                 }
 
-                await using (destination)
+                using (destination)
                 {
                     missingCount = await app.Packager.CreateZip(map, destination, cancellationToken);
+                    written = destination.Position;
                 }
             }
 
@@ -96,25 +97,13 @@ public class Program
 
             app.Logger.Drain();
 
-            string missingMsg = missingCount > 0
-                ? $", with {missingCount} file{(missingCount != 1 ? "s" : "")} missing"
-                : "";
-
             if (!options.DryRun)
             {
-                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms{missingMsg}");
+                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, pk3 size: {Size(written)}{Missing(missingCount)}");
             }
             else
             {
-                long written = ((CountingStream)destination).Position;
-
-                const int kilobyte = 1024;
-                const int megabyte = 1024 * 1024;
-                string size = written > megabyte
-                    ? $"{(double)written / megabyte:N} MB"
-                    : $"{(double)written / kilobyte:N} KB";
-
-                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, estimated pk3 size: {size}{missingMsg}");
+                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, estimated pk3 size: {Size(written)}{Missing(missingCount)}");
             }
 
             return 0;
@@ -135,6 +124,22 @@ public class Program
 
             app.Lifetime.HandleException(e);
             return -1;
+        }
+
+        static string Size(long written)
+        {
+            const long kilobyte = 1024;
+            const long megabyte = 1024 * 1024;
+            return written > megabyte
+                ? $"{(double)written / megabyte:N} MB"
+                : $"{(double)written / kilobyte:N} KB";
+        }
+
+        static string Missing(int missingCount)
+        {
+            return missingCount > 0
+                ? $", with {missingCount} file{(missingCount != 1 ? "s" : "")} missing"
+                : "";
         }
     }
 }
