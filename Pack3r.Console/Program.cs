@@ -49,6 +49,7 @@ public class Program
 
         var app = composition.Application;
         CancellationToken cancellationToken = app.Lifetime.CancellationToken;
+        bool fileCreated = false;
 
         try
         {
@@ -77,6 +78,7 @@ public class Program
                 if (!options.DryRun)
                 {
                     destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
+                    fileCreated = true;
                 }
                 else
                 {
@@ -119,23 +121,15 @@ public class Program
         }
         catch (Exception e)
         {
-            if (!options.DryRun)
+            if (fileCreated)
             {
                 try
                 {
-                    File.Delete(options.Pk3File.FullName);
+                    File.Delete(options.Pk3File!.FullName);
                 }
                 catch (Exception e2)
                 {
-                    if (e is IOException && e2 is IOException && e.Message == e2.Message)
-                    {
-                        // The process cannot access the file '...' because it is being used by another process.
-                        // No need to duplicate this exception
-                    }
-                    else
-                    {
-                        e = new AggregateException("Failed to delete partial pk3", e, e2);
-                    }
+                    e = new AggregateException("Failed to delete partial pk3", e, e2);
                 }
             }
 
