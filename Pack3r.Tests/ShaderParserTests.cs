@@ -1,3 +1,4 @@
+using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
@@ -65,6 +66,24 @@ public class ShaderParserTests
     }
 
     [Fact]
+    public async Task Should_Throw_on_Invalid()
+    {
+        await Assert.ThrowsAnyAsync<InvalidDataException>(() => ParseSingle("""
+            textures/pgm/light_rec_blu_5000
+            {
+                implicitMap -
+            }x
+            """));
+
+        await Assert.ThrowsAnyAsync<InvalidDataException>(() => ParseSingle("""
+            textures/pgm/light_rec_blu_5000
+            {x
+                implicitMap -
+            }
+            """));
+    }
+
+    [Fact]
     public async Task Should_Parse_Implicit_Shader()
     {
         var shader = await ParseSingle("""
@@ -76,7 +95,7 @@ public class ShaderParserTests
             	q3map_shadeangle 46
             	q3map_lightimage textures/pgm/ei/light_blue.tga
             	implicitMap	textures/pgm/abal2.tga
-            }o
+            }
             """);
 
         Assert.Equal("textures/pgm/light_rec_blu_5000", shader.Name.ToString());

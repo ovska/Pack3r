@@ -458,8 +458,7 @@ public class ShaderParser(
 
         if (state != State.None)
         {
-            logger.Fatal($"Shader '{asset.FullPath}' ended in an invalid state: {state}");
-            throw new ControlledException();
+            throw new InvalidDataException($"Shader '{asset.FullPath}' ended in an invalid state: {state}");
         }
     }
 

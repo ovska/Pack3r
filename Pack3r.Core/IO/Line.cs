@@ -57,8 +57,8 @@ public readonly struct Line : IEquatable<Line>
         }
     }
 
-    public bool IsOpeningBrace => FirstChar == '{';
-    public bool IsClosingBrace => FirstChar == '}';
+    public bool IsOpeningBrace => FirstChar == '{' && Value.Length == 1;
+    public bool IsClosingBrace => FirstChar == '}' && Value.Length == 1;
 
     public override bool Equals(object? obj) => obj is Line other && Equals(other);
 
