@@ -66,24 +66,6 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Throw_on_Invalid()
-    {
-        await Assert.ThrowsAnyAsync<InvalidDataException>(() => ParseSingle("""
-            textures/pgm/light_rec_blu_5000
-            {
-                implicitMap -
-            }x
-            """));
-
-        await Assert.ThrowsAnyAsync<InvalidDataException>(() => ParseSingle("""
-            textures/pgm/light_rec_blu_5000
-            {x
-                implicitMap -
-            }
-            """));
-    }
-
-    [Fact]
     public async Task Should_Parse_Implicit_Shader()
     {
         var shader = await ParseSingle("""
@@ -302,5 +284,23 @@ public class ShaderParserTests
         Assert.Equal(
             ["textures/effects/envmap_slate.tga", "models/powerups/holdable/binoc.jpg"],
             shader.Resources.Select(t => t.ToString()));
+    }
+
+    [Fact]
+    public async Task Should_Handle_Keyword_With_Opening_Brace()
+    {
+        var shader = await ParseSingle("""
+            textures/skies/sd_goldrush
+            {
+                {	map textures/skies_sd/goldrush_clouds.tga
+            	    tcMod scale 5 5
+            	    tcMod scroll 0.0015 -0.003
+            	    rgbGen identityLighting
+                }
+            }
+            """);
+
+        Assert.Single(shader.Resources);
+        Assert.Equal("textures/skies_sd/goldrush_clouds.tga", shader.Resources.First().ToString());
     }
 }

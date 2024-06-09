@@ -237,8 +237,10 @@ public class ShaderParser(
         ReadOnlyMemory<char> token;
         bool inComment = false;
 
-        await foreach (var line in reader.ReadLines(asset, default, cancellationToken).ConfigureAwait(false))
+        await foreach (var _line in reader.ReadLines(asset, default, cancellationToken).ConfigureAwait(false))
         {
+            Line line = _line;
+
             if (inComment)
             {
                 if (line.FirstChar == '*' && line.Value.Length == 2 && line.Value.Span[1] == '/')
@@ -263,7 +265,11 @@ public class ShaderParser(
                 }
 
                 state = State.Shader;
-                continue;
+
+                if (!IsContinuationBrace(ref line))
+                {
+                    continue;
+                }
             }
 
             if (state == State.None)
@@ -293,61 +299,15 @@ public class ShaderParser(
 
             Debug.Assert(shader != null);
 
-            if (state == State.Stage)
-            {
-                if (line.IsOpeningBrace)
-                {
-                    throw new InvalidDataException(
-                        $"Invalid token '{line.Raw}' on line {line.Index} in file {asset.FullPath}");
-                }
-
-                if (line.IsClosingBrace)
-                {
-                    state = State.Shader;
-                    continue;
-                }
-
-                // only map, animmap, clampmap and videomap are valid
-                if ((line.FirstChar | 0x20) is not ('m' or 'a' or 'c' or 'v'))
-                {
-                    continue;
-                }
-
-                if (line.MatchKeyword("map", out token) ||
-                    line.MatchKeyword("clampMap", out token))
-                {
-                    // $lightmap, $whiteimage etc
-                    if (token.Span[0] != '$')
-                    {
-                        shader.Resources.Add(token);
-                    }
-                }
-                else if (line.MatchKeyword("animMap", out token))
-                {
-                    // read past the frames-agument
-                    if (token.TryReadPastWhitespace(out token))
-                    {
-                        foreach (var range in token.Split(' '))
-                            shader.Resources.Add(token[range]);
-                    }
-                    else
-                    {
-                        logger.UnparsableKeyword(asset.FullPath, line.Index, "animMap", line.Raw);
-                    }
-                }
-                else if (line.MatchKeyword("videomap", out token))
-                {
-                    shader.Resources.Add(token);
-                }
-
-                continue;
-            }
-
             if (state == State.Shader)
             {
                 if (line.IsOpeningBrace)
                 {
                     state = State.Stage;
+
+                    if (IsContinuationBrace(ref line))
+                        goto ReadStage;
+
                     continue;
                 }
 
@@ -454,12 +414,75 @@ public class ShaderParser(
                     shader.HasLightStyles = true;
                 }
             }
+
+            ReadStage:
+            if (state == State.Stage)
+            {
+                if (line.IsOpeningBrace)
+                {
+                    throw new InvalidDataException(
+                        $"Invalid token '{line.Raw}' on line {line.Index} in file {asset.FullPath}");
+                }
+
+                if (line.IsClosingBrace)
+                {
+                    state = State.Shader;
+                    continue;
+                }
+
+                // only map, animmap, clampmap and videomap are valid
+                if ((line.FirstChar | 0x20) is not ('m' or 'a' or 'c' or 'v'))
+                {
+                    continue;
+                }
+
+                if (line.MatchKeyword("map", out token) ||
+                    line.MatchKeyword("clampMap", out token))
+                {
+                    // $lightmap, $whiteimage etc
+                    if (token.Span[0] != '$')
+                    {
+                        shader.Resources.Add(token);
+                    }
+                }
+                else if (line.MatchKeyword("animMap", out token))
+                {
+                    // read past the frames-agument
+                    if (token.TryReadPastWhitespace(out token))
+                    {
+                        foreach (var range in token.Split(' '))
+                            shader.Resources.Add(token[range]);
+                    }
+                    else
+                    {
+                        logger.UnparsableKeyword(asset.FullPath, line.Index, "animMap", line.Raw);
+                    }
+                }
+                else if (line.MatchKeyword("videomap", out token))
+                {
+                    shader.Resources.Add(token);
+                }
+
+                continue;
+            }
         }
 
         if (state != State.None)
         {
             throw new InvalidDataException($"Shader '{asset.FullPath}' ended in an invalid state: {state}");
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsContinuationBrace(ref Line line)
+    {
+        if (line.Value.Length > 1)
+        {
+            line = new Line(line.Path, line.Index, line.Value[1..].ToString(), false);
+            return true;
+        }
+
+        return false;
     }
 
     private async Task<Dictionary<AssetSource, HashSet<ReadOnlyMemory<char>>>> ParseShaderLists(
