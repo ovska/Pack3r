@@ -44,6 +44,7 @@ public sealed class Packager(
         var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
 
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
+        archive.Comment = $"Created with Pack3r {Global.GetVersion()}";
 
         // contains both actual and alternate files added
         HashSet<ReadOnlyMemory<char>> handledFiles = new(ROMCharComparer.Instance);
