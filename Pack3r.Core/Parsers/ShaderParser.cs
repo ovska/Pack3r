@@ -532,11 +532,11 @@ public class ShaderParser(
 
         return (line[0] | 0x20) switch
         {
-            'q' => !options.IncludeSource && line.StartsWith("qer_"),
-            's' => line.StartsWith("surfaceparm "),
-            'c' => line.StartsWith("cull "),
-            'n' => line.StartsWith("nopicmip") || line.StartsWith("nomipmaps"),
-            't' => line.StartsWith("tesssize"),
+            'q' => !options.IncludeSource && line.StartsWithF("qer_"),
+            's' => line.StartsWithF("surfaceparm") || line.StartsWithF("sort"),
+            'c' => line.StartsWithF("cull"),
+            'n' => line.StartsWithF("nopicmip") || line.StartsWithF("nomipmaps"),
+            't' => line.StartsWithF("tesssize"),
             _ => false,
         };
     }
