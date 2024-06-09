@@ -313,8 +313,8 @@ public class ShaderParser(
                     continue;
                 }
 
-                if (line.MatchPrefix("map ", out token) ||
-                    line.MatchPrefix("clampMap ", out token))
+                if (line.MatchKeyword("map", out token) ||
+                    line.MatchKeyword("clampMap", out token))
                 {
                     // $lightmap, $whiteimage etc
                     if (token.Span[0] != '$')
@@ -322,7 +322,7 @@ public class ShaderParser(
                         shader.Resources.Add(token);
                     }
                 }
-                else if (line.MatchPrefix("animMap ", out token))
+                else if (line.MatchKeyword("animMap", out token))
                 {
                     // read past the frames-agument
                     if (token.TryReadPastWhitespace(out token))
@@ -335,7 +335,7 @@ public class ShaderParser(
                         logger.UnparsableKeyword(asset.FullPath, line.Index, "animMap", line.Raw);
                     }
                 }
-                else if (line.MatchPrefix("videomap ", out token))
+                else if (line.MatchKeyword("videomap", out token))
                 {
                     shader.Resources.Add(token);
                 }
@@ -367,7 +367,7 @@ public class ShaderParser(
 
                 foreach (var prefix in _simpleShaderRefPrefixes)
                 {
-                    if (line.MatchPrefix(prefix, out token))
+                    if (line.MatchKeyword(prefix, out token))
                     {
                         if (!token.Span.StartsWith("$", StringComparison.Ordinal))
                             shader.Shaders.Add(token);
@@ -380,7 +380,7 @@ public class ShaderParser(
                 {
                     foreach (var prefix in _devTexturePrefixes)
                     {
-                        if (line.MatchPrefix(prefix, out token))
+                        if (line.MatchKeyword(prefix, out token))
                         {
                             if (!token.Span.StartsWith("$", StringComparison.Ordinal))
                             {
@@ -414,7 +414,7 @@ public class ShaderParser(
                         }
                     }
                 }
-                else if (line.MatchPrefix("skyparms ", out token))
+                else if (line.MatchKeyword("skyparms", out token))
                 {
                     if (!token.TryReadUpToWhitespace(out token))
                     {
@@ -432,11 +432,11 @@ public class ShaderParser(
                         shader.Resources.Add($"{token}{suffix}".AsMemory());
                     }
                 }
-                else if (line.MatchPrefix("sunshader ", out token))
+                else if (line.MatchKeyword("sunshader", out token))
                 {
                     shader.Shaders.Add(token);
                 }
-                else if (line.MatchPrefix("q3map_surfaceModel ", out token))
+                else if (line.MatchKeyword("q3map_surfaceModel", out token))
                 {
                     if (token.TryReadUpToWhitespace(out token))
                     {
@@ -447,7 +447,7 @@ public class ShaderParser(
                         logger.UnparsableKeyword(asset.FullPath, line.Index, "q3map_surfaceModel", line.Raw);
                     }
                 }
-                else if (!shader.HasLightStyles && line.MatchPrefix("q3map_lightstyle ", out _))
+                else if (!shader.HasLightStyles && line.MatchKeyword("q3map_lightstyle", out _))
                 {
                     shader.HasLightStyles = true;
                 }

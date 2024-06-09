@@ -40,7 +40,7 @@ public sealed class Map : MapAssets, IDisposable
     /// <summary>
     /// Renamable resources (mapscript etc)
     /// </summary>
-    public ConcurrentBag<RenamableResource> RenamableResources { get; } = [];
+    public ConcurrentQueue<RenamableResource> RenamableResources { get; } = [];
 
     public ImmutableArray<DirectoryInfo> AssetDirectories => _assetDirs.Value;
     public ImmutableArray<AssetSource> AssetSources => _assetSrcs.Value;

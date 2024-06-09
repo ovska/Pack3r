@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Pack3r.Extensions;
 using Pack3r.IO;
 
@@ -88,6 +89,24 @@ public static class StringExtensions
 
         token = value[space..].Trim();
         return true;
+    }
+
+    public static bool MatchKeyword(in this Line line, string prefix, out ReadOnlyMemory<char> remainder)
+    {
+        Debug.Assert(line.Value.Span.Trim().SequenceEqual(line.Value.Span), "Line should be trimmed");
+
+        var value = line.Value.Span;
+
+        if (value.Length > prefix.Length &&
+            value.StartsWithF(prefix) &&
+            (value[prefix.Length] is ' ' or '\t'))
+        {
+            remainder = line.Value[(prefix.Length + 1)..].Trim();
+            return true;
+        }
+
+        remainder = default;
+        return false;
     }
 
     public static bool MatchPrefix(in this Line line, string prefix, out ReadOnlyMemory<char> remainder)

@@ -76,7 +76,7 @@ public class ShaderParserTests
             	q3map_shadeangle 46
             	q3map_lightimage textures/pgm/ei/light_blue.tga
             	implicitMap	textures/pgm/abal2.tga
-            }
+            }o
             """);
 
         Assert.Equal("textures/pgm/light_rec_blu_5000", shader.Name.ToString());
@@ -105,6 +105,7 @@ public class ShaderParserTests
         Assert.Equal("textures/common/clipweap_glass", shader.Name.ToString());
         Assert.Empty(shader.Shaders);
         Assert.Empty(shader.Resources);
+        Assert.False(shader.NeededInPk3);
     }
 
     [Fact]
@@ -142,6 +143,15 @@ public class ShaderParserTests
                 "textures/pgm/sky/desert194_up",
             ],
             shader.Resources.AsStrings().Order());
+    }
+
+    [Fact]
+    public async Task Should_Parse_With_Tabs()
+    {
+        var shader = await ParseSingle("textures/mymap/shader\n{\n\t\timplicitMap\t-\n}");
+        Assert.Empty(shader.Resources);
+        Assert.Empty(shader.Shaders);
+        Assert.Equal("textures/mymap/shader", shader.ImplicitMapping?.ToString());
     }
 
     [Fact]

@@ -6,6 +6,32 @@ namespace Pack3r.Tests.ExtensionTests;
 public static class MemoryTests
 {
     [Theory]
+    [InlineData("skyparms -", "skyparms", "-")]
+    [InlineData("skyparms    -", "skyparms", "-")]
+    [InlineData("skyparms\t-", "skyparms", "-")]
+    [InlineData("skyparms\t\t-", "skyparms", "-")]
+    [InlineData("map textures/test", "map", "textures/test")]
+    [InlineData("skyparms -", "map", null)]
+    [InlineData("nopicmip", "nopicmip", null)]
+    [InlineData("nopicmip ", "nopicmip", null)]
+    [InlineData("nopicmip\t\t", "nopicmip", null)]
+    [InlineData("animmap a.tga b.tga c.tga", "animMap", "a.tga b.tga c.tga")]
+    public static void Should_Match_Keyword(string input, string keyword, string? remainder)
+    {
+        var line = new Line("", 1, input, keepRaw: false);
+
+        if (remainder is not null)
+        {
+            Assert.True(line.MatchKeyword(keyword, out var rem));
+            Assert.Equal(remainder, rem.ToString());
+        }
+        else
+        {
+            Assert.False(line.MatchKeyword(keyword, out var rem));
+        }
+    }
+
+    [Theory]
     [InlineData("test arg", "arg")]
     [InlineData(" arg", "arg")]
     public static void Should_Read_Past_Whitespace(string input, string expected)
