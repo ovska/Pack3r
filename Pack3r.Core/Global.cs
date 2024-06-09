@@ -1,4 +1,5 @@
 ﻿using Microsoft.IO;
+using Pack3r.IO;
 using System.Diagnostics;
 
 namespace Pack3r;
@@ -15,4 +16,6 @@ internal static class Global
     });
 
     public static string GetVersion() => typeof(Global).Assembly.GetName().Version?.ToString(3) ?? "?.?.?";
+
+    public static string Disclaimer() => $"// Modified by Pack3r {GetVersion()}";
 }

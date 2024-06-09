@@ -205,13 +205,13 @@ public class ShaderParser(
 
                 if (options.Rename is not null)
                 {
-                    logger.Warn($"Shader '{name}' in '{shader.Asset.Name}' will be modified to account for rename");
+                    logger.Info($"Packed shader '{name}' on line {shader.Line} in '{shader.Asset.Name}' will be modified to account for --rename");
 
                     string convert(string line, int index)
                     {
                         if (index == shader.Line)
                         {
-                            return $"levelshots/{options.Rename}_cc_{type} // Modified by Pack3r {Global.GetVersion()}, was: {line}";
+                            return $"levelshots/{options.Rename}_cc_{type} {Global.Disclaimer()}, was: {line}";
                         }
 
                         return line;

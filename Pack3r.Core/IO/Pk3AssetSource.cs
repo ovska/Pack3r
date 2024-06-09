@@ -10,7 +10,7 @@ namespace Pack3r.IO;
 public sealed class Pk3AssetSource(string path, bool isExcluded, IIntegrityChecker checker) : AssetSource(checker)
 {
     public string ArchivePath => path;
-    public override bool IsExcluded { get; } = isExcluded;
+    public override bool IsExcluded => isExcluded;
     public override string RootPath => ArchivePath;
 
     private readonly ZipArchive _archive = ZipFile.OpenRead(path);

@@ -165,7 +165,7 @@ public class AssetService(
                 {
                     if (line.AsSpan().Trim().EqualsF(lineToReplace))
                     {
-                        return line.Replace(lineToReplace, $"map \"{options.Rename}\"");
+                        return $"{line.Replace(lineToReplace, $"map \"{options.Rename}\"")} {Global.Disclaimer()}";
                     }
 
                     return line;
@@ -174,7 +174,7 @@ public class AssetService(
 
             if (options.Rename is not null)
             {
-                logger.Info($"Name and contents of {arena.Name} will be changed to account for renaming");
+                logger.Info($"Packed {arena.Name} will be modified to account for --rename");
             }
         }
         else
