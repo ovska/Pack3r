@@ -16,7 +16,7 @@ public class SoundscriptParser(
     {
         await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
         {
-            if (line.MatchPrefix("sound ", out var token))
+            if (line.MatchKeyword("sound", out var token))
             {
                 yield return new(token, false, in line);
             }

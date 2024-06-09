@@ -396,8 +396,10 @@ public class ShaderParser(
                 if (found)
                     continue;
 
-                if (line.MatchPrefix("implicit", out token))
+                if (line.Value.StartsWithF("implicit"))
                 {
+                    token = line.Value["implicit".Length..];
+
                     if (!token.TryReadPastWhitespace(out token))
                     {
                         logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{asset.FullPath}'");

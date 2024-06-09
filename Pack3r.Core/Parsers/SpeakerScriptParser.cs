@@ -16,7 +16,7 @@ public class SpeakerScriptParser(
     {
         await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
         {
-            if (line.MatchPrefix("noise ", out var token))
+            if (line.MatchKeyword("noise", out var token))
             {
                 yield return new(token.Trim('"').Trim(), isShader: false, in line);
             }

@@ -109,18 +109,6 @@ public static class StringExtensions
         return false;
     }
 
-    public static bool MatchPrefix(in this Line line, string prefix, out ReadOnlyMemory<char> remainder)
-    {
-        if (line.Value.StartsWithF(prefix.AsSpan()))
-        {
-            remainder = line.Value[prefix.Length..].Trim();
-            return true;
-        }
-
-        remainder = default;
-        return false;
-    }
-
     public static ReadOnlyMemory<char> TrimQuotes(this ReadOnlyMemory<char> token)
     {
         var keySpan = token.Span;
