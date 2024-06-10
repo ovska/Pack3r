@@ -163,7 +163,7 @@ public sealed class Packager(
             }
         }
 
-        if (options.LogLevel >= LogLevel.Info && options.ReferenceDebug)
+        if (options.LogLevel <= LogLevel.Info && options.ReferenceDebug)
         {
             foreach (var file in includedFiles.OrderBy(x => x.ArchivePath, ROMCharComparer.Instance))
             {
