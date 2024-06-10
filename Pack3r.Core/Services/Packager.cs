@@ -380,16 +380,25 @@ public sealed class Packager(
 
         var entry = archive.CreateEntry(resource.ArchivePath);
 
-        DateTime lastWrite = File.GetLastWriteTime(resource.AbsolutePath);
+        // see ZipArchive.CreateEntryFromFile
+        {
+            DateTime lastWrite = File.GetLastWriteTime(resource.AbsolutePath);
 
-        // If file to be archived has an invalid last modified time, use the first datetime representable in the Zip timestamp format
-        // (midnight on January 1, 1980):
-        if (lastWrite.Year < 1980 || lastWrite.Year > 2107)
-            lastWrite = new DateTime(1980, 1, 1, 0, 0, 0);
+            // If file to be archived has an invalid last modified time, use the first datetime representable in the Zip timestamp format
+            // (midnight on January 1, 1980):
+            if (lastWrite.Year < 1980 || lastWrite.Year > 2107)
+                lastWrite = new DateTime(1980, 1, 1, 0, 0, 0);
 
-        entry.LastWriteTime = lastWrite;
+            entry.LastWriteTime = lastWrite;
+        }
 
-        using var reader = new StreamReader(File.OpenRead(resource.AbsolutePath), Encoding.UTF8, leaveOpen: false);
+        using var reader = new StreamReader(
+            File.OpenRead(resource.AbsolutePath),
+            Encoding.UTF8,
+            detectEncodingFromByteOrderMarks: false,
+            bufferSize: 4096,
+            leaveOpen: false);
+
         using var writer = new StreamWriter(entry.Open(), Encoding.UTF8, leaveOpen: false);
 
         string? line;

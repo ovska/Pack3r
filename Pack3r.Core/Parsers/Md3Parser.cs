@@ -19,10 +19,10 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
     {
         using var memoryStream = Global.StreamManager.GetStream(
             tag: "Md3ParseFile",
-            requiredSize: 4096,
+            requiredSize: 1024 * 64,
             asContiguousBuffer: true);
 
-        await using (var fileStream = asset.OpenRead())
+        await using (var fileStream = asset.OpenRead(isAsync: true))
         {
             await fileStream.CopyToAsync(memoryStream, cancellationToken);
         }

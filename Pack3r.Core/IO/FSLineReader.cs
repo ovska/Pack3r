@@ -17,7 +17,7 @@ public class FSLineReader() : ILineReader
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read,
-            bufferSize: path.HasExtension(".map") ? 4096 * 16 : 4096,
+            bufferSize: 4096,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
 
         return ReadLinesCore(path.NormalizePath(), stream, options, cancellationToken);
@@ -25,7 +25,7 @@ public class FSLineReader() : ILineReader
 
     public IAsyncEnumerable<Line> ReadLines(IAsset asset, LineOptions options, CancellationToken cancellationToken)
     {
-        return ReadLinesCore(asset.FullPath, asset.OpenRead(), options, cancellationToken);
+        return ReadLinesCore(asset.FullPath, asset.OpenRead(isAsync: true), options, cancellationToken);
     }
 
     private static async IAsyncEnumerable<Line> ReadLinesCore(

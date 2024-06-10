@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.IO;
+using System.IO.Compression;
 using Pack3r.Extensions;
 using Pack3r.IO;
 
@@ -25,7 +26,7 @@ public interface IAsset
     /// Opens a stream to read the data.
     /// </summary>
     /// <returns></returns>
-    Stream OpenRead();
+    Stream OpenRead(bool isAsync = false);
 
     /// <summary>
     /// Creates a new entry to destination archive.
@@ -41,7 +42,13 @@ public sealed class FileAsset(
     public string FullPath { get; } = file.FullName.NormalizePath();
     public AssetSource Source => source;
 
-    public Stream OpenRead() => file.OpenRead();
+    public Stream OpenRead(bool isAsync = false) => new FileStream(
+        file.FullName,
+        FileMode.Open,
+        FileAccess.Read,
+        FileShare.Read,
+        bufferSize: 4096,
+        isAsync ? (FileOptions.Asynchronous | FileOptions.SequentialScan) : FileOptions.SequentialScan);
 
     public ZipArchiveEntry CreateEntry(ZipArchive archive) => archive.CreateEntryFromFile(FullPath, Name, CompressionLevel.Optimal);
 }
@@ -55,7 +62,7 @@ public sealed class Pk3Asset(
     public string FullPath { get; } = Path.Combine(archivePath, entry.FullName).NormalizePath();
     public AssetSource Source => source;
 
-    public Stream OpenRead() => entry.Open();
+    public Stream OpenRead(bool isAsync = false) => entry.Open();
 
     public ZipArchiveEntry CreateEntry(ZipArchive archive)
     {

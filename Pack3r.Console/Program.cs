@@ -67,11 +67,12 @@ public class Program
                 app.Logger.System($"Running dry run for '{mapName}' without creating a pk3");
             }
 
-            Stream destination;
             var timer = Stopwatch.StartNew();
 
+            Stream destination;
             PackResult result;
 
+            // map keeps read-locks for pk3s it encounters, so keep it alive for at little time as possible
             using (Map map = await app.AssetService.GetPackingData(cancellationToken))
             {
                 if (!options.DryRun)
@@ -81,7 +82,6 @@ public class Program
                 }
                 else
                 {
-                    options.Pk3File = null!;
                     destination = new CountingStream();
                 }
 
@@ -94,15 +94,8 @@ public class Program
             timer.Stop();
 
             app.Logger.Drain();
-
-            if (!options.DryRun)
-            {
-                app.Logger.System($"Packaging finished in {timer.ElapsedMilliseconds} ms, {result}, pk3 size: {result.Size()}");
-            }
-            else
-            {
-                app.Logger.System($"Dry run finished in {timer.ElapsedMilliseconds} ms, {result}, estimated pk3 size: {result.Size()}");
-            }
+            app.Logger.System(
+                $"{(options.DryRun ? "Dry run" : "Packaging")} finished in {timer.ElapsedMilliseconds} ms, {result}, pk3 size: {result.Size()}");
 
             return 0;
         }
