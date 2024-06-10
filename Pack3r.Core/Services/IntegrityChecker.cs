@@ -18,19 +18,22 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
     {
         if (!_jpgs.IsEmpty)
         {
-            string paths = string.Join(Environment.NewLine, _jpgs.Select(p => $"\t{p}"));
-            logger.Warn($"Found potentially progressive JPGs which are unsupported on 2.60b: {Environment.NewLine}{paths}");
+            logger.Warn($"Found potentially progressive JPGs which are unsupported on 2.60b: {Format(_jpgs)}");
         }
 
         if (!_tgas.IsEmpty)
         {
-            string paths = string.Join(Environment.NewLine, _tgas.Select(p => $"\t{p}"));
-            logger.Warn($"Found top-left pixel ordered TGAs which are drawn upside down on 2.60b clients: {Environment.NewLine}{paths}");
+            logger.Warn($"Found top-left pixel ordered TGAs which are drawn upside down on 2.60b clients: {Format(_tgas)}");
         }
 
         foreach (var (path, warning) in _wavs)
         {
             logger.Warn($"File '{path}' {warning}");
+        }
+
+        static string Format(IEnumerable<string> values)
+        {
+            return Environment.NewLine + string.Join(Environment.NewLine, values.Select(p => $"\t{p}"));
         }
     }
 
@@ -38,14 +41,14 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
     private readonly ConcurrentBag<string> _jpgs = [];
     private readonly ConcurrentBag<string> _tgas = [];
 
-    private readonly ConcurrentDictionary<(string, string), object?> _handled = [];
+    private readonly ConcurrentDictionary<string, object?> _handled = [];
 
     public void CheckIntegrity(IAsset asset)
     {
         if (!CanCheckIntegrity(asset.FullPath))
             return;
 
-        if (!_handled.TryAdd((asset.Name, ""), null))
+        if (!_handled.TryAdd(asset.Name, null))
             return;
 
         CheckIntegrityCore(asset);

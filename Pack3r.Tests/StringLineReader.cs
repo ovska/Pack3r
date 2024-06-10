@@ -1,5 +1,4 @@
-﻿using System.IO.Compression;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Pack3r.IO;
 using Pack3r.Models;
 

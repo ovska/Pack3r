@@ -29,12 +29,12 @@ public class IncludedFile
         ArchivePath = resource.ArchivePath.AsMemory();
     }
 
-    public IncludedFile(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null)
+    public IncludedFile(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null, bool devResource = false)
     {
         Source = source;
         SourcePath = Path.Combine(source.RootPath, relativePath.ToString()).NormalizePath().AsMemory();
         ArchivePath = relativePath;
-        SourceOnly = resource.SourceOnly;
+        SourceOnly = resource.SourceOnly || devResource;
         ReferencedIn = resource.Line.Path;
         ReferencedLine = resource.Line.Index is int i and >= 0 ? i : null;
         Shader = shader;

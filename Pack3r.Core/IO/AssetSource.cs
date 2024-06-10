@@ -4,13 +4,12 @@ using System.Runtime.InteropServices;
 using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
-using Pack3r.Services;
 
 namespace Pack3r.IO;
 
 public abstract class AssetSource : IDisposable
 {
-    public abstract bool IsExcluded { get; }
+    public bool IsExcluded { get; }
     public abstract string RootPath { get; }
     public abstract FileInfo? GetShaderlist();
 
@@ -21,50 +20,18 @@ public abstract class AssetSource : IDisposable
     public Dictionary<ReadOnlyMemory<char>, IAsset> Assets => _assetsLazy.Value;
 
     private readonly Lazy<Dictionary<ReadOnlyMemory<char>, IAsset>> _assetsLazy;
-    private readonly IIntegrityChecker _checker;
 
     protected bool _disposed;
 
-    protected AssetSource(IIntegrityChecker checker)
+    protected AssetSource(bool isExcluded)
     {
-        _checker = checker;
+        IsExcluded = isExcluded;
         _assetsLazy = new(InitializeAssets, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public virtual void Dispose()
     {
         _disposed = true;
-    }
-
-    public abstract bool Contains(ReadOnlyMemory<char> relativePath);
-
-    public bool TryHandleAsset(
-        ZipArchive destination,
-        ReadOnlyMemory<char> relativePath,
-        Resource resource,
-        out ZipArchiveEntry? entry)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        if (Assets.TryGetValue(relativePath, out IAsset? asset))
-        {
-            if (IsExcluded)
-            {
-                entry = null;
-            }
-            else
-            {
-                if (!resource.SourceOnly)
-                    _checker.CheckIntegrity(asset);
-
-                entry = asset.CreateEntry(destination);
-            }
-
-            return true;
-        }
-
-        entry = null;
-        return false;
     }
 
     public bool TryRead(

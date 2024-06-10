@@ -1,5 +1,3 @@
-using Pack3r.Extensions;
-using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Parsers;
@@ -8,8 +6,6 @@ namespace Pack3r.Tests;
 
 public class ShaderParserTests
 {
-    private static DirectoryAssetSource Source => new(new DirectoryInfo("~/"), false, new NoopChecker());
-
     private static async Task<Shader> ParseSingle(string data, bool includeDevFiles = false)
     {
         var parser = GetParser(data, includeDevFiles);

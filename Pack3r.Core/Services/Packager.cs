@@ -198,7 +198,7 @@ public sealed class Packager(
 
             foreach (var source in map.AssetSources)
             {
-                if (source.IsExcluded && source.Contains(relativePath))
+                if (source.IsExcluded && source.Assets.ContainsKey(relativePath))
                     return true;
             }
 
@@ -217,7 +217,7 @@ public sealed class Packager(
 
         void AddShaderFile(Shader shader, Resource resource)
         {
-            if (shader.Source is Pk3AssetSource { IsExcluded: true })
+            if (shader.Source.IsExcluded)
                 return;
 
             if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory(), resource, shader))
@@ -230,7 +230,7 @@ public sealed class Packager(
         {
             foreach (var source in map.AssetSources)
             {
-                if (TryAddFileFromSource(source, relativePath, resource, shader))
+                if (TryAddFileFromSource(source, relativePath, resource, shader, devResource))
                     return;
             }
 
@@ -239,38 +239,64 @@ public sealed class Packager(
 
             string sourceOnly = devResource ? " (source file)" : "";
             string lineNo = resource.Line.Index > 0 ? $" line {resource.Line.Index}" : "";
-            string referencedIn = $"(referenced in: '{map.GetRelativeToRoot(resource.Line.Path).NormalizePath()}'{lineNo})";
+            //string shaderref = shader != null ? $" shader '{shader.Name}' line {shader.Line}, in:" : "";
+            const string shaderref = "";
+            string referencedIn = $"(referenced in{shaderref}: '{map.GetRelativeToRoot(resource.Line.Path).NormalizePath()}'{lineNo})";
             OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly} {referencedIn}", devResource);
         }
 
-        bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null)
+        bool TryAddFileFromSource(
+            AssetSource source,
+            ReadOnlyMemory<char> relativePath,
+            Resource resource,
+            Shader? shader = null,
+            bool devResource = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             try
             {
                 ZipArchiveEntry? entry;
+                IAsset? asset = null;
 
                 if (shader is not null &&
                     map.ShaderConvert.Count > 0 &&
                     map.ShaderConvert.TryGetValue(shader.Asset, out var convertList))
                 {
-                    if (!source.Assets.TryGetValue(relativePath, out IAsset? asset))
+                    if (!source.Assets.TryGetValue(relativePath, out asset))
                         return false;
 
                     entry = CreateRenamableShader(archive, asset, convertList, cancellationToken);
                 }
                 else
                 {
-                    if (!source.TryHandleAsset(archive, relativePath, resource, out entry))
+                    if (!source.Assets.TryGetValue(relativePath, out asset))
                         return false;
+
+                    if (source.IsExcluded)
+                    {
+                        // file found from an excluded source
+                        entry = null;
+                    }
+                    else
+                    {
+                        if (!resource.SourceOnly && !devResource)
+                            integrityChecker.CheckIntegrity(asset);
+
+                        entry = asset.CreateEntry(archive);
+                    }
                 }
 
                 handledFiles.Add(relativePath);
 
                 if (entry is not null)
                 {
-                    includedFiles.Add(new IncludedFile(source, relativePath, resource, shader));
+                    includedFiles.Add(new IncludedFile(
+                        source,
+                        asset != null ? asset.Name.AsMemory() : relativePath,
+                        resource,
+                        shader,
+                        devResource));
                 }
 
                 return true;

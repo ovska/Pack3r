@@ -7,20 +7,14 @@ using Pack3r.Services;
 
 namespace Pack3r.IO;
 
-public sealed class Pk3AssetSource(string path, bool isExcluded, IIntegrityChecker checker) : AssetSource(checker)
+public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(isExcluded)
 {
     public string ArchivePath => path;
-    public override bool IsExcluded => isExcluded;
     public override string RootPath => ArchivePath;
 
     private readonly ZipArchive _archive = ZipFile.OpenRead(path);
 
     public override string ToString() => $"{{ Pk3: {ArchivePath} }}";
-
-    public override bool Contains(ReadOnlyMemory<char> relativePath)
-    {
-        return Assets.ContainsKey(relativePath);
-    }
 
     public override async IAsyncEnumerable<Shader> EnumerateShaders(
         IShaderParser parser,

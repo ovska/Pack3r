@@ -12,10 +12,9 @@ public sealed class Map : MapAssets, IDisposable
 {
     private bool _disposed;
 
-    public Map(PackOptions options, IIntegrityChecker integrityChecker)
+    public Map(PackOptions options)
     {
         _options = options;
-        _integrityChecker = integrityChecker;
         _assetDirs = new(() => InitAssetDirectories().ToImmutableArray(), LazyThreadSafetyMode.ExecutionAndPublication);
         _assetSrcs = new(InitAssetSources, LazyThreadSafetyMode.ExecutionAndPublication);
     }
@@ -46,7 +45,6 @@ public sealed class Map : MapAssets, IDisposable
     public ImmutableArray<AssetSource> AssetSources => _assetSrcs.Value;
 
     private readonly PackOptions _options;
-    private readonly IIntegrityChecker _integrityChecker;
     private string? _root;
     private readonly Lazy<ImmutableArray<DirectoryInfo>> _assetDirs;
     private readonly Lazy<ImmutableArray<AssetSource>> _assetSrcs;
@@ -143,7 +141,7 @@ public sealed class Map : MapAssets, IDisposable
                 continue;
             }
 
-            list.Add(new DirectoryAssetSource(dir, isExcluded: dirFilter == SourceFilter.Excluded, _integrityChecker));
+            list.Add(new DirectoryAssetSource(dir, isExcluded: dirFilter == SourceFilter.Excluded));
 
             // pk3s need to be loaded always if there are pk3/dir excludes
             if (_options.LoadPk3s || _options.ExcludeSources.Count > 0)
@@ -161,7 +159,7 @@ public sealed class Map : MapAssets, IDisposable
                         : pk3Filter == SourceFilter.Excluded;
 
                     if (_options.LoadPk3s || pk3isExcluded)
-                        list.Add(new Pk3AssetSource(file.FullName, isExcluded: pk3isExcluded, _integrityChecker));
+                        list.Add(new Pk3AssetSource(file.FullName, isExcluded: pk3isExcluded));
                 }
             }
         }
@@ -175,11 +173,11 @@ public sealed class Map : MapAssets, IDisposable
                 {
                     if (mod.EqualsF(dir.Name))
                     {
-                        //list.Add(new DirectoryAssetSource(dir, isExcluded: true, _integrityChecker));
+                        //list.Add(new DirectoryAssetSource(dir, isExcluded: true));
 
                         foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
                         {
-                            list.Add(new Pk3AssetSource(file.FullName, isExcluded: true, _integrityChecker));
+                            list.Add(new Pk3AssetSource(file.FullName, isExcluded: true));
                         }
 
                         break;

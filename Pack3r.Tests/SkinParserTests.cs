@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Pack3r.Parsers;
+﻿using Pack3r.Parsers;
 
 namespace Pack3r.Tests;
 

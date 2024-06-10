@@ -1,5 +1,4 @@
-﻿using System.IO.Compression;
-using Pack3r.Models;
+﻿using Pack3r.Models;
 using Pack3r.Services;
 
 namespace Pack3r.Tests;
