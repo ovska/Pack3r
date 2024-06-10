@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using Pack3r.Extensions;
 
 namespace Pack3r.IO;
 

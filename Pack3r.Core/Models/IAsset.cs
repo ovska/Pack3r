@@ -1,5 +1,4 @@
-﻿using System.IO;
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using Pack3r.Extensions;
 using Pack3r.IO;
 
