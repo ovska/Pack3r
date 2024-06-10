@@ -322,6 +322,11 @@ public sealed class Packager(
 
             if (!devResource && !options.DryRun && (required || options.RequireAllAssets))
             {
+                if (!required && options.RequireAllAssets)
+                {
+                    handler = $"{handler.ToStringAndClear()} (use --loose to ignore missing files)";
+                }
+
                 logger.Fatal(ref handler);
                 throw new ControlledException();
             }
