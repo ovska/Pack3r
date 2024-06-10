@@ -7,6 +7,12 @@ public interface IProgressMeter : IDisposable
     public void Report(int value);
 }
 
+public sealed class NoOpProgressMeter : IProgressMeter
+{
+    public void Dispose() { }
+    public void Report(int value) { }
+}
+
 public sealed class ConsoleProgressMeter : IProgressMeter
 {
     private readonly string _name;

@@ -5,7 +5,10 @@ public interface IProgressManager
     IProgressMeter Create(string name, int? max);
 }
 
-public sealed class ConsoleProgressManager : IProgressManager
+public sealed class ConsoleProgressManager(PackOptions options) : IProgressManager
 {
-    public IProgressMeter Create(string name, int? max) => new ConsoleProgressMeter(name, max);
+    public IProgressMeter Create(string name, int? max) =>
+        options.LogLevel == Logging.LogLevel.None
+            ? new NoOpProgressMeter()
+            : new ConsoleProgressMeter(name, max);
 }

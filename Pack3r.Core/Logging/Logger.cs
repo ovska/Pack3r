@@ -57,7 +57,7 @@ public sealed class LoggerBase : ILogger
         ref DefaultInterpolatedStringHandler handler,
         string? caller)
     {
-        if (level < _minimumLogLevel)
+        if (level != LogLevel.Fatal && level < _minimumLogLevel)
         {
             return;
         }
@@ -98,8 +98,15 @@ public sealed class LoggerBase : ILogger
         }
     }
 
-    private static void LogInternalNoLock(LogLevel level, string message, string? context)
+    private void LogInternalNoLock(LogLevel level, string message, string? context)
     {
+        if (_minimumLogLevel == LogLevel.None)
+        {
+            Debug.Assert(level is LogLevel.Fatal, $"Invalid None loglevel got through: {level}");
+            Console.Out.WriteLine(message);
+            return;
+        }
+
         var defaultForeground = Console.ForegroundColor;
         var defaultBackground = Console.BackgroundColor;
 
