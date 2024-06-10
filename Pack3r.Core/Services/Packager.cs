@@ -310,7 +310,7 @@ public sealed class Packager(
             }
             else
             {
-                logger.Error($"Failed to pack file '{archivePath}' from path: '{absolutePath}'");
+                logger.Error($"Failed to pack file '{archivePath}' from path: '{absolutePath}' (use Trace verbosity for details)");
             }
 
             return false;
