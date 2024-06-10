@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.IO;
+using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -237,7 +238,9 @@ public sealed class Packager(
                 devResource = true;
 
             string sourceOnly = devResource ? " (source file)" : "";
-            OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly}", devResource);
+            string lineNo = resource.Line.Index > 0 ? $" line {resource.Line.Index}" : "";
+            string referencedIn = $"(referenced in: '{map.GetRelativeToRoot(resource.Line.Path).NormalizePath()}'{lineNo})";
+            OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly} {referencedIn}", devResource);
         }
 
         bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null)
