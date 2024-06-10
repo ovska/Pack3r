@@ -23,7 +23,7 @@ public static class LoggingExtensions
 
         if (isStale)
         {
-            var d = delta.Days;
+            var d = (int)delta.TotalDays;
             var h = delta.Hours;
             logger.Warn($"{type} mismatch with BSP timestamp by {d}d {h}h, ensure some files aren't from an older compile");
         }

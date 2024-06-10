@@ -95,7 +95,7 @@ public class Program
 
             app.Logger.Drain();
             app.Logger.System(
-                $"{(options.DryRun ? "Dry run" : "Packaging")} finished in {timer.ElapsedMilliseconds} ms, {result}, pk3 size: {result.Size()}");
+                $"{(options.DryRun ? "Dry run" : "Packaging")} finished in {timer.Elapsed.TotalSeconds:F1} seconds, {result}, pk3 size: {result.Size()}");
 
             return 0;
         }
