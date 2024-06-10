@@ -10,6 +10,8 @@ namespace Pack3r.Parsers;
 
 public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
 {
+    public string Description => "model";
+
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".md3") || resource.EndsWithF(".mdc");
 
     public async Task<ResourceList?> Parse(

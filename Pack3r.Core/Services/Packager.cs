@@ -233,8 +233,11 @@ public sealed class Packager(
                     return;
             }
 
+            if (options.IncludeSource && resource.SourceOnly)
+                devResource = true;
+
             string sourceOnly = devResource ? " (source file)" : "";
-            OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly}");
+            OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly}", devResource);
         }
 
         bool TryAddFileFromSource(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null)
@@ -332,7 +335,7 @@ public sealed class Packager(
             }
             else
             {
-                logger.Error(ref handler);
+                logger.Log(devResource ? LogLevel.Warn : LogLevel.Error, ref handler);
             }
         }
     }

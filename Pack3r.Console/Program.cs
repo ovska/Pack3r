@@ -25,7 +25,7 @@ public class Program
             .Bind<IReferenceParser>(1).To<AseParser>()
             .Bind<IReferenceParser>(2).To<Md3Parser>()
             .Bind<IReferenceParser>(3).To<SkinParser>()
-            .Bind<IReferenceResourceParser>().To<ReferenceResourceParser>()
+            .Bind<IResourceRefParser>().To<ResourceRefParser>()
             .Bind<IAssetService>().To<AssetService>()
             .Bind<LoggerBase>().To<LoggerBase>()
             .Bind<ILogger<TT>>().To<Logger<TT>>()

@@ -6,6 +6,8 @@ namespace Pack3r.Parsers;
 
 public class SkinParser(ILineReader reader) : IReferenceParser
 {
+    public string Description => "skin";
+
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".skin");
 
     public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)

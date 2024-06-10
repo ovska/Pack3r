@@ -10,6 +10,8 @@ public partial class AseParser(
     ILogger<AseParser> logger,
     ILineReader reader) : IReferenceParser
 {
+    public string Description => "model";
+
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".ase");
 
     public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)

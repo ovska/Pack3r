@@ -16,7 +16,7 @@ internal class FileAsset(string path) : IAsset
         throw new NotImplementedException();
     }
 
-    public Stream OpenRead() => File.OpenRead(FullPath);
+    public Stream OpenRead(bool isAsync = false) => File.OpenRead(FullPath);
 }
 
 internal class MockAsset : IAsset
@@ -30,7 +30,7 @@ internal class MockAsset : IAsset
         throw new NotImplementedException();
     }
 
-    public Stream OpenRead()
+    public Stream OpenRead(bool isAsync = false)
     {
         throw new NotImplementedException();
     }

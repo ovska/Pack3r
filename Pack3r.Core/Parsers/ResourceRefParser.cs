@@ -5,19 +5,19 @@ using Pack3r.Progress;
 
 namespace Pack3r.Parsers;
 
-public interface IReferenceResourceParser
+public interface IResourceRefParser
 {
     Task ParseReferences(
         Map map,
         CancellationToken cancellationToken);
 }
 
-public class ReferenceResourceParser(
+public class ResourceRefParser(
     PackOptions options,
-    ILogger<ReferenceResourceParser> logger,
+    ILogger<ResourceRefParser> logger,
     IReferenceParser[] parsers,
     IProgressManager progressManager)
-    : IReferenceResourceParser
+    : IResourceRefParser
 {
     public async Task ParseReferences(
         Map map,
@@ -58,8 +58,7 @@ public class ReferenceResourceParser(
 
             // if the misc_model is still present, this resource is ONLY a misc_model
             // and we can try to trim the values
-            if (!options.IncludeSource &&
-                map.MiscModels.TryGetValue(resource, out var instances))
+            if (map.MiscModels.TryGetValue(resource, out var instances))
             {
                 foreach (var item in result.ToArray()) // loop over a copy
                 {
@@ -79,6 +78,15 @@ public class ReferenceResourceParser(
                     if (allRemapped)
                     {
                         result.Remove(item);
+
+                        if (options.IncludeSource)
+                        {
+                            result.Add(new Resource(
+                                item.Value,
+                                item.IsShader,
+                                item.Line,
+                                sourceOnly: true));
+                        }
                     }
                 }
             }
@@ -120,7 +128,7 @@ public class ReferenceResourceParser(
             }
         }
 
-        logger.Warn($"File not found in sources: '{resource}'");
+        logger.Warn($"Can't resolve files used by {parser.Description}, file not found: '{resource.Value}'");
         return Task.FromResult(default(ResourceList));
     }
 }

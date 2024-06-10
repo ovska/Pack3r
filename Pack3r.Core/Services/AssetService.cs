@@ -16,7 +16,7 @@ public class AssetService(
     ILogger<AssetService> logger,
     IMapFileParser mapFileParser,
     IResourceParser[] resourceParsers,
-    IReferenceResourceParser referenceParser,
+    IResourceRefParser referenceParser,
     IIntegrityChecker integrityChecker)
     : IAssetService
 {
