@@ -92,11 +92,16 @@ public abstract class AssetSource : IDisposable
 
                 // try to add extensionless asset for textures without shader
                 dict.TryAdd(key.ChangeExtension(""), asset);
+                // TODO: should jpg "upcast" to tga? does not work in 2.60b but does elsewhere
+                // dict.TryAdd(key.ChangeExtension(".tga"), asset);
                 continue;
             }
             else if (texExt == TextureExtension.Tga)
             {
                 dict[key] = asset;
+
+                // add tga since "downcasting" works from tga
+                dict.TryAdd(key.ChangeExtension(".jpg"), asset);
 
                 ref IAsset? entry = ref CollectionsMarshal.GetValueRefOrAddDefault(
                     dict,
@@ -105,7 +110,7 @@ public abstract class AssetSource : IDisposable
 
                 // try to add extensionless asset for textures without shader.
                 // tga should also have priority over same named jpg
-                if (entry is null || entry.FullPath.EqualsF(key.ChangeExtension(".jpg").Span))
+                if (entry is null || entry.Name.EqualsF(key.ChangeExtension(".jpg").Span))
                 {
                     entry = asset;
                 }
