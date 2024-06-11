@@ -1,12 +1,13 @@
-﻿using System.IO.Compression;
+﻿using System.Diagnostics;
+using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
-using Pack3r.Services;
 
 namespace Pack3r.IO;
 
+[DebuggerDisplay("{DebuggerDisplay,nq}")]
 public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(isExcluded)
 {
     public string ArchivePath => path;
@@ -15,6 +16,7 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(i
     private readonly ZipArchive _archive = ZipFile.OpenRead(path);
 
     public override string ToString() => $"{{ Pk3: {ArchivePath} }}";
+    internal string DebuggerDisplay => $"{{ Pk3 src: '{Path.GetFileName(ArchivePath)}' (Excluded: {IsExcluded}) }}";
 
     public override async IAsyncEnumerable<Shader> EnumerateShaders(
         IShaderParser parser,
@@ -26,6 +28,9 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(i
         foreach (var entry in _archive.Entries)
         {
             if (!entry.FullName.HasExtension(".shader") || skipPredicate(entry.FullName))
+                continue;
+
+            if (entry.FullName.Length > Global.MAX_QPATH)
                 continue;
 
             await foreach (var shader in parser.Parse(new Pk3Asset(this, ArchivePath, entry), cancellationToken))
@@ -48,8 +53,7 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(i
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _archive.Entries
-            .Where(entry => Tokens.PackableFile()
-            .IsMatch(entry.FullName.GetExtension()))
+            .Where(entry => entry.FullName.Length < Global.MAX_QPATH && Tokens.PackableFile().IsMatch(entry.FullName.GetExtension()))
             .Select(entry => new Pk3Asset(this, ArchivePath, entry));
     }
 

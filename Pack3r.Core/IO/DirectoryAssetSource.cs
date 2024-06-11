@@ -1,15 +1,18 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Pack3r.Models;
 using Pack3r.Parsers;
 
 namespace Pack3r.IO;
 
+[DebuggerDisplay("{DebuggerDisplay,nq}")]
 public sealed class DirectoryAssetSource(DirectoryInfo directory, bool isExcluded) : AssetSource(isExcluded)
 {
     public DirectoryInfo Directory => directory;
     public override string RootPath => directory.FullName;
 
     public override string ToString() => $"{{ Dir: {Directory.FullName} }}";
+    internal string DebuggerDisplay => $"{{ Dir src: '{Directory.Name}' (Excluded: {IsExcluded}) }}";
 
     public override async IAsyncEnumerable<Shader> EnumerateShaders(
         IShaderParser parser,

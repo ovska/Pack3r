@@ -72,31 +72,19 @@ public abstract class AssetSource : IDisposable
                 // if a jpg path was already added by a tga file, overwrite it
                 dict[key] = asset;
 
+                // add tga since "downcasting" works from tga to jpg
+                dict.TryAdd(key.ChangeExtension(".tga"), asset);
+
                 // try to add extensionless asset for textures without shader
                 dict.TryAdd(key.ChangeExtension(""), asset);
-
-                // TODO: should jpg "upcast" to tga? does not work in 2.60b but does elsewhere
-                // dict.TryAdd(key.ChangeExtension(".tga"), asset);
                 continue;
             }
             else if (texExt == TextureExtension.Tga)
             {
                 dict[key] = asset;
 
-                // add tga since "downcasting" works from tga
-                dict.TryAdd(key.ChangeExtension(".jpg"), asset);
-
-                ref IAsset? entry = ref CollectionsMarshal.GetValueRefOrAddDefault(
-                    dict,
-                    key.ChangeExtension(""),
-                    out _);
-
-                // try to add extensionless asset for textures without shader.
-                // tga should also have priority over same named jpg
-                if (entry is null || entry.Name.EqualsF(key.ChangeExtension(".jpg").Span))
-                {
-                    entry = asset;
-                }
+                // tga takes prio over jpg if there is no texture
+                dict[key.ChangeExtension("")] = asset;
             }
         }
 

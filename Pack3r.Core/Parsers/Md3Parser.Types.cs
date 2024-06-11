@@ -16,7 +16,7 @@ public partial class Md3Parser
         public override readonly string ToString() => Encoding.ASCII.GetString(this);
     }
 
-    [InlineArray(64)]
+    [InlineArray(Global.MAX_QPATH)]
     private struct Q3Name
     {
         public byte _elem0;
