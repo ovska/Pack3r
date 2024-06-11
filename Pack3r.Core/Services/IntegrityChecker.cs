@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using NAudio.Wave;
 using Pack3r.Extensions;
 using Pack3r.Logging;
@@ -36,6 +37,10 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
             return Environment.NewLine + string.Join(Environment.NewLine, values.Select(p => $"\t{p}"));
         }
     }
+
+    public IEnumerable<string> JPGs => _jpgs.AsEnumerable();
+    public IEnumerable<string> TGAs => _tgas.AsEnumerable();
+    public IEnumerable<string> WAVs => _wavs.AsEnumerable().Select(x => x.path);
 
     private readonly ConcurrentQueue<(string path, string warning)> _wavs = [];
     private readonly ConcurrentBag<string> _jpgs = [];
@@ -126,18 +131,17 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
         if (!ms.TryGetBuffer(out ArraySegment<byte> buffer))
             buffer = ms.ToArray();
 
-        ReadOnlySpan<byte> bytes = buffer;
+        ReadOnlySpan<ushort> bytePairs = MemoryMarshal.Cast<byte, ushort>(buffer.AsSpan());
 
         // A progressive DCT-based JPEG can be identified by bytes “0xFF, 0xC2″
         // Also, progressive JPEG images usually contain .. a couple of “Start of Scan” matches (bytes: “0xFF, 0xDA”)
         // source: https://superuser.com/a/1010777
-        ReadOnlySpan<byte> DCTbytes = [0xFF, 0xC2];
-        ReadOnlySpan<byte> SOSbytes = [0xFF, 0xDA];
+        const ushort DCTbytes = 0xFF | (0xC2 << 8);
+        const ushort SOSbytes = 0xFF | (0xDA << 8);
 
-        if (bytes.IndexOf(DCTbytes) >= 0 && bytes.Count(SOSbytes) >= 6)
+        if (bytePairs.IndexOf(DCTbytes) >= 0 && bytePairs.Count(SOSbytes) >= 6)
         {
-            _jpgs.Add(fullPath.NormalizePath());
-            //return "is potentially a progressive JPG, which is not supported on 2.60b clients";
+            _jpgs.Add(fullPath.NormalizePath()/* + ' ' + bytePairs.Count(DCTbytes) + ' ' + bytePairs.Count(SOSbytes)*/);
         }
     }
 

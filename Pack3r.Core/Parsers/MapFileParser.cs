@@ -3,7 +3,6 @@ using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
-using ROMC = System.ReadOnlyMemory<char>;
 
 namespace Pack3r.Parsers;
 
@@ -27,17 +26,17 @@ public class MapFileParser(
         State state = State.None;
         char expect = default;
 
-        Dictionary<ROMC, (ROMC value, Line line)> entitydata = new(ROMCharComparer.Instance);
-        HashSet<ROMC> nonPrefixedShaders = new(ROMCharComparer.Instance);
+        Dictionary<QString, (QString value, Line line)> entitydata = [];
+        HashSet<QString> nonPrefixedShaders = [];
         ResourceList shaders = [];
         ResourceList resources = [];
         ResourceList referenceResources = [];
         Dictionary<Resource, List<ReferenceMiscModel>> miscModels = [];
 
-        ROMC currentEntity = default;
+        QString currentEntity = default;
         bool hasStyleLights = false;
 
-        List<ROMC> unsupTerrains = [];
+        List<QString> unsupTerrains = [];
 
         int lineCount = 0;
         var timer = Stopwatch.StartNew();
@@ -132,7 +131,7 @@ public class MapFileParser(
             if (state == State.BrushDef)
             {
                 int lastParen = line.Raw.LastIndexOf(')');
-                ROMC shaderPart = line.Raw.AsMemory(lastParen + 2);
+                QPath shaderPart = line.Raw.AsMemory(lastParen + 2);
 
                 if (!CanSkip(shaderPart))
                 {
@@ -164,7 +163,7 @@ public class MapFileParser(
                 AddTexture(line.Value);
             }
 
-            void AddTexture(ROMC value)
+            void AddTexture(QPath value)
             {
                 if (nonPrefixedShaders.Add(value))
                     shaders.Add(Resource.Shader($"textures/{value}", in line));
@@ -177,7 +176,7 @@ public class MapFileParser(
             logger.Warn($"Shaders referenced by terrains are not supported, please include manually (on entities: {entities})");
         }
 
-        logger.System($".map file ({lineCount:N0} lines) parsed successfully in {timer.ElapsedMilliseconds} ms");
+        logger.Debug($".map file ({lineCount:N0} lines) parsed successfully in {timer.ElapsedMilliseconds} ms");
 
         return new MapAssets
         {
@@ -248,7 +247,7 @@ public class MapFileParser(
                 else if (key.EqualsF("shader"))
                 {
                     // terrains require some extra trickery
-                    ROMC val = value;
+                    QPath val = value;
                     if (entitydata.ContainsKey("terrain".AsMemory()) &&
                         !value.Span.StartsWithF("textures/"))
                     {
@@ -282,7 +281,7 @@ public class MapFileParser(
 
         bool IsClassName(string className)
         {
-            return entitydata.GetValueOrDefault("classname".AsMemory()).value.EqualsF(className);
+            return entitydata.GetValueOrDefault("classname".AsMemory()).value.Equals(className);
         }
     }
 
@@ -290,7 +289,7 @@ public class MapFileParser(
     /// Whether the shader is one of the most common ones and should be skipped.
     /// </summary>
     /// <param name="shaderPart"><c>pgm/holo 0 0 0</c></param>
-    private static bool CanSkip(ROMC shaderPart)
+    private static bool CanSkip(QPath shaderPart)
     {
         var span = shaderPart.Span;
 

@@ -18,7 +18,7 @@ public class MapscriptParser(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        HashSet<ReadOnlyMemory<char>> unsupported = new(ROMCharComparer.Instance);
+        HashSet<QString> unsupported = [];
 
         await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
         {

@@ -1,4 +1,5 @@
 ﻿using Microsoft.IO;
+using Pack3r.Extensions;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -10,15 +11,24 @@ internal static class Global
     public const int MAX_QPATH = 64;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void EnsureQPathLength(string path)
+    {
+        if (path.Length > MAX_QPATH)
+            ThrowPathTooLong(path);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void EnsureQPathLength(ReadOnlyMemory<char> path)
     {
         if (path.Length > MAX_QPATH)
             ThrowPathTooLong(path);
-
     }
 
     [DoesNotReturn]
-    public static void ThrowPathTooLong(ReadOnlyMemory<char> path) => throw new InvalidDataException($"Path is too long (max 64): {path}");
+    public static void ThrowPathTooLong(string path) => throw new InvalidDataException($"Path is too long (max 64): '{path.NormalizePath()}'");
+
+    [DoesNotReturn]
+    public static void ThrowPathTooLong(ReadOnlyMemory<char> path) => throw new InvalidDataException($"Path is too long (max 64): '{path.ToString().NormalizePath()}'");
 
     public static readonly object ConsoleLock = new();
 

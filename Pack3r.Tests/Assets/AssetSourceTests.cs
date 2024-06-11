@@ -14,21 +14,21 @@ public static class AssetSourceTests
     [Fact]
     public static void Should_Resolve_Textures()
     {
-        ReadOnlyMemory<char> none = "textures/smiley".AsMemory();
-        ReadOnlyMemory<char> jpg = "textures/smiley.jpg".AsMemory();
-        ReadOnlyMemory<char> tga = "textures/smiley.tga".AsMemory();
+        QPath none = "textures/smiley";
+        QPath jpg = "textures/smiley.jpg";
+        QPath tga = "textures/smiley.tga";
 
         var jpgSrc = GetSource("fileprio_jpg");
-        Assert.Equal(2, jpgSrc.Assets.Count);
+        Assert.Equal(3, jpgSrc.Assets.Count);
         AssertHas(jpgSrc, jpg, jpg);
+        AssertHas(jpgSrc, tga, jpg);
         AssertHas(jpgSrc, none, jpg);
-        Assert.DoesNotContain(tga, jpgSrc.Assets); // can't downcast jpg in 2.60b
 
         var tgaSrc = GetSource("fileprio_tga");
-        Assert.Equal(3, tgaSrc.Assets.Count);
+        Assert.Equal(2, tgaSrc.Assets.Count);
         AssertHas(tgaSrc, tga, tga);
-        AssertHas(tgaSrc, jpg, tga);
         AssertHas(tgaSrc, none, tga);
+        Assert.DoesNotContain(jpg, tgaSrc.Assets);
 
         var bothSrc = GetSource("fileprio_both");
         Assert.Equal(3, bothSrc.Assets.Count);
@@ -38,11 +38,11 @@ public static class AssetSourceTests
 
         static void AssertHas(
             AssetSource source,
-            ReadOnlyMemory<char> key,
-            ReadOnlyMemory<char> expected)
+            QPath key,
+            QPath expected)
         {
             Assert.Contains(key, source.Assets);
-            Assert.Equal(expected.ToString(), source.Assets[key].Name);
+            Assert.Equal(expected, source.Assets[key].Name);
         }
     }
 }

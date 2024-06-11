@@ -12,7 +12,7 @@ namespace Pack3r.Parsers;
 
 public interface IShaderParser
 {
-    Task<Dictionary<ReadOnlyMemory<char>, Shader>> GetReferencedShaders(
+    Task<Dictionary<QPath, Shader>> GetReferencedShaders(
         Map map,
         CancellationToken cancellationToken);
 
@@ -28,12 +28,12 @@ public class ShaderParser(
     IProgressManager progressManager)
     : IShaderParser
 {
-    public async Task<Dictionary<ReadOnlyMemory<char>, Shader>> GetReferencedShaders(
+    public async Task<Dictionary<QPath, Shader>> GetReferencedShaders(
         Map map,
         CancellationToken cancellationToken)
     {
-        ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders = new(ROMCharComparer.Instance);
-        ConcurrentDictionary<ReadOnlyMemory<char>, List<Shader>> duplicateShaders = new(ROMCharComparer.Instance);
+        ConcurrentDictionary<QPath, Shader> allShaders = [];
+        ConcurrentDictionary<QPath, List<Shader>> duplicateShaders = [];
 
         var whitelistsBySource = await ParseShaderLists(map, cancellationToken);
         int shaderFileCount = 0;
@@ -125,11 +125,11 @@ public class ShaderParser(
 
         logger.Debug($"Parsed total of {allShaders.Count} shaders");
 
-        Dictionary<ReadOnlyMemory<char>, Shader> included = new(ROMCharComparer.Instance);
+        Dictionary<QPath, Shader> included = [];
 
         AddShaders(
             map,
-            map.Shaders.Select(r => r.Value),
+            map.Shaders.Select(r => (QPath)r.Value),
             allShaders,
             duplicateShaders,
             included,
@@ -148,10 +148,10 @@ public class ShaderParser(
 
     private void AddShaders(
         Map map,
-        IEnumerable<ReadOnlyMemory<char>> shaders,
-        ConcurrentDictionary<ReadOnlyMemory<char>, Shader> allShaders,
-        ConcurrentDictionary<ReadOnlyMemory<char>, List<Shader>> duplicateShaders,
-        Dictionary<ReadOnlyMemory<char>, Shader> included,
+        IEnumerable<QPath> shaders,
+        ConcurrentDictionary<QPath, Shader> allShaders,
+        ConcurrentDictionary<QPath, List<Shader>> duplicateShaders,
+        Dictionary<QPath, Shader> included,
         int depth,
         CancellationToken cancellationToken)
     {
@@ -274,7 +274,7 @@ public class ShaderParser(
 
             if (state == State.None)
             {
-                ReadOnlyMemory<char> shaderName = line.Value;
+                QPath shaderName = line.Value;
 
                 State next = State.AfterShaderName;
 
@@ -282,7 +282,7 @@ public class ShaderParser(
                 // textures/mymap/ice {
                 if (shaderName.Span[^1] == '{')
                 {
-                    shaderName = shaderName[..^1];
+                    shaderName = shaderName.Value[..^1].TrimEnd();
                     next = State.Shader;
                 }
 
@@ -485,14 +485,14 @@ public class ShaderParser(
         return false;
     }
 
-    private async Task<Dictionary<AssetSource, HashSet<ReadOnlyMemory<char>>>> ParseShaderLists(
+    private async Task<Dictionary<AssetSource, HashSet<QPath>>> ParseShaderLists(
         Map map,
         CancellationToken cancellationToken)
     {
         if (!options.UseShaderlist)
             return [];
 
-        var dict = new Dictionary<AssetSource, HashSet<ReadOnlyMemory<char>>>();
+        var dict = new Dictionary<AssetSource, HashSet<QPath>>();
 
         foreach (var source in map.AssetSources)
         {
@@ -509,7 +509,7 @@ public class ShaderParser(
                     continue;
                 }
 
-                HashSet<ReadOnlyMemory<char>> allowedFiles = new(ROMCharComparer.Instance);
+                HashSet<QPath> allowedFiles = [];
 
                 await foreach (var line in reader.ReadLines(shaderlist.FullName, default, cancellationToken))
                 {

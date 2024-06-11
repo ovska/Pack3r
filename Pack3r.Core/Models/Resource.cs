@@ -21,20 +21,19 @@ public sealed class Resource : IEquatable<Resource>
         bool isShader,
         string filePath) => new(value, isShader, new Line(filePath, -1, "", true));
 
-    public ReadOnlyMemory<char> Value { get; }
+    public QString Value { get; }
     public bool IsShader { get; }
     public Line Line { get; }
     public bool SourceOnly { get; }
 
     public bool Equals(Resource? other)
     {
-        return IsShader == other?.IsShader
-            && ROMCharComparer.Instance.Equals(Value, other.Value);
+        return IsShader == other?.IsShader && Value.Equals(other.Value);
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(IsShader, ROMCharComparer.Instance.GetHashCode(Value));
+        return HashCode.Combine(IsShader, Value);
     }
 
     public override bool Equals(object? obj)
@@ -47,7 +46,7 @@ public sealed class Resource : IEquatable<Resource>
     /// <param name="Value">Path to the resource</param>
     /// <param name="IsShader">Whether the path is to a shader and not a file</param>
     public Resource(
-        ReadOnlyMemory<char> value,
+        QString value,
         bool isShader,
         in Line line,
         bool sourceOnly = false)
