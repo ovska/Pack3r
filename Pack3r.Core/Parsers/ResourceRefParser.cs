@@ -23,19 +23,8 @@ public class ResourceRefParser(
         Map map,
         CancellationToken cancellationToken)
     {
-        // remove all misc_models that are referenced elsewhere, as all their assets are 100% needed in that case
-/*        if (map.MiscModels.Count > 0)
-        {
-            foreach (var res in map.ReferenceResources.Concat(map.Resources))
-            {
-                if (map.MiscModels.Remove(res) && map.MiscModels.Count == 0)
-                    break;
-            }
-        }*/
-
-        // TODO: fix remapped textures on misc_models not showing as source-only textures
-
         int counter = 0;
+        
         using var progress = progressManager.Create(
             "Parsing md3, ase and skin files for assets",
             map.ReferenceResources.Count + map.MiscModels.Count);
@@ -51,7 +40,7 @@ public class ResourceRefParser(
 
             ResourceList? result = await TryParse(map, resource, cancellationToken);
 
-            if (result is null)
+            if (result is not { Count: > 0 })
             {
                 continue;
             }
@@ -67,7 +56,7 @@ public class ResourceRefParser(
                     foreach (ReferenceMiscModel instance in instances)
                     {
                         if (!instance.Remaps.TryGetValue(item.Value, out var remap) ||
-                            item.Value.EqualsF(remap.Span))
+                            item.Value.Equals(remap))
                         {
                             allRemapped = false;
                             break;
@@ -91,6 +80,8 @@ public class ResourceRefParser(
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             foreach (var item in result)
             {
                 (item.IsShader ? map.Shaders : map.Resources).Add(item);
@@ -103,6 +94,9 @@ public class ResourceRefParser(
         Resource resource,
         CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return Task.FromCanceled<ResourceList?>(cancellationToken);
+
         IReferenceParser? parser = null;
 
         foreach (var item in parsers)

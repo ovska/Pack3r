@@ -48,8 +48,8 @@ public sealed class Packager(
         archive.Comment = $"Created with Pack3r {Global.GetVersion()}";
 
         // contains both actual and alternate files added
-        HashSet<ReadOnlyMemory<char>> handledFiles = new(ROMCharComparer.Instance);
-        HashSet<ReadOnlyMemory<char>> handledShaders = new(ROMCharComparer.Instance);
+        HashSet<QPath> handledFiles = [];
+        HashSet<QPath> handledShaders = [];
         List<IncludedFile> includedFiles = [];
 
         RenamableResource[] renamable = [.. map.RenamableResources];
@@ -94,10 +94,10 @@ public sealed class Packager(
             {
                 progress.Report(count++);
 
-                var shaderName = shaderResource.Value;
+                QPath shaderName = shaderResource.Value;
 
                 // hack
-                if (shaderName.EqualsF("noshader"))
+                if (shaderName.Equals("noshader"))
                     continue;
 
                 // already handled
@@ -166,7 +166,7 @@ public sealed class Packager(
 
         if (options.LogLevel <= LogLevel.Info && options.ReferenceDebug)
         {
-            foreach (var file in includedFiles.OrderBy(x => x.ArchivePath, ROMCharComparer.Instance))
+            foreach (var file in includedFiles.OrderBy(x => x.ArchivePath))
             {
                 var lineref = file.ReferencedLine != null ? $" line {file.ReferencedLine}" : "";
                 var shaderref = file.Shader != null
@@ -186,12 +186,12 @@ public sealed class Packager(
 
         integrityChecker.Log();
 
-        // end
-        logger.Info($"{includedFiles.Count} files included in pk3");
+        return new PackResult(
+            Packed: includedFiles.Count,
+            Missing: missingFiles,
+            Bytes: destination.Position);
 
-        return new PackResult(Packed: includedFiles.Count, Missing: missingFiles, Bytes: destination.Position);
-
-        bool IsHandledOrExcluded(ReadOnlyMemory<char> relativePath)
+        bool IsHandledOrExcluded(QPath relativePath)
         {
             if (handledFiles.Contains(relativePath))
                 return true;
@@ -226,7 +226,7 @@ public sealed class Packager(
             OnFailedAddFile(false, $"Shader file '{shader.GetAbsolutePath()}' not found");
         }
 
-        void AddFileRelative(ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null, bool devResource = false)
+        void AddFileRelative(QPath relativePath, Resource resource, Shader? shader = null, bool devResource = false)
         {
             foreach (var source in map.AssetSources)
             {
@@ -247,7 +247,7 @@ public sealed class Packager(
 
         bool TryAddFileFromSource(
             AssetSource source,
-            ReadOnlyMemory<char> relativePath,
+            QPath relativePath,
             Resource resource,
             Shader? shader = null,
             bool devResource = false)

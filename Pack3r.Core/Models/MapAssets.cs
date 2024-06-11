@@ -32,22 +32,21 @@ public class MapAssets
 
 public sealed class ReferenceMiscModel
 {
-    public ReadOnlyMemory<char> Model { get; }
-    public Dictionary<ReadOnlyMemory<char>, ReadOnlyMemory<char>> Remaps { get; }
+    public QPath Model { get; }
+    public Dictionary<QPath, QPath> Remaps { get; }
 
     public ReferenceMiscModel(
-        ReadOnlyMemory<char> model,
-        IEnumerable<(ReadOnlyMemory<char>, ReadOnlyMemory<char>)> entitydata)
+        QPath model,
+        IEnumerable<(QString key, QString value)> entitydata)
     {
         Model = model;
-
-        Remaps = new(ROMCharComparer.Instance);
+        Remaps = [];
 
         Span<Range> ranges = stackalloc Range[16];
 
         foreach (var (key, value) in entitydata)
         {
-            if (!key.StartsWithF("_remap"))
+            if (!key.Span.StartsWithF("_remap"))
             {
                 continue;
             }

@@ -5,7 +5,7 @@ namespace Pack3r.Models;
 
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
 public sealed class Shader(
-    ReadOnlyMemory<char> name,
+    QPath name,
     IAsset asset,
     int line)
     : IEquatable<Shader>
@@ -16,16 +16,16 @@ public sealed class Shader(
 
     public IAsset Asset { get; } = asset;
 
-    public ReadOnlyMemory<char> Name { get; } = name;
+    public QPath Name { get; } = name;
 
     /// <summary>References to textures, models, videos etc</summary>
-    public List<ReadOnlyMemory<char>> Resources { get; } = [];
+    public List<QPath> Resources { get; } = [];
 
     /// <summary>References to editorimages, lightimages etc</summary>
-    public List<ReadOnlyMemory<char>> DevResources { get; } = [];
+    public List<QPath> DevResources { get; } = [];
 
     /// <summary>References to other shaders</summary>
-    public List<ReadOnlyMemory<char>> Shaders { get; } = [];
+    public List<QPath> Shaders { get; } = [];
 
     /// <summary>Shader generates stylelights</summary>
     public bool HasLightStyles { get; set; }
@@ -42,7 +42,7 @@ public sealed class Shader(
     /// <summary>
     /// Shader name used to resolve the texture used, texture name with or without extension.
     /// </summary>
-    public ReadOnlyMemory<char>? ImplicitMapping { get; set; }
+    public QPath? ImplicitMapping { get; set; }
 
     public bool Equals(Shader? other)
     {

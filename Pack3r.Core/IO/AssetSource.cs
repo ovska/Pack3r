@@ -1,5 +1,4 @@
-﻿using System.Runtime.InteropServices;
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
 
@@ -27,8 +26,8 @@ public abstract class AssetSource : IDisposable
     public string Name => _name ??= Path.GetFileName(RootPath);
     private string? _name;
 
-    public Dictionary<ReadOnlyMemory<char>, IAsset> Assets => _assetsLazy.Value;
-    private readonly Lazy<Dictionary<ReadOnlyMemory<char>, IAsset>> _assetsLazy;
+    public Dictionary<QString, IAsset> Assets => _assetsLazy.Value;
+    private readonly Lazy<Dictionary<QString, IAsset>> _assetsLazy;
 
     protected bool _disposed;
 
@@ -53,13 +52,13 @@ public abstract class AssetSource : IDisposable
         return HashCode.Combine(GetType(), RootPath);
     }
 
-    private Dictionary<ReadOnlyMemory<char>, IAsset> InitializeAssets()
+    private Dictionary<QString, IAsset> InitializeAssets()
     {
-        Dictionary<ReadOnlyMemory<char>, IAsset> dict = new(ROMCharComparer.Instance);
+        Dictionary<QString, IAsset> dict = [];
 
         foreach (var asset in EnumerateAssets())
         {
-            ReadOnlyMemory<char> key = asset.Name.AsMemory();
+            QString key = asset.Name;
 
             var texExt = asset.FullPath.GetTextureExtension();
 
@@ -73,10 +72,10 @@ public abstract class AssetSource : IDisposable
                 dict[key] = asset;
 
                 // add tga since "downcasting" works from tga to jpg
-                dict.TryAdd(key.ChangeExtension(".tga"), asset);
+                dict.TryAdd(key.Value.ChangeExtension(".tga"), asset);
 
                 // try to add extensionless asset for textures without shader
-                dict.TryAdd(key.ChangeExtension(""), asset);
+                dict.TryAdd(key.Value.ChangeExtension(""), asset);
                 continue;
             }
             else if (texExt == TextureExtension.Tga)
@@ -84,7 +83,7 @@ public abstract class AssetSource : IDisposable
                 dict[key] = asset;
 
                 // tga takes prio over jpg if there is no texture
-                dict[key.ChangeExtension("")] = asset;
+                dict[key.Value.ChangeExtension("")] = asset;
             }
         }
 

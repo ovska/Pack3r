@@ -16,4 +16,9 @@ public static class TestExtensions
     {
         return items.Select(i => i.ToString());
     }
+
+    public static IEnumerable<string> AsStrings(this List<QPath> items)
+    {
+        return items.Select(i => i.ToString());
+    }
 }

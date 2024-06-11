@@ -94,8 +94,13 @@ public class Program
             timer.Stop();
 
             app.Logger.Drain();
+
+            string op = options.DryRun ? "Dry run" : "Packaging";
+            string output = !options.DryRun
+                    ? $" to '{options.Pk3File.FullName}'"
+                    : "";
             app.Logger.System(
-                $"{(options.DryRun ? "Dry run" : "Packaging")} finished in {timer.Elapsed.TotalSeconds:F1} seconds, {result}, pk3 size: {result.Size()}");
+                $"{op} finished in {timer.Elapsed.TotalSeconds:F1} seconds, {result}, pk3 size: {result.Size()}{output}");
 
             return 0;
         }
