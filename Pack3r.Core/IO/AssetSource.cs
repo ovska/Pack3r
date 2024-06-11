@@ -1,6 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.IO.Compression;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Pack3r.Extensions;
 using Pack3r.Models;
 using Pack3r.Parsers;
@@ -9,16 +7,27 @@ namespace Pack3r.IO;
 
 public abstract class AssetSource : IDisposable
 {
-    public bool IsExcluded { get; }
     public abstract string RootPath { get; }
     public abstract FileInfo? GetShaderlist();
+    public abstract IAsyncEnumerable<Shader> EnumerateShaders(
+        IShaderParser parser,
+        Func<string, bool> skipPredicate,
+        CancellationToken cancellationToken);
 
+    protected abstract IEnumerable<IAsset> EnumerateAssets();
+
+    /// <summary>
+    /// Whether this source is used to discover files, but never pack them (pak0, mod files etc).
+    /// </summary>
+    public bool IsExcluded { get; }
+
+    /// <summary>
+    /// Display name (folder/pk3 name).
+    /// </summary>
     public string Name => _name ??= Path.GetFileName(RootPath);
-
     private string? _name;
 
     public Dictionary<ReadOnlyMemory<char>, IAsset> Assets => _assetsLazy.Value;
-
     private readonly Lazy<Dictionary<ReadOnlyMemory<char>, IAsset>> _assetsLazy;
 
     protected bool _disposed;
@@ -34,28 +43,6 @@ public abstract class AssetSource : IDisposable
         _disposed = true;
     }
 
-    public bool TryRead(
-       ReadOnlyMemory<char> resourcePath,
-       ILineReader reader,
-       LineOptions options,
-       CancellationToken cancellationToken,
-       [NotNullWhen(true)] out IAsyncEnumerable<Line>? lines)
-    {
-        if (Assets.TryGetValue(resourcePath, out IAsset? asset))
-        {
-            lines = reader.ReadLines(asset, options, cancellationToken);
-            return true;
-        }
-
-        lines = null;
-        return false;
-    }
-
-    public abstract IAsyncEnumerable<Shader> EnumerateShaders(
-        IShaderParser parser,
-        Func<string, bool> skipPredicate,
-        CancellationToken cancellationToken);
-
     public override bool Equals(object? obj)
     {
         return obj?.GetType() == GetType() && RootPath.EqualsF((obj as AssetSource)?.RootPath);
@@ -65,8 +52,6 @@ public abstract class AssetSource : IDisposable
     {
         return HashCode.Combine(GetType(), RootPath);
     }
-
-    protected abstract IEnumerable<IAsset> EnumerateAssets();
 
     private Dictionary<ReadOnlyMemory<char>, IAsset> InitializeAssets()
     {
@@ -87,11 +72,9 @@ public abstract class AssetSource : IDisposable
                 // if a jpg path was already added by a tga file, overwrite it
                 dict[key] = asset;
 
-                // add tga since "downcasting" works from tga
-                dict.TryAdd(key.ChangeExtension(".tga"), asset);
-
                 // try to add extensionless asset for textures without shader
                 dict.TryAdd(key.ChangeExtension(""), asset);
+
                 // TODO: should jpg "upcast" to tga? does not work in 2.60b but does elsewhere
                 // dict.TryAdd(key.ChangeExtension(".tga"), asset);
                 continue;
