@@ -10,14 +10,14 @@ public class IncludedFile
     public AssetSource? Source { get; }
     public Shader? Shader { get; }
     public ReadOnlyMemory<char> SourcePath { get; init; }
-    public ReadOnlyMemory<char> ArchivePath { get; init; }
+    public QPath ArchivePath { get; init; }
     public bool SourceOnly { get; init; }
     public string? ReferencedIn { get; init; }
     public int? ReferencedLine { get; init; }
 
     public IncludedFile(
         ReadOnlyMemory<char> sourcePath,
-        ReadOnlyMemory<char> archivePath)
+        QPath archivePath)
     {
         SourcePath = sourcePath;
         ArchivePath = archivePath;
