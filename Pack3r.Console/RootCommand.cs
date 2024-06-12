@@ -46,7 +46,7 @@ public class RootCommand
     public bool Source { get; set; }
 
     [CliOption(
-        Description = "Only read shaders present in shaderlist.txt",
+        Description = "Only read shaders present in shaderlist.txt if one exists",
         Aliases = ["-sl"])]
     public bool Shaderlist { get; set; }
 
@@ -83,7 +83,7 @@ public class RootCommand
     public List<string> Exclude { get; set; } = ["pak0.pk3", "pak0.pk3dir"];
 
     [CliOption(
-        Description = "Adds pk3s in these mod folders to exclude-list",
+        Description = "Adds all pk3s in mod directories to exclude-list",
         Arity = CliArgumentArity.ZeroOrMore,
         ValidationRules = CliValidationRules.LegalPath,
         AllowMultipleArgumentsPerToken = true)]

@@ -496,16 +496,16 @@ public class ShaderParser(
 
         foreach (var source in map.AssetSources)
         {
-            var shaderlist = source.GetShaderlist();
+            var shaderlistAsset = source.GetShaderlist();
 
-            if (shaderlist is not { Exists: true })
+            if (shaderlistAsset is null)
                 continue;
 
             try
             {
                 HashSet<QString> allowedFiles = [];
 
-                await foreach (var line in reader.ReadLines(shaderlist.FullName, default, cancellationToken))
+                await foreach (var line in reader.ReadLines(shaderlistAsset, default, cancellationToken))
                 {
                     allowedFiles.Add(line.Value);
                 }
@@ -514,7 +514,7 @@ public class ShaderParser(
             }
             catch (Exception e)
             {
-                logger.Exception(e, $"Could not read shaderlist '{shaderlist.FullName}'");
+                logger.Exception(e, $"Could not read shaderlist '{shaderlistAsset.FullPath}'");
                 throw new ControlledException();
             }
         }

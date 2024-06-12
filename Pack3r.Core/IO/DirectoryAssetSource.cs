@@ -42,8 +42,10 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, bool isExclude
             .Select(f => new FileAsset(this, f));
     }
 
-    public override FileInfo? GetShaderlist()
+    public override IAsset? GetShaderlist()
     {
-        return new FileInfo(Path.Combine(Directory.FullName, "scripts", "shaderlist.txt"));
+        return new FileAsset(
+            this,
+            new FileInfo(Path.Combine(Directory.FullName, "scripts", "shaderlist.txt")));
     }
 }

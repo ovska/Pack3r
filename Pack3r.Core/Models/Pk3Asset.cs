@@ -8,11 +8,10 @@ namespace Pack3r.Models;
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
 public sealed class Pk3Asset(
     Pk3AssetSource source,
-    string archivePath,
     ZipArchiveEntry entry) : IAsset
 {
     public string Name { get; } = entry.FullName.NormalizePath();
-    public string FullPath { get; } = Path.Combine(archivePath, entry.FullName).NormalizePath();
+    public string FullPath { get; } = Path.Combine(source.ArchivePath, entry.FullName).NormalizePath();
     public AssetSource Source => source;
 
     public Stream OpenRead(bool isAsync = false) => entry.Open();
