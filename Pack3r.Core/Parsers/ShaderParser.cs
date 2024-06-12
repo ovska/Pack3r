@@ -40,7 +40,7 @@ public class ShaderParser(
 
         using (var progress = progressManager.Create("Parsing shader files", max: null))
         {
-            await Parallel.ForEachAsync(map.AssetSources, cancellationToken, async (source, ct) =>
+            await Parallel.ForEachAsync(map.AssetSources, Global.ParallelOptions(cancellationToken), async (source, ct) =>
             {
                 var whitelist = whitelistsBySource.GetValueOrDefault(source);
 

@@ -188,7 +188,7 @@ public class AssetService(
         // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
         ConcurrentDictionary<Resource, object?> referencedResources = [];
 
-        await Parallel.ForEachAsync(resourceParsers, cancellationToken, async (parser, ct) =>
+        await Parallel.ForEachAsync(resourceParsers, Global.ParallelOptions(cancellationToken), async (parser, ct) =>
         {
             string path = parser.GetPath(map);
 
