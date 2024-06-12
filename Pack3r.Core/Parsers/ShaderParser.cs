@@ -52,7 +52,7 @@ public class ShaderParser(
 
                     if (whitelist is not null &&
                         !fileName.StartsWithF("levelshots") &&
-                        !whitelist.Contains(fileName.AsMemory()))
+                        !whitelist.Contains(fileName))
                     {
                         if (options.ShaderDebug)
                             logger.Debug($"Skipped parsing shaders from {getName()} (not in shaderlist)");
@@ -274,7 +274,7 @@ public class ShaderParser(
 
             if (state == State.None)
             {
-                QPath shaderName = line.Value;
+                ReadOnlyMemory<char> shaderName = line.Value;
 
                 State next = State.AfterShaderName;
 
@@ -282,7 +282,7 @@ public class ShaderParser(
                 // textures/mymap/ice {
                 if (shaderName.Span[^1] == '{')
                 {
-                    shaderName = shaderName.Value[..^1].TrimEnd();
+                    shaderName = shaderName[..^1].TrimEnd();
                     next = State.Shader;
                 }
 
@@ -485,31 +485,25 @@ public class ShaderParser(
         return false;
     }
 
-    private async Task<Dictionary<AssetSource, HashSet<QPath>>> ParseShaderLists(
+    private async Task<Dictionary<AssetSource, HashSet<QString>>> ParseShaderLists(
         Map map,
         CancellationToken cancellationToken)
     {
         if (!options.UseShaderlist)
             return [];
 
-        var dict = new Dictionary<AssetSource, HashSet<QPath>>();
+        var dict = new Dictionary<AssetSource, HashSet<QString>>();
 
         foreach (var source in map.AssetSources)
         {
             var shaderlist = source.GetShaderlist();
 
-            if (shaderlist is null)
+            if (shaderlist is not { Exists: true })
                 continue;
 
             try
             {
-                if (!shaderlist.Exists)
-                {
-                    logger.Debug($"Shaderlist skipped, does not exist in {shaderlist.FullName}");
-                    continue;
-                }
-
-                HashSet<QPath> allowedFiles = [];
+                HashSet<QString> allowedFiles = [];
 
                 await foreach (var line in reader.ReadLines(shaderlist.FullName, default, cancellationToken))
                 {
