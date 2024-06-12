@@ -47,7 +47,7 @@ public class Program
     {
         using var composition = new Composition(options);
 
-        var app = composition.Application;
+        App app = composition.Application;
         CancellationToken cancellationToken = app.Lifetime.CancellationToken;
         bool fileCreated = false;
 
@@ -60,7 +60,11 @@ public class Program
                 if (options.Rename != null)
                     mapName += "' as '" + options.Rename;
 
-                app.Logger.System($"Packaging '{mapName}' to '{options.Pk3File.FullName}'");
+                string force = options.Overwrite && options.Pk3File.Exists
+                    ? " (overwriting existing file)"
+                    : "";
+
+                app.Logger.System($"Packaging '{mapName}' to '{options.Pk3File.FullName}'{force}");
             }
             else
             {
