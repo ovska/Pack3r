@@ -7,7 +7,7 @@ namespace Pack3r.IO;
 public abstract class AssetSource : IDisposable
 {
     public abstract string RootPath { get; }
-    public abstract FileInfo? GetShaderlist();
+    public abstract IAsset? GetShaderlist();
     public abstract IAsyncEnumerable<Shader> EnumerateShaders(
         IShaderParser parser,
         Func<string, bool> skipPredicate,

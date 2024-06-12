@@ -33,7 +33,7 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(i
             if (entry.FullName.Length > Global.MAX_QPATH)
                 continue;
 
-            await foreach (var shader in parser.Parse(new Pk3Asset(this, ArchivePath, entry), cancellationToken))
+            await foreach (var shader in parser.Parse(new Pk3Asset(this, entry), cancellationToken))
             {
                 yield return shader;
             }
@@ -54,11 +54,22 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(i
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _archive.Entries
             .Where(entry => entry.FullName.Length < Global.MAX_QPATH && Tokens.PackableFile().IsMatch(entry.FullName.GetExtension()))
-            .Select(entry => new Pk3Asset(this, ArchivePath, entry));
+            .Select(entry => new Pk3Asset(this, entry));
     }
 
-    public override FileInfo? GetShaderlist()
+    public override IAsset? GetShaderlist()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        ZipArchiveEntry? entry =
+            _archive.GetEntry("scripts/shaderlist.txt") ??
+            _archive.GetEntry("scripts\\shaderlist.txt");
+
+        if (entry is not null)
+        {
+            return new Pk3Asset(this, entry);
+        }
+
         return null;
     }
 }
