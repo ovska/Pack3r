@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r.Models;
@@ -33,11 +34,7 @@ public sealed class Shader(
     /// <summary>Shader includes references to any files needed in pk3</summary>
     public bool NeededInPk3 => Resources.Count > 0 || Shaders.Count > 0 || ImplicitMapping.HasValue;
 
-    public string GetAbsolutePath()
-    {
-        var path = Path.Combine(Source.RootPath, DestinationPath);
-        return OperatingSystem.IsWindows() ? path.Replace('\\', '/') : path;
-    }
+    public string GetAbsolutePath() => Path.Combine(Source.RootPath, DestinationPath).NormalizePath();
 
     /// <summary>
     /// Shader name used to resolve the texture used, texture name with or without extension.
