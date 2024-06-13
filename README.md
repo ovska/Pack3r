@@ -38,7 +38,7 @@
 - `-e, --exclude` Never pack files found in these pk3s or directories [default: pak0.pk3|pak0.pk3dir]
 - `-m --mods` Adds pk3s in these mod folders to exclude-list
 - `-?, -h, --help` Show help and usage information
-- `-v, --version` Show version information
+- `--version` Show version information
 
 Example:
 
