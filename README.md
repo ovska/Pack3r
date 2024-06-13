@@ -40,13 +40,7 @@
 - `-?, -h, --help` Show help and usage information
 - `--version` Show version information
 
-Example:
-
-```bash
-.\Pack3r.exe 'C:\Temp\ET\map\ET\etmain\maps\sungilarity.map' --o 'C:\Temp\test.pk3'
-.\Pack3r.exe 'C:\Temp\ET\map\ET\etmain\maps\sungilarity.map' --dryrun --includepk3
-.\Pack3r.exe 'C:\Temp\ET\map\ET\etmain\maps\sungilarity.map' --output 'C:\releases\' --rename sungilarity_b1 --mods etjump --verbosity debug_
-```
+See below for examples.
 
 ## Limitations
 - Usable only through CLI, no GUI application is planned
@@ -66,3 +60,40 @@ BSP, lightmaps, mapscript, speakerscript, soundscript, etc. are always assumed t
 Map is `etmain/void.pk3dir/maps/void_b1.map`, the priority is:
   `pak0.pk3` -> `etmain/void.pk3dir/` -> `etmain/` -> any pk3 files in etmain
 Mapscript must be in `etmain/void.pk3dir/maps/` in this case and not directly in etmain
+
+## Example usage
+
+### Pack a release-ready mymap.pk3 to etmain
+```bash
+.\Pack3r 'C:\ET\etmain\maps\mymap.map'
+```
+
+### Pack a release-ready beta release mymap_b1_.pk3 to etmain
+```bash
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' -r mymap_b1
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' --rename mymap_b1
+```
+
+### See if there are missing files, and how large pk3 would be created
+```bash
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' -d
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' --dryrun
+```
+
+### Figure out what files were included and why (without creating pk3)
+```bash
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' -d -rd -v info
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' --dryrun --referencedebug --verbosity info
+```
+
+### Share map source with someone else
+You can optionally delete bsp and lightmaps from the zip after packing to reduce file size
+```bash
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' -s -l -o 'C:\mymap_source.zip'
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' --source --loose --output 'C:\mymap_source.zip'
+```
+
+### Pack a map while ignoring some pk3s in etmain and including others
+```bash
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' --includepk3 --ignore skies_MASTER.pk3
+```
