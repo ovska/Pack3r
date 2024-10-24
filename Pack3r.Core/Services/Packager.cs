@@ -100,44 +100,54 @@ public sealed class Packager(
                 if (shaderName.Equals("noshader"))
                     continue;
 
-                // already handled
-                if (!handledShaders.Add(shaderName))
-                    continue;
+                HandleShaderRecursive(shaderName);
 
-                if (!shadersByName.TryGetValue(shaderName, out Shader? shader))
+                void HandleShaderRecursive(QPath shaderName)
                 {
-                    // might just be a texture without a shader
-                    AddFileRelative(shaderName, shaderResource);
-                    continue;
-                }
+                    // already handled
+                    if (!handledShaders.Add(shaderName))
+                        return;
 
-                styleLights = styleLights || shader.HasLightStyles;
+                    if (!shadersByName.TryGetValue(shaderName, out Shader? shader))
+                    {
+                        // might just be a texture without a shader
+                        AddFileRelative(shaderName, shaderResource);
+                        return;
+                    }
 
-                if (!shader.NeededInPk3)
-                    continue;
+                    styleLights = styleLights || shader.HasLightStyles;
 
-                if (!handledFiles.Contains(shader.DestinationPath.AsMemory()))
-                    AddShaderFile(shader, shaderResource);
+                    if (!shader.NeededInPk3)
+                        return;
 
-                if (shader.ImplicitMapping is { } implicitMapping)
-                {
-                    AddFileRelative(implicitMapping, shaderResource, shader);
-                }
+                    if (!handledFiles.Contains(shader.DestinationPath.AsMemory()))
+                        AddShaderFile(shader, shaderResource);
 
-                foreach (var file in shader.Resources)
-                {
-                    if (IsHandledOrExcluded(file))
-                        continue;
+                    if (shader.ImplicitMapping is { } implicitMapping)
+                    {
+                        AddFileRelative(implicitMapping, shaderResource, shader);
+                    }
 
-                    AddFileRelative(file, shaderResource, shader);
-                }
+                    foreach (var file in shader.Resources)
+                    {
+                        if (IsHandledOrExcluded(file))
+                            continue;
 
-                foreach (var file in shader.DevResources)
-                {
-                    if (IsHandledOrExcluded(file))
-                        continue;
+                        AddFileRelative(file, shaderResource, shader);
+                    }
 
-                    AddFileRelative(file, shaderResource, shader, devResource: true);
+                    foreach (var file in shader.DevResources)
+                    {
+                        if (IsHandledOrExcluded(file))
+                            continue;
+
+                        AddFileRelative(file, shaderResource, shader, devResource: true);
+                    }
+
+                    foreach (var inner in shader.Shaders)
+                    {
+                        HandleShaderRecursive(inner);
+                    }
                 }
             }
         }
