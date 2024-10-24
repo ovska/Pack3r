@@ -89,13 +89,12 @@ public class ResourceRefParser(
         }
     }
 
-    private Task<ResourceList?> TryParse(
+    private async Task<ResourceList?> TryParse(
         Map map,
         Resource resource,
         CancellationToken cancellationToken)
     {
-        if (cancellationToken.IsCancellationRequested)
-            return Task.FromCanceled<ResourceList?>(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         IReferenceParser? parser = null;
 
@@ -111,18 +110,18 @@ public class ResourceRefParser(
         if (parser is null)
         {
             logger.Warn($"Unsupported reference resource type: {resource}");
-            return Task.FromResult(default(ResourceList));
+            return null;
         }
 
         foreach (var source in map.AssetSources)
         {
             if (source.Assets.TryGetValue(resource.Value, out IAsset? asset))
             {
-                return parser.Parse(asset, cancellationToken);
+                return await parser.Parse(asset, cancellationToken);
             }
         }
 
         logger.Warn($"Can't resolve files used by {parser.Description}, file not found: '{resource.Value}'");
-        return Task.FromResult(default(ResourceList));
+        return null;
     }
 }
