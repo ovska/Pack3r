@@ -91,7 +91,7 @@ public sealed class LoggerBase : ILogger
 
         lock (Global.ConsoleLock)
         {
-            foreach (var message in messages)
+            foreach (ref var message in messages)
             {
                 LogInternalNoLock(message.Level, message.Message, message.Context);
             }
