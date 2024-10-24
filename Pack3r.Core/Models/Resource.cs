@@ -51,6 +51,9 @@ public sealed class Resource : IEquatable<Resource>
         in Line line,
         bool sourceOnly = false)
     {
+        if (isShader)
+            value = value.TrimTextureExtension();
+
         Global.EnsureQPathLength(value);
         Value = value;
         IsShader = isShader;

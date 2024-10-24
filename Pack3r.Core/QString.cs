@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Runtime.CompilerServices;
+using Pack3r.Extensions;
 
 namespace Pack3r;
 
@@ -51,6 +52,12 @@ public readonly struct QString : IEquatable<QString>, IComparable<QString>, IEqu
     public override string ToString() => Value.ToString();
 
     public bool Equals(string? other) => other.AsSpan().Equals(Span, StringComparison.OrdinalIgnoreCase);
+
+    public QString TrimTextureExtension() => Value.Span.GetTextureExtension() switch
+    {
+        TextureExtension.Tga or TextureExtension.Jpg => new QString(Value[..^4]),
+        _ => this,
+    };
 
     public static bool operator ==(QString left, QString right) => left.Equals(right);
     public static bool operator !=(QString left, QString right) => !(left == right);
