@@ -64,7 +64,8 @@ public abstract class AssetSource : IDisposable
 
             if (texExt == TextureExtension.Other)
             {
-                dict.Add(key, asset);
+                dict[key] = asset; // overwrite if same file is here multiple times
+                // TODO: pick the lowercase one? or check edit timestamp and pick newest?
             }
             else if (texExt == TextureExtension.Jpg)
             {
