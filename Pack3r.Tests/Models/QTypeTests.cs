@@ -43,4 +43,14 @@ public static class QTypeTests
         Assert.Equal(-1, new QPath("asd").CompareTo("ASD"));
         Assert.Equal(-1, new QString("asd").CompareTo("ASD"));
     }
+
+    [Theory]
+    [InlineData("textures/nakki/tex", "textures/nakki/tex")]
+    [InlineData("textures/nakki/tex.md3", "textures/nakki/tex.md3")]
+    [InlineData("textures/nakki/tex.jpg", "textures/nakki/tex")]
+    [InlineData("textures/nakki/tex.tga", "textures/nakki/tex")]
+    public static void QString_Should_Trim_Extension(string actual, string expected)
+    {
+        Assert.Equal(expected, new QString(actual).TrimTextureExtension().ToString());
+    }
 }
