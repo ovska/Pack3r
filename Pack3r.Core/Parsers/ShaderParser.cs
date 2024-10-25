@@ -208,20 +208,18 @@ public class ShaderParser(
                 {
                     logger.Info($"Packed shader '{name}' on line {shader.Line} in '{shader.Asset.Name}' will be modified to account for --rename");
 
-                    string convert(string line, int index)
-                    {
-                        if (index == shader.Line)
-                        {
-                            return $"levelshots/{options.Rename}_cc_{type} {Global.Disclaimer()}, was: {line}";
-                        }
-
-                        return line;
-                    }
-
                     if (!map.ShaderConvert.TryGetValue(shader.Asset, out var list))
                         map.ShaderConvert[shader.Asset] = list = [];
 
-                    list.Add(convert);
+                    list.Add((string line, int index) =>
+                    {
+                        if (index == shader.Line)
+                        {
+                            return $"levelshots/{options.Rename}_cc_{type} {Global.Disclaimer}, was: {line}";
+                        }
+
+                        return line;
+                    });
                 }
             }
         }

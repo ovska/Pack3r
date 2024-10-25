@@ -18,7 +18,7 @@ public sealed class Resource : IEquatable<Resource>
     public static Resource FromModel(ReadOnlyMemory<char> value, string filePath)
         => new(value, isShader: true, new Line(filePath, -1, "", true));
 
-    public QString Value { get; }
+    public QString Value { get; } // should this be a QPath ?
     public bool IsShader { get; }
     public Line Line { get; }
     public bool SourceOnly { get; }
