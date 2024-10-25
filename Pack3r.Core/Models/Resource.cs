@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r.Models;
@@ -16,10 +15,8 @@ public sealed class Resource : IEquatable<Resource>
     public static Resource File(string value, in Line line) => new(value.AsMemory(), false, in line);
     public static Resource File(ReadOnlyMemory<char> value, in Line line) => new(value, false, in line);
 
-    public static Resource FromModel(
-        ReadOnlyMemory<char> value,
-        bool isShader,
-        string filePath) => new(value, isShader, new Line(filePath, -1, "", true));
+    public static Resource FromModel(ReadOnlyMemory<char> value, string filePath)
+        => new(value, isShader: true, new Line(filePath, -1, "", true));
 
     public QString Value { get; }
     public bool IsShader { get; }

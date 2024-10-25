@@ -48,7 +48,7 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
         [NotNullWhen(true)] out ResourceList? resources,
         [NotNullWhen(false)] out string? error)
     {
-        return Path.GetExtension(fileName).Equals(".mdc", StringComparison.OrdinalIgnoreCase)
+        return fileName.GetExtension().Equals(".mdc", StringComparison.OrdinalIgnoreCase)
             ? Impl<MdcHeader, MdcSurface>(fileName, bytes, out resources, out error)
             : Impl<Md3Header, Md3Surface>(fileName, bytes, out resources, out error);
     }
@@ -109,8 +109,7 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
                 {
                     if (!string.IsNullOrEmpty(shaderName))
                     {
-                        bool isShader = shaderName.GetExtension().IsEmpty;
-                        resources.Add(Resource.FromModel(shaderName.Replace('\\', '/').AsMemory(), isShader, path));
+                        resources.Add(Resource.FromModel(shaderName.AsMemory(), path));
                     }
                 }
                 else
