@@ -44,6 +44,12 @@ public sealed class Map : MapAssets, IDisposable
     public ImmutableArray<DirectoryInfo> AssetDirectories => _assetDirs.Value;
     public ImmutableArray<AssetSource> AssetSources => _assetSrcs.Value;
 
+    public DirectoryAssetSource GetMapRootAssets()
+    {
+        DirectoryInfo root = new(GetMapRoot());
+        return AssetSources.OfType<DirectoryAssetSource>().Single(src => src.Directory.FullName == root.FullName);
+    }
+
     private readonly PackOptions _options;
     private string? _root;
     private readonly Lazy<ImmutableArray<DirectoryInfo>> _assetDirs;

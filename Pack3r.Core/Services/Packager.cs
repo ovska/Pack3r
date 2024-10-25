@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Diagnostics;
+using System.IO;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -166,7 +167,15 @@ public sealed class Packager(
                     $"Stylelight shader ({styleShader.Name})",
                     new FileInfo(Path.ChangeExtension(map.Path, "bsp")),
                     styleShader);
-                AddCompileFile(styleShader.FullName);
+
+                if (string.IsNullOrEmpty(options.Rename))
+                {
+                    AddCompileFile(styleShader.FullName);
+                }
+                else
+                {
+                    AddRenamedStylelightShader(archive, styleShader, map, options.Rename, cancellationToken);
+                }
             }
             else
             {
@@ -455,5 +464,31 @@ public sealed class Packager(
             cancellationToken.ThrowIfCancellationRequested();
             writer.WriteLine(resource.Convert(line, options));
         }
+    }
+
+    private static void AddRenamedStylelightShader(
+        ZipArchive archive,
+        FileInfo stylelightShaderFile,
+        Map map,
+        string rename,
+        CancellationToken cancellationToken)
+    {
+        string needle = $"\t\tmap maps/{map.Name}/lm_";
+        string replacement = $"\t\tmap maps/{rename}/lm_";
+        CreateRenamableShader(
+            archive,
+            new FileAsset(map.GetMapRootAssets(), stylelightShaderFile),
+            [
+                (string line, int _) =>
+                {
+                    if (line.StartsWith(needle))
+                    {
+                        return line.Replace(needle, replacement) + " " + Global.Disclaimer();
+                    }
+
+                    return line;
+                }
+            ],
+            cancellationToken);
     }
 }
