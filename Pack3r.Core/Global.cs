@@ -41,7 +41,7 @@ internal static class Global
 
     public static string GetVersion() => typeof(Global).Assembly.GetName().Version?.ToString(3) ?? "?.?.?";
 
-    public static string Disclaimer() => $"// Modified by Pack3r {GetVersion()}";
+    public static string Disclaimer { get; } = $"// Modified by Pack3r {GetVersion()}";
 
     public static ParallelOptions ParallelOptions(CancellationToken cancellationToken)
     {
