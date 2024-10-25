@@ -42,11 +42,11 @@ public static class Md3ParserTests
         var result = await parser.Parse(new FileAsset(path), default);
 
         Assert.NotNull(result);
-        Assert.All(result, s => Assert.False(s.IsShader));
+        Assert.All(result, s => Assert.True(s.IsShader));
         Assert.Equal(
         [
-            "models/mapobjects/furniture/chairmetal.tga",
-            "models/mapobjects/furniture/sherman_s.tga",
+            "models/mapobjects/furniture/chairmetal",
+            "models/mapobjects/furniture/sherman_s",
         ], result!.Select(s => s.Value.ToString()));
     }
 }
