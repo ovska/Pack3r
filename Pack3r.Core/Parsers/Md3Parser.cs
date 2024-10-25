@@ -109,7 +109,7 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
                 {
                     if (!string.IsNullOrEmpty(shaderName))
                     {
-                        resources.Add(Resource.FromModel(shaderName.AsMemory(), path));
+                        resources.Add(Resource.FromModel(shaderName, path));
                     }
                 }
                 else
