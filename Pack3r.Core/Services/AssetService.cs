@@ -137,7 +137,7 @@ public class AssetService(
                 {
                     if (line.AsSpan().Trim().EqualsF(lineToReplace))
                     {
-                        return $"{line.Replace(lineToReplace, $"map \"{options.Rename}\"")} {Global.Disclaimer()}";
+                        return $"{line.Replace(lineToReplace, $"map \"{options.Rename}\"")} {Global.Disclaimer}";
                     }
 
                     return line;

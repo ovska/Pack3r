@@ -285,7 +285,7 @@ public sealed class Packager(
                     if (!source.Assets.TryGetValue(relativePath, out asset))
                         return false;
 
-                    entry = CreateRenamableShader(archive, asset, convertList, cancellationToken);
+                    entry = CreateRenamableShader(archive, asset, renamedName: null, convertList, cancellationToken);
                 }
                 else
                 {
@@ -391,10 +391,11 @@ public sealed class Packager(
     private static ZipArchiveEntry CreateRenamableShader(
         ZipArchive archive,
         IAsset asset,
+        string? renamedName,
         List<Func<string, int, string>> convertList,
         CancellationToken cancellationToken)
     {
-        ZipArchiveEntry entry = archive.CreateEntry(asset.Name, CompressionLevel.Optimal);
+        ZipArchiveEntry entry = archive.CreateEntry(renamedName ?? asset.Name, CompressionLevel.Optimal);
 
         using var reader = new StreamReader(asset.OpenRead(), Encoding.UTF8);
         using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
@@ -478,12 +479,13 @@ public sealed class Packager(
         CreateRenamableShader(
             archive,
             new FileAsset(map.GetMapRootAssets(), stylelightShaderFile),
+            renamedName: $"scripts/q3map2_{rename}.shader",
             [
                 (string line, int _) =>
                 {
                     if (line.StartsWith(needle))
                     {
-                        return line.Replace(needle, replacement) + " " + Global.Disclaimer();
+                        return line.Replace(needle, replacement) + " " + Global.Disclaimer;
                     }
 
                     return line;
