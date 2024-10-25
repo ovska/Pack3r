@@ -285,6 +285,9 @@ public sealed class Packager(
                     if (!source.Assets.TryGetValue(relativePath, out asset))
                         return false;
 
+                    if (!shader.Asset.Name.EqualsF(relativePath))
+                        convertList = [];
+
                     entry = CreateRenamableShader(archive, asset, renamedName: null, convertList, cancellationToken);
                 }
                 else
@@ -395,7 +398,17 @@ public sealed class Packager(
         List<Func<string, int, string>> convertList,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         ZipArchiveEntry entry = archive.CreateEntry(renamedName ?? asset.Name, CompressionLevel.Optimal);
+
+        if (convertList.Count == 0)
+        {
+            using var input = asset.OpenRead();
+            using var output = entry.Open();
+            input.CopyTo(output);
+            return entry;
+        }
 
         using var reader = new StreamReader(asset.OpenRead(), Encoding.UTF8);
         using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
