@@ -19,6 +19,10 @@
     "unsung": {
       "commandName": "Project",
       "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\unsung.map\" -d -m etjump_stable"
+    },
+    "noargs": {
+      "commandName": "Project",
+      "commandLineArgs": ""
     }
   }
 }

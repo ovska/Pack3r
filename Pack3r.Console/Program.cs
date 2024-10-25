@@ -40,7 +40,17 @@ public class Program
 
     public static Task<int> Main(string[] args)
     {
-        return Cli.RunAsync<RootCommand>(args.Length == 0 ? AskArgs() : args);
+        if (args.Length == 0)
+        {
+            if (AskArgs() is not { } valid)
+            {
+                return Task.FromResult(-1);
+            }
+
+            args = valid;
+        }
+
+        return Cli.RunAsync<RootCommand>(args);
     }
 
     public static async Task<int> Execute(PackOptions options)
@@ -127,8 +137,18 @@ public class Program
         }
     }
 
-    private static string[] AskArgs()
+    private static string[]? AskArgs()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            if (OpenFileDialog.OpenFile(out string file) && !string.IsNullOrEmpty(file))
+            {
+                return [file];
+            }
+
+            return null;
+        }
+
         System.Console.WriteLine($"Pack3r {typeof(PackOptions).Assembly.GetName().Version?.ToString(3)}");
         System.Console.WriteLine("For more options, run Pack3r through the command line");
         System.Console.WriteLine("Enter path to .map file:");
