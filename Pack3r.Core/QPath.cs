@@ -23,11 +23,7 @@ public readonly struct QPath : IEquatable<QPath>, IComparable<QPath>, IEquatable
     public QPath(string path)
     {
         Global.EnsureQPathLength(path);
-
-        if (path.Contains('\\'))
-            path = path.Replace('\\', '/');
-
-        Value = path.AsMemory();
+        Value = path.Replace('\\', '/').AsMemory();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

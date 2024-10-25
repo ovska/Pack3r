@@ -30,10 +30,10 @@ public class AssetService(
         {
             { Name: "etmain" } => mapsParent,
             { Parent: { Name: "etmain" } pk3dirParent } when mapsParent.Name.HasExtension(".pk3dir") => pk3dirParent,
-            _ => throw new EnvironmentException($"maps-directory should be in etmain or a pk3dir in etmain: '{options.MapFile.FullName}'"),
+            _ => throw new EnvironmentException($"maps-directory should be in etmain or etmain/*.pk3dir: '{options.MapFile.FullName}'"),
         };
 
-        MapAssets assets = await mapFileParser.ParseMapAssets(options.MapFile.FullName, cancellationToken).ConfigureAwait(false);
+        MapAssets assets = await mapFileParser.ParseMapAssets(options.MapFile.FullName, cancellationToken);
 
         Map map = new(options)
         {

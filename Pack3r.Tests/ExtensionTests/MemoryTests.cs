@@ -27,7 +27,7 @@ public static class MemoryTests
         }
         else
         {
-            Assert.False(line.MatchKeyword(keyword, out var rem));
+            Assert.False(line.MatchKeyword(keyword, out _));
         }
     }
 

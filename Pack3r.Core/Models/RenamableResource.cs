@@ -1,7 +1,9 @@
-﻿using Pack3r.Extensions;
+﻿using System.Diagnostics;
+using Pack3r.Extensions;
 
 namespace Pack3r.Models;
 
+[DebuggerDisplay("{DebuggerDisplay,nq}")]
 public sealed class RenamableResource
 {
     public required string? Name { get; set; }
@@ -22,4 +24,6 @@ public sealed class RenamableResource
     private string _archivePath = "";
 
     public Func<string, PackOptions, string>? Convert { get; init; }
+
+    internal string DebuggerDisplay => $"{{ RenamableResource '{Name}': {ArchivePath} (convert: {Convert is not null}) }}";
 }
