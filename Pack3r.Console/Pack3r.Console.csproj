@@ -12,6 +12,7 @@
     <Product>Pack3r</Product>
     <PackageProjectUrl>https://github.com/ovska/Pack3r</PackageProjectUrl>
     <PackageId>Pack3r</PackageId>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
