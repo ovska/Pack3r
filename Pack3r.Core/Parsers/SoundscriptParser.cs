@@ -10,6 +10,8 @@ public class SoundscriptParser(
 {
     public string Description => "soundscript";
 
+    public bool SearchModDirectories => false;
+
     public async IAsyncEnumerable<Resource> Parse(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)

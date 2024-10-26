@@ -14,6 +14,8 @@ public class MapscriptParser(
 {
     public string Description => "mapscript";
 
+    public bool SearchModDirectories => false;
+
     public async IAsyncEnumerable<Resource> Parse(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)
