@@ -8,5 +8,8 @@ public interface IResourceParser
 
     IAsyncEnumerable<Resource> Parse(string path, CancellationToken cancellationToken);
 
-    string GetPath(Map map, string? rename = null);
+    /// <summary>
+    /// Returns the archive path of the resource, e.g. <c>maps/mapName.script</c>
+    /// </summary>
+    string GetRelativePath(string mapName);
 }

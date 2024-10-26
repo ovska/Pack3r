@@ -23,12 +23,8 @@ public class SoundscriptParser(
         }
     }
 
-    public string GetPath(Map map, string? rename = null)
+    public string GetRelativePath(string mapName)
     {
-        return Path.Combine(
-            map.GetMapRoot(),
-            "sound",
-            "scripts",
-            $"{rename ?? map.Name}.sounds");
+        return Path.Combine("sound", "scripts", $"{mapName}.sounds");
     }
 }
