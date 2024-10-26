@@ -15,12 +15,11 @@ public sealed class Resource : IEquatable<Resource>
     public static Resource File(string value, in Line line) => new(value.AsMemory(), false, in line);
     public static Resource File(ReadOnlyMemory<char> value, in Line line) => new(value, false, in line);
 
-    public static Resource FromModel(QPath value, string filePath)
-        => new(value, isShader: true, new Line(filePath, -1, "", true));
+    public static Resource FromModel(QPath value, IResourceSource source) => new(value, source);
 
     public QString Value { get; } // should this be a QPath ?
     public bool IsShader { get; }
-    public Line Line { get; }
+    public IResourceSource Source { get; }
     public bool SourceOnly { get; }
 
     public bool Equals(Resource? other)
@@ -40,12 +39,17 @@ public sealed class Resource : IEquatable<Resource>
 
     internal string DebuggerDisplay => $"{{ Resource: {Value} ({(IsShader ? "shader" : "file")}) }}";
 
+    public Resource(QString value, bool isShader, in Line line, bool sourceOnly = false)
+        : this(value, isShader, (IResourceSource)line, sourceOnly)
+    {
+
+    }
     /// <param name="Value">Path to the resource</param>
     /// <param name="IsShader">Whether the path is to a shader and not a file</param>
     public Resource(
         QString value,
         bool isShader,
-        in Line line,
+        IResourceSource source,
         bool sourceOnly = false)
     {
         if (isShader)
@@ -54,8 +58,16 @@ public sealed class Resource : IEquatable<Resource>
         Global.EnsureQPathLength(value);
         Value = value;
         IsShader = isShader;
-        Line = line;
+        Source = source;
         SourceOnly = sourceOnly;
+    }
+
+    private Resource(QString value, IResourceSource source)
+    {
+        Global.EnsureQPathLength(value);
+        Value = value.TrimTextureExtension();
+        IsShader = true;
+        Source = source;
     }
 }
 

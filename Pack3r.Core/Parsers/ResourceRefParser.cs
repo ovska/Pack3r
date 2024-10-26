@@ -73,7 +73,7 @@ public class ResourceRefParser(
                             result.Add(new Resource(
                                 item.Value,
                                 item.IsShader,
-                                item.Line,
+                                item.Source,
                                 sourceOnly: true));
                         }
                     }
