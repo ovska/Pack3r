@@ -78,8 +78,8 @@ public class MapscriptParser(
         return false;
     }
 
-    public string GetPath(Map map, string? rename = null)
+    public string GetRelativePath(string mapName)
     {
-        return Path.Combine(map.GetMapRoot(), "maps", $"{rename ?? map.Name}.script");
+        return Path.Combine("maps", $"{mapName}.script");
     }
 }

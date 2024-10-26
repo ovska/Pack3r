@@ -185,27 +185,47 @@ public class AssetService(
 
     private async Task ParseResources(Map map, CancellationToken cancellationToken)
     {
+        List<string> resourceDirectories = [map.ETMain.FullName];
+
+        if (options.ModFolders.Count > 0 && map.ETMain.Parent?.FullName is { } etInstallFolder)
+        {
+            resourceDirectories.AddRange(options.ModFolders.Select(mod => Path.Combine(etInstallFolder, mod)));
+        }
+
         // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
         ConcurrentDictionary<Resource, object?> referencedResources = [];
 
         await Parallel.ForEachAsync(resourceParsers, Global.ParallelOptions(cancellationToken), async (parser, ct) =>
         {
-            string path = parser.GetPath(map);
+            string relativePath = parser.GetRelativePath(map.Name);
+            List<FileInfo> foundFiles = resourceDirectories
+                .Select(dir => new FileInfo(Path.Combine(dir, relativePath)))
+                .Where(file => file.Exists)
+                .OrderByDescending(file => file.LastWriteTime)
+                .ToList();
 
-            if (!File.Exists(path))
+            if (foundFiles.Count == 0)
             {
-                logger.Debug($"Skipped {parser.Description}, file '{path}' not found");
+                logger.Debug($"Skipped {parser.Description}, file '{relativePath}' not found in {resourceDirectories.Count} folder(s)");
                 return;
+            }
+
+            string absolutePath = foundFiles[0].FullName.NormalizePath();
+
+            if (foundFiles.Count > 1)
+            {
+                logger.Warn(
+                    $"File '{relativePath.NormalizePath()}' found in multiple folders, picking the newest: '{absolutePath}'");
             }
 
             map.RenamableResources.Enqueue(new()
             {
                 Name = parser.Description,
-                AbsolutePath = path,
-                ArchivePath = map.GetRelativeToRoot(parser.GetPath(map, options.Rename))
+                AbsolutePath = absolutePath,
+                ArchivePath = parser.GetRelativePath(options.Rename ?? map.Name),
             });
 
-            await foreach (var resource in parser.Parse(path, ct).ConfigureAwait(false))
+            await foreach (var resource in parser.Parse(absolutePath, ct).ConfigureAwait(false))
             {
                 referencedResources.TryAdd(resource, null);
             }
