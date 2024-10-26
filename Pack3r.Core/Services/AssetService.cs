@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.IO;
 using Pack3r.Extensions;
 using Pack3r.Logging;
 using Pack3r.Models;
@@ -165,7 +166,7 @@ public class AssetService(
         {
             map.RenamableResources.Enqueue(new()
             {
-                Name = null,
+                Name = "levelshot image",
                 AbsolutePath = levelshot.FullName,
                 ArchivePath = Path.Combine(
                     "levelshots",
@@ -178,6 +179,20 @@ public class AssetService(
                 $"Levelshot skipped, file not found in '{Path.GetFileNameWithoutExtension(levelshot.FullName.AsSpan())}.tga/.jpg'");
         }
 
+        if (FindFileFromMods(map, Path.Combine("maps", $"{map.Name}_tracemap.tga")) is { Exists: true } tracemap)
+        {
+            map.RenamableResources.Enqueue(new()
+            {
+                Name = "tracemap",
+                AbsolutePath = tracemap.FullName,
+                ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}_tracemap.tga")
+            });
+        }
+        else
+        {
+            logger.Trace($"Tracemap skipped, not found in any directory.");
+        }
+
         await ParseResources(map, cancellationToken);
 
         return map;
@@ -185,47 +200,32 @@ public class AssetService(
 
     private async Task ParseResources(Map map, CancellationToken cancellationToken)
     {
-        List<string> resourceDirectories = [map.ETMain.FullName];
-
-        if (options.ModFolders.Count > 0 && map.ETMain.Parent?.FullName is { } etInstallFolder)
-        {
-            resourceDirectories.AddRange(options.ModFolders.Select(mod => Path.Combine(etInstallFolder, mod)));
-        }
-
         // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
         ConcurrentDictionary<Resource, object?> referencedResources = [];
 
         await Parallel.ForEachAsync(resourceParsers, Global.ParallelOptions(cancellationToken), async (parser, ct) =>
         {
             string relativePath = parser.GetRelativePath(map.Name);
-            List<FileInfo> foundFiles = resourceDirectories
-                .Select(dir => new FileInfo(Path.Combine(dir, relativePath)))
-                .Where(file => file.Exists)
-                .OrderByDescending(file => file.LastWriteTime)
-                .ToList();
+            FileInfo? file = parser.SearchModDirectories
+                ? FindFileFromMods(map, relativePath)
+                : new FileInfo(Path.Combine(map.GetMapRoot(), relativePath));
 
-            if (foundFiles.Count == 0)
+            if (file is not { Exists: true })
             {
-                logger.Debug($"Skipped {parser.Description}, file '{relativePath}' not found in {resourceDirectories.Count} folder(s)");
+                logger.Log(
+                    options.ReferenceDebug ? LogLevel.Warn : LogLevel.Debug,
+                    $"Skipped {parser.Description}, file '{relativePath}' not found{(parser.SearchModDirectories ? " in any sources" : "")}");
                 return;
-            }
-
-            string absolutePath = foundFiles[0].FullName.NormalizePath();
-
-            if (foundFiles.Count > 1)
-            {
-                logger.Warn(
-                    $"File '{relativePath.NormalizePath()}' found in multiple folders, picking the newest: '{absolutePath}'");
             }
 
             map.RenamableResources.Enqueue(new()
             {
                 Name = parser.Description,
-                AbsolutePath = absolutePath,
+                AbsolutePath = file.FullName,
                 ArchivePath = parser.GetRelativePath(options.Rename ?? map.Name),
             });
 
-            await foreach (var resource in parser.Parse(absolutePath, ct).ConfigureAwait(false))
+            await foreach (var resource in parser.Parse(file.FullName, ct).ConfigureAwait(false))
             {
                 referencedResources.TryAdd(resource, null);
             }
@@ -237,6 +237,44 @@ public class AssetService(
         }
 
         await referenceParser.ParseReferences(map, cancellationToken);
+    }
+
+    private FileInfo? FindFileFromMods(Map map, string relativePath)
+    {
+        var files = EnumerateFolders()
+            .Select(dir => new FileInfo(Path.Combine(dir, relativePath)))
+            .Where(file => file.Exists)
+            .ToList();
+
+        if (files.Count == 0)
+        {
+            return null;
+        }
+
+        if (files.Count > 1)
+        {
+            logger.Debug($"File '{relativePath.NormalizePath()}' found in multiple folders, picking the newest: '{files[0].FullName}'");
+        }
+
+        return files[0];
+
+        IEnumerable<string> EnumerateFolders()
+        {
+            if (options.ModFolders.Count > 0 && map.ETMain.Parent?.FullName is { Length: > 0 } etInstallFolder)
+            {
+                foreach (var mod in options.ModFolders)
+                {
+                    yield return Path.Combine(etInstallFolder, mod);
+                }
+            }
+
+            yield return map.GetMapRoot();
+
+            if (map.GetMapRoot().NormalizePath() != map.ETMain.FullName.NormalizePath())
+            {
+                yield return map.ETMain.FullName;
+            }
+        }
     }
 
     private static string FormatDir(DirectoryInfo etmain, DirectoryInfo directory)

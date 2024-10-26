@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using Pack3r.Extensions;
 using Pack3r.IO;
-using Pack3r.Services;
 using IOPath = System.IO.Path;
 
 namespace Pack3r.Models;
