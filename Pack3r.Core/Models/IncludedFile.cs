@@ -12,8 +12,7 @@ public class IncludedFile
     public ReadOnlyMemory<char> SourcePath { get; init; }
     public QPath ArchivePath { get; init; }
     public bool SourceOnly { get; init; }
-    public string? ReferencedIn { get; init; }
-    public int? ReferencedLine { get; init; }
+    public IResourceSource? Reference { get; init;  }
 
     public IncludedFile(
         ReadOnlyMemory<char> sourcePath,
@@ -35,8 +34,7 @@ public class IncludedFile
         SourcePath = Path.Combine(source.RootPath, relativePath.ToString()).NormalizePath().AsMemory();
         ArchivePath = relativePath;
         SourceOnly = resource.SourceOnly || devResource;
-        ReferencedIn = resource.Line.Path;
-        ReferencedLine = resource.Line.Index is int i and >= 0 ? i : null;
+        Reference = resource.Source;
         Shader = shader;
     }
 

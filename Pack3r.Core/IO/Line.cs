@@ -1,9 +1,10 @@
 ﻿using System.Diagnostics;
+using Pack3r.Models;
 
 namespace Pack3r.IO;
 
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
-public readonly struct Line : IEquatable<Line>
+public readonly struct Line : IEquatable<Line>, IResourceSource
 {
     /// <summary>
     /// 1-based line index.
@@ -83,4 +84,8 @@ public readonly struct Line : IEquatable<Line>
     public override int GetHashCode() => HashCode.Combine(Index, Raw, Path);
 
     internal string DebuggerDisplay => $"{{ Line: '{Value}' in L{Index} {Path} }}";
+
+    int IResourceSource.Position => Index;
+    PositionType IResourceSource.Type => Index > 0 ? PositionType.Line : PositionType.Unknown;
+    string IResourceSource.File => Path;
 }

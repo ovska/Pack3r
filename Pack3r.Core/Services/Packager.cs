@@ -187,12 +187,11 @@ public sealed class Packager(
         {
             foreach (var file in includedFiles.OrderBy(x => x.ArchivePath))
             {
-                var lineref = file.ReferencedLine != null ? $" line {file.ReferencedLine}" : "";
                 var shaderref = file.Shader != null
                     ? $" shader '{file.Shader.DestinationPath}' line {file.Shader.Line} in"
                     : "";
-                var fileref = file.ReferencedIn != null
-                    ? $" (referenced in{shaderref} file: '{map.GetRelativeToRoot(file.ReferencedIn)}'{lineref})"
+                var fileref = file.Reference is not null
+                    ? $" (referenced in{shaderref} file: {file.Reference.Format(map)})"
                     : "";
                 var srcOnly = file.SourceOnly ? " (source only)" : "";
                 var src = file.Source != null
@@ -257,10 +256,7 @@ public sealed class Packager(
                 devResource = true;
 
             string sourceOnly = devResource ? " (source file)" : "";
-            string lineNo = resource.Line.Index > 0 ? $" line {resource.Line.Index}" : "";
-            //string shaderref = shader != null ? $" shader '{shader.Name}' line {shader.Line}, in:" : "";
-            const string shaderref = "";
-            string referencedIn = $"(referenced in{shaderref}: '{map.GetRelativeToRoot(resource.Line.Path).NormalizePath()}'{lineNo})";
+            string referencedIn = $"(referenced in {resource.Source.Format(map)})";
             OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly} {referencedIn}", devResource);
         }
 

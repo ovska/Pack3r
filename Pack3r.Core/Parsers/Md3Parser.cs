@@ -103,19 +103,24 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
             int shaderOffset = surfaceOffset + surface.ShaderOffset;
             ReadOnlySpan<byte> shaderSlice = bytes.Slice(shaderOffset, surface.ShaderCount * Unsafe.SizeOf<Md3Shader>());
 
-            foreach (var shader in MemoryMarshal.Cast<byte, Md3Shader>(shaderSlice))
+            ReadOnlySpan<Md3Shader> shaders = MemoryMarshal.Cast<byte, Md3Shader>(shaderSlice);
+
+            for (int j = 0; j < shaders.Length; j++)
             {
+                Md3Shader shader = shaders[j];
+                int position = 1 + shaderOffset + j * Unsafe.SizeOf<Md3Shader>();
+
                 if (shader.name.TryGetString(out string? shaderName))
                 {
                     if (!string.IsNullOrEmpty(shaderName))
                     {
-                        resources.Add(Resource.FromModel(shaderName, path));
+                        resources.Add(Resource.FromModel(shaderName, new BinaryResourceSource(path, position)));
                     }
                 }
                 else
                 {
                     resources = null;
-                    error = $"Invalid shader name on surf {i}, no null terminator found";
+                    error = $"Invalid shader name on surf {i} byte position {position}, no null terminator found in string";
                     return false;
                 }
             }
