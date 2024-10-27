@@ -43,12 +43,6 @@ public sealed class Map : MapAssets, IDisposable
     public ImmutableArray<DirectoryInfo> AssetDirectories => _assetDirs.Value;
     public ImmutableArray<AssetSource> AssetSources => _assetSrcs.Value;
 
-    public DirectoryAssetSource GetMapRootAssets()
-    {
-        DirectoryInfo root = new(GetMapRoot());
-        return AssetSources.OfType<DirectoryAssetSource>().Single(src => src.Directory.FullName == root.FullName);
-    }
-
     private readonly PackOptions _options;
     private string? _root;
     private readonly Lazy<ImmutableArray<DirectoryInfo>> _assetDirs;
@@ -87,16 +81,6 @@ public sealed class Map : MapAssets, IDisposable
     }
 
     public string GetRelativeToRoot(string path) => IOPath.GetRelativePath(GetMapRoot(), path).NormalizePath();
-
-    /// <summary>
-    /// Returns path <strong>relative to ETMain</strong>.
-    /// </summary>
-    public string GetArchivePath(string fullPath)
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        return IOPath.GetRelativePath(AssetDirectories[0].FullName, fullPath);
-    }
 
     private IEnumerable<DirectoryInfo> InitAssetDirectories()
     {

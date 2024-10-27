@@ -226,7 +226,7 @@ public sealed class Packager(
         void AddCompileFile(string absolutePath)
         {
             if (!TryAddFileAbsolute(
-                archivePath: map.GetArchivePath(absolutePath).NormalizePath(),
+                archivePath: Path.GetRelativePath(map.ETMain.FullName, absolutePath).NormalizePath(),
                 absolutePath))
             {
                 OnFailedAddFile(required: true, $"File '{absolutePath}' not found");
@@ -483,11 +483,16 @@ public sealed class Packager(
         string rename,
         CancellationToken cancellationToken)
     {
+        DirectoryAssetSource rootSource = map
+            .AssetSources
+            .OfType<DirectoryAssetSource>()
+            .Single(src => src.Directory.FullName == map.GetMapRoot());
+
         string needle = $"\t\tmap maps/{map.Name}/lm_";
         string replacement = $"\t\tmap maps/{rename}/lm_";
         CreateRenamableShader(
             archive,
-            new FileAsset(map.GetMapRootAssets(), stylelightShaderFile),
+            new FileAsset(rootSource, stylelightShaderFile),
             renamedName: $"scripts/q3map2_{rename}.shader",
             [
                 (string line, int _) =>
