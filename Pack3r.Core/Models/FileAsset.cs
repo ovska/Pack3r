@@ -20,7 +20,7 @@ public sealed class FileAsset(
         FileAccess.Read,
         FileShare.Read,
         bufferSize: 4096,
-        isAsync ? (FileOptions.Asynchronous | FileOptions.SequentialScan) : FileOptions.SequentialScan);
+        FileOptions.SequentialScan | (isAsync ? FileOptions.Asynchronous : 0));
 
     public ZipArchiveEntry CreateEntry(ZipArchive archive) => archive.CreateEntryFromFile(FullPath, Name, CompressionLevel.Optimal);
 
