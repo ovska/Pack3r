@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using NAudio.Wave;
 using Pack3r.Extensions;
+using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
 
@@ -13,18 +14,18 @@ public interface IIntegrityChecker
     void CheckIntegrity(IAsset asset);
 }
 
-public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegrityChecker
+public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger, AppLifetime lifetime) : IIntegrityChecker
 {
     public void Log()
     {
         if (!_jpgs.IsEmpty)
         {
-            logger.Warn($"Found potentially progressive JPGs which are unsupported on 2.60b: {Format(_jpgs)}");
+            logger.Warn($"Found potentially progressive JPGs which are unsupported on 2.60b:{Format(_jpgs)}");
         }
 
         if (!_tgas.IsEmpty)
         {
-            logger.Warn($"Found top-left pixel ordered TGAs which are drawn upside down on 2.60b clients: {Format(_tgas)}");
+            logger.Warn($"Found top-left pixel ordered TGAs which are drawn upside down on 2.60b clients:{Format(_tgas)}");
         }
 
         foreach (var (path, warning) in _wavs)
@@ -82,7 +83,7 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
 
         if (extension.EqualsF(".jpg"))
         {
-            VerifyJpg(fullPath, stream);
+            VerifyJpg(fullPath, stream, useAsync: asset.Source is not Pk3AssetSource);
             return;
         }
 
@@ -95,6 +96,8 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
 
     private void VerifyTga(string path, Stream stream)
     {
+        lifetime.CancellationToken.ThrowIfCancellationRequested();
+
         const int index = 17;
         int value = -1;
 
@@ -121,12 +124,21 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
         }
     }
 
-    private void VerifyJpg(string fullPath, Stream stream)
+    private void VerifyJpg(string fullPath, Stream stream, bool useAsync)
     {
-        // some light testing determined the average jpg to be <85kb
-        using var ms = Global.StreamManager.GetStream(nameof(VerifyJpg), requiredSize: 1024 * 128);
+        lifetime.CancellationToken.ThrowIfCancellationRequested();
 
-        stream.CopyTo(ms);
+        // some light testing determined the average jpg to be <85kb
+        using var ms = Global.StreamManager.GetStream(nameof(VerifyJpg), requiredSize: 1024 * 128, asContiguousBuffer: true);
+
+        if (useAsync)
+        {
+            stream.CopyToAsync(ms, lifetime.CancellationToken).GetAwaiter().GetResult();
+        }
+        else
+        {
+            stream.CopyTo(ms);
+        }
 
         if (!ms.TryGetBuffer(out ArraySegment<byte> buffer))
             buffer = ms.ToArray();
@@ -141,7 +153,7 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
 
         if (bytePairs.IndexOf(DCTbytes) >= 0 && bytePairs.Count(SOSbytes) >= 6)
         {
-            _jpgs.Add(fullPath.NormalizePath()/* + ' ' + bytePairs.Count(DCTbytes) + ' ' + bytePairs.Count(SOSbytes)*/);
+            _jpgs.Add(fullPath.NormalizePath());
         }
     }
 
@@ -153,7 +165,7 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
             WaveFormat fmt = reader.WaveFormat;
 
             if (fmt.Encoding != WaveFormatEncoding.Pcm)
-                return $"has invalid encoding {fmt.Encoding} instead of PCM";
+                return $"invalid encoding {fmt.Encoding} instead of PCM";
 
             List<string> errors = [];
 
@@ -164,10 +176,10 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger) : IIntegr
                 errors.Add($"expected 16bit instead of {fmt.BitsPerSample}bit");
 
             if (fmt.SampleRate is not 44100 and not 44100 / 2 and not 44100 / 4)
-                errors.Add($"expected multiple of 44.1 kHz instead of {fmt.SampleRate}");
+                errors.Add($"expected 44.1 kHz supported sample rate instead of {fmt.SampleRate}");
 
             if (errors.Count > 0)
-                return $"has invalid audio format: {string.Join(" | ", errors)}";
+                return $"invalid audio format: {string.Join(" | ", errors)}";
         }
         catch (Exception e)
         {
