@@ -284,7 +284,12 @@ public sealed class Packager(
                     if (!shader.Asset.Name.EqualsF(relativePath))
                         convertList = [];
 
-                    entry = CreateRenamableShader(archive, asset, renamedName: null, convertList, cancellationToken);
+                    // ugly hack to rename levelshots
+                    string archivePath = shader.Asset.Name.EqualsF($"scripts/levelshots_{map.Name}.shader")
+                        ? $"scripts/levelshots_{options.Rename ?? map.Name}"
+                        : shader.Asset.Name;
+
+                    entry = CreateRenamableShader(archive, asset, archivePath, convertList, cancellationToken);
                 }
                 else
                 {
@@ -390,13 +395,13 @@ public sealed class Packager(
     private static ZipArchiveEntry CreateRenamableShader(
         ZipArchive archive,
         IAsset asset,
-        string? renamedName,
+        string archivePath,
         List<Func<string, int, string>> convertList,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        ZipArchiveEntry entry = archive.CreateEntry(renamedName ?? asset.Name, CompressionLevel.Optimal);
+        ZipArchiveEntry entry = archive.CreateEntry(archivePath, CompressionLevel.Optimal);
 
         if (convertList.Count == 0)
         {
@@ -493,7 +498,7 @@ public sealed class Packager(
         CreateRenamableShader(
             archive,
             new FileAsset(rootSource, stylelightShaderFile),
-            renamedName: $"scripts/q3map2_{rename}.shader",
+            archivePath: $"scripts/q3map2_{rename}.shader",
             [
                 (string line, int _) =>
                 {

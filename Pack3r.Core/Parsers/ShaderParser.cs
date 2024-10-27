@@ -209,7 +209,9 @@ public class ShaderParser(
                     logger.Info($"Packed shader '{name}' on line {shader.Line} in '{shader.Asset.Name}' will be modified to account for --rename");
 
                     if (!map.ShaderConvert.TryGetValue(shader.Asset, out var list))
+                    {
                         map.ShaderConvert[shader.Asset] = list = [];
+                    }
 
                     list.Add((string line, int index) =>
                     {

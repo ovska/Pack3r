@@ -1,5 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.IO;
 using Pack3r.Extensions;
 using Pack3r.Logging;
 using Pack3r.Models;
@@ -155,14 +154,7 @@ public class AssetService(
             logger.Info($"Arena skipped, file not found in '{arena.FullName}'");
         }
 
-        FileInfo levelshot = new(Path.Combine(map.GetMapRoot(), "levelshots", $"{map.Name}.tga"));
-
-        if (!levelshot.Exists)
-        {
-            levelshot = new(Path.ChangeExtension(levelshot.FullName, ".jpg"));
-        }
-
-        if (levelshot.Exists)
+        if (TryGetLevelshot(out FileInfo levelshot))
         {
             map.RenamableResources.Enqueue(new()
             {
@@ -196,6 +188,19 @@ public class AssetService(
         await ParseResources(map, cancellationToken);
 
         return map;
+
+        bool TryGetLevelshot(out FileInfo levelshot)
+        {
+            levelshot = new FileInfo(Path.Combine(map.GetMapRoot(), "levelshots", $"{map.Name}.tga"));
+
+            if (levelshot.Exists)
+            {
+                return true;
+            }
+
+            levelshot = new FileInfo(Path.Combine(map.GetMapRoot(), "levelshots", $"{map.Name}.jpg"));
+            return levelshot.Exists;
+        }
     }
 
     private async Task ParseResources(Map map, CancellationToken cancellationToken)
