@@ -9,13 +9,13 @@ public class IncludedFile
 {
     public AssetSource? Source { get; }
     public Shader? Shader { get; }
-    public ReadOnlyMemory<char> SourcePath { get; init; }
-    public QPath ArchivePath { get; init; }
+    public QString SourcePath { get; init; }
+    public QString ArchivePath { get; init; }
     public bool SourceOnly { get; init; }
     public IResourceSource? Reference { get; init;  }
 
     public IncludedFile(
-        ReadOnlyMemory<char> sourcePath,
+        QString sourcePath,
         QPath archivePath)
     {
         SourcePath = sourcePath;
@@ -24,11 +24,11 @@ public class IncludedFile
 
     public IncludedFile(RenamableResource resource)
     {
-        SourcePath = resource.AbsolutePath.AsMemory();
-        ArchivePath = resource.ArchivePath.AsMemory();
+        SourcePath = resource.AbsolutePath;
+        ArchivePath = resource.ArchivePath;
     }
 
-    public IncludedFile(AssetSource source, ReadOnlyMemory<char> relativePath, Resource resource, Shader? shader = null, bool devResource = false)
+    public IncludedFile(AssetSource source, QString relativePath, Resource resource, Shader? shader = null, bool devResource = false)
     {
         Source = source;
         SourcePath = Path.Combine(source.RootPath, relativePath.ToString()).NormalizePath().AsMemory();

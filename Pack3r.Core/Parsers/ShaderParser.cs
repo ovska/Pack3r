@@ -358,15 +358,9 @@ public class ShaderParser(
 
                 if (line.Value.StartsWithF("implicit"))
                 {
-                    token = line.Value["implicit".Length..];
-
-                    if (!token.TryReadPastWhitespace(out token))
+                    if (line.Value.TryReadPastWhitespace(out token))
                     {
-                        logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{asset.FullPath}'");
-                    }
-                    else
-                    {
-                        if (token.Span.Equals("-", StringComparison.Ordinal))
+                        if (token.Length == 1 && token.Span.Equals("-", StringComparison.Ordinal))
                         {
                             shader.ImplicitMapping = shader.Name;
                         }
@@ -374,6 +368,10 @@ public class ShaderParser(
                         {
                             shader.ImplicitMapping = token;
                         }
+                    }
+                    else
+                    {
+                        logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{asset.FullPath}'");
                     }
                 }
                 else if (line.MatchKeyword("skyparms", out token))
@@ -384,7 +382,7 @@ public class ShaderParser(
                         continue;
                     }
 
-                    if (token.Span.Equals("-", StringComparison.Ordinal))
+                    if (token.Span.Length == 1 && token.Span.Equals("-", StringComparison.Ordinal))
                     {
                         token = shader.Name;
                     }
@@ -473,6 +471,9 @@ public class ShaderParser(
         }
     }
 
+    /// <summary>
+    /// Returns whether the line is not empty (just a single opening brace)
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsContinuationBrace(ref Line line)
     {

@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.IO;
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -62,6 +60,7 @@ public sealed class Packager(
             foreach (var res in renamable)
             {
                 CreateRenamable(archive, options, res, cancellationToken);
+                handledFiles.Add(res.ArchivePath);
                 progress.Report(++i);
 
                 includedFiles.Add(new IncludedFile(res));
@@ -316,7 +315,7 @@ public sealed class Packager(
                 {
                     includedFiles.Add(new IncludedFile(
                         source,
-                        asset != null ? asset.Name.AsMemory() : relativePath,
+                        asset != null ? (QString)asset.Name : relativePath,
                         resource,
                         shader,
                         devResource));
@@ -354,7 +353,7 @@ public sealed class Packager(
             {
                 archive.CreateEntryFromFile(absolutePath, archivePath);
                 handledFiles.Add(archivePath.AsMemory());
-                includedFiles.Add(new IncludedFile(sourcePath: absolutePath.AsMemory(), archivePath: archivePath.AsMemory()));
+                includedFiles.Add(new IncludedFile(sourcePath: absolutePath, archivePath: archivePath));
                 return true;
             }
             catch (IOException ioex) { ex = ioex; }

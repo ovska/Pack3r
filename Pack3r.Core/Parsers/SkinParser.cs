@@ -20,8 +20,8 @@ public class SkinParser(ILineReader reader) : IReferenceParser
 
             if (comma >= 0)
             {
-                result.Add(
-                    new Resource(line.Value[(comma + 1)..].Trim().Trim('"'), isShader: true, in line));
+                var value = line.Value[(comma + 1)..].Trim().Trim('"');
+                result.Add(new Resource(value, isShader: true, in line));
             }
         }
 
