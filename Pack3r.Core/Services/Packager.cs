@@ -286,7 +286,7 @@ public sealed class Packager(
 
                     // ugly hack to rename levelshots
                     string archivePath = shader.Asset.Name.EqualsF($"scripts/levelshots_{map.Name}.shader")
-                        ? $"scripts/levelshots_{options.Rename ?? map.Name}"
+                        ? $"scripts/levelshots_{options.Rename ?? map.Name}.shader"
                         : shader.Asset.Name;
 
                     entry = CreateRenamableShader(archive, asset, archivePath, convertList, cancellationToken);
