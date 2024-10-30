@@ -6,7 +6,9 @@ namespace Pack3r.Tests.Assets;
 
 public sealed class IntegrityTests
 {
-    private readonly IntegrityChecker _checker = new(NullLogger<IntegrityChecker>.Instance);
+    private readonly IntegrityChecker _checker = new(
+        NullLogger<IntegrityChecker>.Instance,
+        new AppLifetime(NullLogger<AppLifetime>.Instance, null!));
 
     [Fact]
     public void Should_Verify_Progressive_Jpg()

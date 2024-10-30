@@ -169,13 +169,13 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger, AppLifeti
 
             List<string> errors = [];
 
-            if (fmt.Channels != 1)
+            if (fmt.Channels is not 1)
                 errors.Add($"expected mono instead of {fmt.Channels} channels");
 
-            if (fmt.BitsPerSample != 16)
-                errors.Add($"expected 16bit instead of {fmt.BitsPerSample}bit");
+            if (fmt.BitsPerSample is not (8 or 16 or 32))
+                errors.Add($"expected 8 or 16 bits per sample instead of {fmt.BitsPerSample}");
 
-            if (fmt.SampleRate is not 44100 and not 44100 / 2 and not 44100 / 4)
+            if (fmt.SampleRate is not (44100 or 44100 / 2 or 44100 / 4))
                 errors.Add($"expected 44.1 kHz supported sample rate instead of {fmt.SampleRate}");
 
             if (errors.Count > 0)
