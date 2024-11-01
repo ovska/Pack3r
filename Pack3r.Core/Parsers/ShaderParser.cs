@@ -448,8 +448,20 @@ public class ShaderParser(
                     // read past the frames-agument
                     if (token.TryReadPastWhitespace(out token))
                     {
-                        foreach (var range in token.Split(' '))
-                            shader.Resources.Add(token[range]);
+                        AddFrames(shader.Resources, token);
+
+                        static void AddFrames(List<QPath> list, ReadOnlyMemory<char> source)
+                        {
+                            foreach (var match in Tokens.WhitespaceSeparatedTokens().EnumerateMatches(source.Span))
+                            {
+                                ReadOnlyMemory<char> value = source.Slice(match).TrimQuotes().Trim();
+
+                                if (!value.IsEmpty)
+                                {
+                                    list.Add(value);
+                                }
+                            }
+                        }
                     }
                     else
                     {
