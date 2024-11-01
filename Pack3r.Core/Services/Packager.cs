@@ -215,7 +215,7 @@ public sealed class Packager(
 
             foreach (var source in map.AssetSources)
             {
-                if (source.IsExcluded && source.Assets.ContainsKey(relativePath))
+                if (source.NotPacked && source.Assets.ContainsKey(relativePath))
                     return true;
             }
 
@@ -234,7 +234,7 @@ public sealed class Packager(
 
         void AddShaderFile(Shader shader, Resource resource)
         {
-            if (shader.Source.IsExcluded)
+            if (shader.Source.NotPacked)
                 return;
 
             if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory(), resource, shader))
@@ -251,7 +251,7 @@ public sealed class Packager(
                     return;
             }
 
-            if (options.IncludeSource && resource.SourceOnly)
+            if (options.OnlySource && resource.SourceOnly)
                 devResource = true;
 
             string sourceOnly = devResource ? " (source file)" : "";
@@ -295,7 +295,7 @@ public sealed class Packager(
                     if (!source.Assets.TryGetValue(relativePath, out asset))
                         return false;
 
-                    if (source.IsExcluded)
+                    if (source.NotPacked)
                     {
                         // file found from an excluded source
                         entry = null;

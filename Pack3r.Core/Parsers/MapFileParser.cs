@@ -213,7 +213,7 @@ public class MapFileParser(
                         bool isMiscModel = IsClassName("misc_model");
                         var res = new Resource(value, isShader: false, in line, sourceOnly: isMiscModel);
 
-                        if (options.IncludeSource || !isMiscModel)
+                        if (options.OnlySource || !isMiscModel)
                         {
                             referenceResources.Add(res);
                             resources.Add(res);

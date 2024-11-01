@@ -17,7 +17,7 @@ public class PackOptions
 
     public bool ReferenceDebug { get; set; }
 
-    public bool IncludeSource { get; set; }
+    public bool OnlySource { get; set; }
 
     public bool RequireAllAssets { get; set; }
 
@@ -29,9 +29,9 @@ public class PackOptions
 
     public bool LoadPk3s { get; set; }
 
-    public List<string> IgnoreSources { get; init; } = null!;
+    public List<string> UnscannedSources { get; init; } = null!;
 
-    public List<string> ExcludeSources { get; init; } = null!;
+    public List<string> UnpackedSources { get; init; } = null!;
 
     public List<string> ModFolders { get; init; } = null!;
 } 

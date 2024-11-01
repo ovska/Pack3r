@@ -103,12 +103,12 @@ public class ShaderParser(
                             }
 
                             // cases such as common shaders, if they are compile only we don't care
-                            if (!options.IncludeSource && (!a.NeededInPk3 || !b.NeededInPk3))
+                            if (!options.OnlySource && (!a.NeededInPk3 || !b.NeededInPk3))
                             {
                                 return a.NeededInPk3 ? b : a;
                             }
 
-                            if (!a.Source.IsExcluded || !b.Source.IsExcluded)
+                            if (!a.Source.NotPacked || !b.Source.NotPacked)
                             {
                                 duplicate.AddOrUpdate(
                                     key: a.Name,
@@ -336,7 +336,7 @@ public class ShaderParser(
                     }
                 }
 
-                if (!found && options.IncludeSource)
+                if (!found && options.OnlySource)
                 {
                     foreach (var prefix in _devTexturePrefixes)
                     {
@@ -563,7 +563,7 @@ public class ShaderParser(
 
         return (line[0] | 0x20) switch
         {
-            'q' => !options.IncludeSource && line.StartsWithF("qer_"),
+            'q' => !options.OnlySource && line.StartsWithF("qer_"),
             's' => line.StartsWithF("surfaceparm") || line.StartsWithF("sort"),
             'c' => line.StartsWithF("cull"),
             'n' => line.StartsWithF("nopicmip") || line.StartsWithF("nomipmaps"),

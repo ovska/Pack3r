@@ -51,7 +51,7 @@ public class AssetService(
         {
             string srcMsg = string.Join(
                 Environment.NewLine,
-                map.AssetSources.Select(src => $"\t{src.RootPath}{(src.IsExcluded ? " (not packed)" : "")}"));
+                map.AssetSources.Select(src => $"\t{src.RootPath}{(src.NotPacked ? " (not packed)" : "")}"));
             logger.System($"Using sources for discovery: {Environment.NewLine}{srcMsg}");
         }
         else
@@ -61,18 +61,45 @@ public class AssetService(
             logger.System($"Using directories{pk3msg} for discovery: {dirMsg}");
         }
 
-        // add bsp
-        FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
-        map.RenamableResources.Enqueue(new()
+        if (!options.OnlySource)
         {
-            Name = "bsp",
-            AbsolutePath = bsp.FullName,
-            ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.bsp")
-        });
+            // add bsp
+            FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
+            map.RenamableResources.Enqueue(new()
+            {
+                Name = "bsp",
+                AbsolutePath = bsp.FullName,
+                ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.bsp")
+            });
 
-        // add .map
-        if (options.IncludeSource)
+            var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
+
+            if (lightmapDir.Exists && lightmapDir.GetFiles("lm_????.tga") is { Length: > 0 } lmFiles)
+            {
+                map.HasLightmaps = true;
+                bool timestampWarned = false;
+
+                for (int i = 0; i < lmFiles.Length; i++)
+                {
+                    FileInfo? file = lmFiles[i];
+                    timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmaps", bsp, file);
+
+                    map.RenamableResources.Enqueue(new()
+                    {
+                        Name = "lightmaps",
+                        AbsolutePath = file.FullName,
+                        ArchivePath = Path.Combine("maps", options.Rename ?? map.Name, file.Name)
+                    });
+                }
+            }
+            else
+            {
+                logger.Info($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
+            }
+        }
+        else
         {
+            // add .map
             map.RenamableResources.Enqueue(new()
             {
                 Name = "map source",
@@ -80,32 +107,6 @@ public class AssetService(
                 ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.map"),
             });
         }
-
-        var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
-
-        if (lightmapDir.Exists && lightmapDir.GetFiles("lm_????.tga") is { Length: > 0 } lmFiles)
-        {
-            map.HasLightmaps = true;
-            bool timestampWarned = false;
-
-            for (int i = 0; i < lmFiles.Length; i++)
-            {
-                FileInfo? file = lmFiles[i];
-                timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmaps", bsp, file);
-
-                map.RenamableResources.Enqueue(new()
-                {
-                    Name = "lightmaps",
-                    AbsolutePath = file.FullName,
-                    ArchivePath = Path.Combine("maps", options.Rename ?? map.Name, file.Name)
-                });
-            }
-        }
-        else
-        {
-            logger.Info($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
-        }
-
         var objdata = new FileInfo(Path.ChangeExtension(map.Path, "objdata"));
 
         if (objdata.Exists)
@@ -171,18 +172,21 @@ public class AssetService(
                 $"Levelshot skipped, file not found in '{Path.GetFileNameWithoutExtension(levelshot.FullName.AsSpan())}.tga/.jpg'");
         }
 
-        if (FindFileFromMods(map, Path.Combine("maps", $"{map.Name}_tracemap.tga")) is { Exists: true } tracemap)
+        if (!options.OnlySource)
         {
-            map.RenamableResources.Enqueue(new()
+            if (FindFileFromMods(map, Path.Combine("maps", $"{map.Name}_tracemap.tga")) is { Exists: true } tracemap)
             {
-                Name = "tracemap",
-                AbsolutePath = tracemap.FullName,
-                ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}_tracemap.tga")
-            });
-        }
-        else
-        {
-            logger.Trace($"Tracemap skipped, not found in any directory.");
+                map.RenamableResources.Enqueue(new()
+                {
+                    Name = "tracemap",
+                    AbsolutePath = tracemap.FullName,
+                    ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}_tracemap.tga")
+                });
+            }
+            else
+            {
+                logger.Trace($"Tracemap skipped, not found in any directory.");
+            }
         }
 
         await ParseResources(map, cancellationToken);
