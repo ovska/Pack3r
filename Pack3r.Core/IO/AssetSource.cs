@@ -18,7 +18,7 @@ public abstract class AssetSource : IDisposable
     /// <summary>
     /// Whether this source is used to discover files, but never pack them (pak0, mod files etc).
     /// </summary>
-    public bool IsExcluded { get; }
+    public bool NotPacked { get; }
 
     /// <summary>
     /// Display name (folder/pk3 name).
@@ -31,9 +31,9 @@ public abstract class AssetSource : IDisposable
 
     protected bool _disposed;
 
-    protected AssetSource(bool isExcluded)
+    protected AssetSource(bool notPacked)
     {
-        IsExcluded = isExcluded;
+        NotPacked = notPacked;
         _assetsLazy = new(InitializeAssets, LazyThreadSafetyMode.ExecutionAndPublication);
     }
 

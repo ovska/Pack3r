@@ -106,7 +106,7 @@ public sealed class Map : MapAssets, IDisposable
             .EnumerateDirectories("*.pk3dir", SearchOption.TopDirectoryOnly)
             .OrderByDescending(dir => dir.Name, StringComparer.OrdinalIgnoreCase))
         {
-            if (IsExcluded(pk3dir) == SourceFilter.Ignored)
+            if (GetSourceFilter(pk3dir) == SourceFilter.Ignored)
                 continue;
 
             if (unique.Add(pk3dir.FullName))
@@ -122,7 +122,7 @@ public sealed class Map : MapAssets, IDisposable
 
         foreach (var dir in AssetDirectories)
         {
-            var dirFilter = IsExcluded(dir);
+            var dirFilter = GetSourceFilter(dir);
 
             // never ignore etmain
             if (dirFilter == SourceFilter.Ignored && !dir.FullName.EqualsF(ETMain.FullName))
@@ -130,25 +130,25 @@ public sealed class Map : MapAssets, IDisposable
                 continue;
             }
 
-            list.Add(new DirectoryAssetSource(dir, isExcluded: dirFilter == SourceFilter.Excluded));
+            list.Add(new DirectoryAssetSource(dir, notPacked: dirFilter == SourceFilter.Excluded));
 
             // pk3s need to be loaded always if there are pk3/dir excludes
-            if (_options.LoadPk3s || _options.ExcludeSources.Count > 0)
+            if (_options.LoadPk3s || _options.UnpackedSources.Count > 0)
             {
                 foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
                 {
-                    var pk3Filter = IsExcluded(file);
+                    var pk3Filter = GetSourceFilter(file);
 
                     if (pk3Filter == SourceFilter.Ignored)
                         continue;
 
                     // exclude all pk3s in an excluded pk3dir
-                    bool pk3isExcluded = dir.FullName.HasExtension("pk3dir")
+                    bool notPacked = dir.FullName.HasExtension("pk3dir")
                         ? (dirFilter == SourceFilter.Excluded || pk3Filter == SourceFilter.Excluded)
                         : pk3Filter == SourceFilter.Excluded;
 
-                    if (_options.LoadPk3s || pk3isExcluded)
-                        list.Add(new Pk3AssetSource(file.FullName, isExcluded: pk3isExcluded));
+                    if (_options.LoadPk3s || notPacked)
+                        list.Add(new Pk3AssetSource(file.FullName, notPacked: notPacked));
                 }
             }
         }
@@ -162,11 +162,9 @@ public sealed class Map : MapAssets, IDisposable
                 {
                     if (mod.EqualsF(dir.Name))
                     {
-                        //list.Add(new DirectoryAssetSource(dir, isExcluded: true));
-
                         foreach (var file in dir.EnumerateFiles("*.pk3", SearchOption.TopDirectoryOnly))
                         {
-                            list.Add(new Pk3AssetSource(file.FullName, isExcluded: true));
+                            list.Add(new Pk3AssetSource(file.FullName, notPacked: true));
                         }
 
                         break;
@@ -184,24 +182,24 @@ public sealed class Map : MapAssets, IDisposable
         byte[] sortKeys = new byte[512];
 
         return list
-            .OrderByDescending(s => (s.IsExcluded, s.Name.EqualsF("pak0.pk3"))) // pak0 first, then other excludes
+            .OrderByDescending(s => (s.NotPacked, s.Name.EqualsF("pak0.pk3"))) // pak0 first, then other excludes
             .ThenBy(s => s is DirectoryAssetSource d ? AssetDirectories.IndexOf(d.Directory) : int.MaxValue)
             .ThenByDescending(s => IOPath.GetFileNameWithoutExtension(s.RootPath))
             .ToImmutableArray();
 #pragma warning restore IDE0305 // Simplify collection initialization
     }
 
-    private SourceFilter IsExcluded(FileSystemInfo item)
+    private SourceFilter GetSourceFilter(FileSystemInfo item)
     {
         ReadOnlySpan<char> dirOrPk3 = IOPath.GetFileName(item.FullName.AsSpan());
 
-        foreach (var value in _options.IgnoreSources)
+        foreach (var value in _options.UnscannedSources)
         {
             if (dirOrPk3.EqualsF(value))
                 return SourceFilter.Ignored;
         }
 
-        foreach (var value in _options.ExcludeSources)
+        foreach (var value in _options.UnpackedSources)
         {
             if (dirOrPk3.EqualsF(value))
                 return SourceFilter.Excluded;

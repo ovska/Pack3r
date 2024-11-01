@@ -68,7 +68,7 @@ public class ResourceRefParser(
                     {
                         result.Remove(item);
 
-                        if (options.IncludeSource)
+                        if (options.OnlySource)
                         {
                             result.Add(new Resource(
                                 item.Value,

@@ -8,7 +8,7 @@ using Pack3r.Parsers;
 namespace Pack3r.IO;
 
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
-public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(isExcluded)
+public sealed class Pk3AssetSource(string path, bool notPacked) : AssetSource(notPacked)
 {
     public string ArchivePath => path;
     public override string RootPath => ArchivePath;
@@ -16,7 +16,7 @@ public sealed class Pk3AssetSource(string path, bool isExcluded) : AssetSource(i
     private readonly ZipArchive _archive = ZipFile.OpenRead(path);
 
     public override string ToString() => $"{{ Pk3: {ArchivePath} }}";
-    internal string DebuggerDisplay => $"{{ Pk3 src: '{Path.GetFileName(ArchivePath)}' (Excluded: {IsExcluded}) }}";
+    internal string DebuggerDisplay => $"{{ Pk3 src: '{Path.GetFileName(ArchivePath)}' (Excluded: {NotPacked}) }}";
 
     public override async IAsyncEnumerable<Shader> EnumerateShaders(
         IShaderParser parser,

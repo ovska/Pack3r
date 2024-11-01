@@ -19,7 +19,7 @@ public class RootCommand
     public FileInfo Map { get; set; } = null!;
 
     [CliOption(
-        Description = "Path to destination pk3 or directory, defaults to etmain",
+        Description = "Path to destination pk3/zip (or directory where it will be written), defaults to etmain/mapname.pk3",
         Required = false,
         ValidationRules = CliValidationRules.LegalPath)]
     public FileSystemInfo? Output { get; set; }
@@ -28,7 +28,7 @@ public class RootCommand
     public bool DryRun { get; set; }
 
     [CliOption(
-        Description = "Map release name (bsp, lightmaps, mapscript, etc.)",
+        Description = "Name of the map after packing (renames bsp, lightmaps, mapscript etc.)",
         Required = false,
         ValidationRules = CliValidationRules.LegalFileName)]
     public string? Rename { get; set; }
@@ -42,7 +42,7 @@ public class RootCommand
     public bool Loose { get; set; }
 
     [CliOption(
-        Description = "Pack source files such as .map, editorimages, misc_models")]
+        Description = "Pack only source files (.map, editorimages, misc_models) without packing BSP & lightmaps")]
     public bool Source { get; set; }
 
     [CliOption(
@@ -61,26 +61,30 @@ public class RootCommand
     public bool ReferenceDebug { get; set; }
 
     [CliOption(
-        Description = "Overwrite existing files in the output path with impunity")]
+        Description = "Overwrite existing files in the output path with impunity",
+        Aliases = ["-f", "--overwrite"])]
     public bool Force { get; set; }
 
     [CliOption(
-        Description = "Include pk3 files and pk3dirs in etmain when indexing files")]
+        Description = "Include pk3 files and pk3dirs in etmain when indexing files",
+        Aliases = ["-pk3"])]
     public bool IncludePk3 { get; set; }
 
     [CliOption(
-        Description = "Ignore some pk3 files or pk3dir directories",
+        Description = "Don't scan pk3/pk3dirs for assets",
         Arity = CliArgumentArity.ZeroOrMore,
         ValidationRules = CliValidationRules.LegalPath,
-        AllowMultipleArgumentsPerToken = true)]
-    public List<string> Ignore { get; set; } = ["pak1.pk3", "pak2.pk3", "mp_bin.pk3"];
+        AllowMultipleArgumentsPerToken = true,
+        Aliases = ["-ns"])]
+    public List<string> NoScan { get; set; } = ["pak1.pk3", "pak2.pk3", "mp_bin.pk3"];
 
     [CliOption(
-        Description = "Never pack files found in these pk3s or directories",
+        Description = "Scan some pk3s/pk3dirs but don't pack their contants",
         Arity = CliArgumentArity.ZeroOrMore,
         ValidationRules = CliValidationRules.LegalPath,
-        AllowMultipleArgumentsPerToken = true)]
-    public List<string> Exclude { get; set; } =
+        AllowMultipleArgumentsPerToken = true,
+        Aliases = ["-np"])]
+    public List<string> NoPack { get; set; } =
     [
         "pak0.pk3",
         "pak0.pk3dir",
@@ -104,11 +108,11 @@ public class RootCommand
             MapFile = ResolveMap(),
             Pk3File = ResolvePk3(),
             Overwrite = Force,
-            ExcludeSources = Exclude,
-            IgnoreSources = Ignore,
+            UnpackedSources = NoPack,
+            UnscannedSources = NoScan,
             ModFolders = Mods,
             DryRun = DryRun,
-            IncludeSource = Source,
+            OnlySource = Source,
             LoadPk3s = IncludePk3,
             LogLevel = Verbosity,
             Rename = Rename,
@@ -116,7 +120,7 @@ public class RootCommand
             UseShaderlist = Shaderlist,
             ShaderDebug = ShaderDebug,
             ReferenceDebug = ReferenceDebug,
-        });
+        }); ; ;
     }
 
     private FileInfo ResolveMap()
@@ -158,7 +162,8 @@ public class RootCommand
                 pk3Location = etmain;
             }
 
-            pk3 = new FileInfo(Path.Combine(pk3Location.FullName, Path.ChangeExtension(pk3Name, ".pk3")));
+            string outName = Path.ChangeExtension(pk3Name, Source ? ".zip" : ".pk3");
+            pk3 = new FileInfo(Path.Combine(pk3Location.FullName, outName));
         }
         else
         {

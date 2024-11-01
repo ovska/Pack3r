@@ -22,7 +22,7 @@ public class ShaderParserTests
         var reader = new StringLineReader(data);
         return new ShaderParser(
             reader,
-            new PackOptions { IncludeSource = includeDevFiles, MapFile = null! },
+            new PackOptions { OnlySource = includeDevFiles, MapFile = null! },
             NullLogger<ShaderParser>.Instance,
             new NoOpProgressManager());
     }
