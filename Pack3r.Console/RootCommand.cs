@@ -80,7 +80,15 @@ public class RootCommand
         Arity = CliArgumentArity.ZeroOrMore,
         ValidationRules = CliValidationRules.LegalPath,
         AllowMultipleArgumentsPerToken = true)]
-    public List<string> Exclude { get; set; } = ["pak0.pk3", "pak0.pk3dir"];
+    public List<string> Exclude { get; set; } =
+    [
+        "pak0.pk3",
+        "pak0.pk3dir",
+        "lights.pk3",
+        "sd-mapobjects.pk3",
+        "common.pk3",
+        "astro-skies.pk3",
+    ];
 
     [CliOption(
         Description = "Adds all pk3s in mod directories to exclude-list",
