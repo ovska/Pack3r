@@ -10,10 +10,10 @@ namespace Pack3r.Models;
 public sealed class Resource : IEquatable<Resource>
 {
     public static Resource Shader(string value, in Line line) => new(value.AsMemory(), true, in line);
-    public static Resource Shader(ReadOnlyMemory<char> value, in Line line) => new(value, true, in line);
+    public static Resource Shader(QString value, in Line line) => new(value, true, in line);
 
     public static Resource File(string value, in Line line) => new(value.AsMemory(), false, in line);
-    public static Resource File(ReadOnlyMemory<char> value, in Line line) => new(value, false, in line);
+    public static Resource File(QString value, in Line line) => new(value, false, in line);
 
     public static Resource FromModel(QPath value, IResourceSource source) => new(value, source);
 

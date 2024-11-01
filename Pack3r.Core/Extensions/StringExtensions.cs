@@ -11,19 +11,23 @@ public static class StringExtensions
 {
     public static string NormalizePath(this string path) => path.Replace(Path.DirectorySeparatorChar, '/');
 
-    public static ReadOnlyMemory<char> ChangeExtension(this ReadOnlyMemory<char> file, ReadOnlySpan<char> extension)
+    public static QString ChangeExtension(this ReadOnlyMemory<char> file, ReadOnlySpan<char> extension)
     {
-        int extensionLength = file.GetExtension().Length;
-
-        var withoutExtension = file[..^extensionLength];
+        ReadOnlySpan<char> current = file.GetExtension();
 
         if (extension.IsEmpty)
-            return withoutExtension;
+        {
+            return file[..^current.Length];
+        }
 
-        return $"{withoutExtension.Span}{extension}".AsMemory();
+        if (current.SequenceEqual(extension))
+        {
+            return file;
+        }
+
+        return $"{file[..^current.Length]}{extension}".AsMemory();
     }
 
-    public static TextureExtension GetTextureExtension(this ReadOnlyMemory<char> path) => GetTextureExtension(path.Span);
     public static TextureExtension GetTextureExtension(this string path) => GetTextureExtension(path.AsSpan());
     public static TextureExtension GetTextureExtension(this ReadOnlySpan<char> path)
     {
@@ -41,29 +45,9 @@ public static class StringExtensions
         return TextureExtension.Other;
     }
 
-    public static ArraySegment<Range> Split(
-        this ReadOnlyMemory<char> value,
-        char separator,
-        StringSplitOptions options = StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-    {
-        var ranges = new Range[32];
-
-        int count = value.Span.Split(ranges.AsSpan(), separator, options);
-
-        if (count == 0)
-        {
-            ranges[0] = Range.All;
-            count = 1;
-        }
-
-        return new ArraySegment<Range>(ranges, 0, count);
-    }
-
     public static bool TryReadUpToWhitespace(in this ReadOnlyMemory<char> value, out ReadOnlyMemory<char> token)
     {
-        var span = value.Span;
-
-        int space = span.IndexOfAny(Tokens.SpaceOrTab);
+        int space = value.Span.IndexOfAny(Tokens.SpaceOrTab);
 
         if (space == -1)
         {
@@ -77,9 +61,7 @@ public static class StringExtensions
 
     public static bool TryReadPastWhitespace(in this ReadOnlyMemory<char> value, out ReadOnlyMemory<char> token)
     {
-        var span = value.Span;
-
-        int space = span.IndexOfAny(Tokens.SpaceOrTab);
+        int space = value.Span.IndexOfAny(Tokens.SpaceOrTab);
 
         if (space == -1)
         {
@@ -111,29 +93,24 @@ public static class StringExtensions
 
     public static ReadOnlyMemory<char> TrimQuotes(this ReadOnlyMemory<char> token)
     {
-        var keySpan = token.Span;
-
-        if (keySpan.Length >= 2 &&
-            keySpan[0] == '"' &&
-            keySpan[^1] == '"')
-        {
-            return token[1..^1];
-        }
-
+        _ = TryTrimQuotes(token, out token);
         return token;
     }
 
     public static bool TryTrimQuotes(this ReadOnlyMemory<char> token, out ReadOnlyMemory<char> trimmed)
     {
-        var keySpan = token.Span;
-
-        if (keySpan.Length >= 2 &&
-            keySpan[0] == '"' &&
-            keySpan[^1] == '"')
+        if (token.Length >= 2)
         {
-            trimmed = token[1..^1];
-            return true;
+            var keySpan = token.Span;
+
+            if (keySpan[0] == '"' &&
+                keySpan[^1] == '"')
+            {
+                trimmed = token[1..^1];
+                return true;
+            }
         }
+
 
         trimmed = token;
         return false;

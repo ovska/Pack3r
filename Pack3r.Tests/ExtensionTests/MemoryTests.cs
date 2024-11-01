@@ -1,5 +1,7 @@
-﻿using Pack3r.Extensions;
+﻿using System.Collections.Generic;
+using Pack3r.Extensions;
 using Pack3r.IO;
+using Pack3r.Models;
 
 namespace Pack3r.Tests.ExtensionTests;
 
@@ -54,9 +56,24 @@ public static class MemoryTests
     [InlineData("test arg", (string[])["test", "arg"])]
     [InlineData("test arg arg2", (string[])["test", "arg", "arg2"])]
     [InlineData("test arg ", (string[])["test", "arg"])]
+    [InlineData("test \"arg\" ", (string[])["test", "arg"])]
+    [InlineData("test\t\t\"arg\" ", (string[])["test", "arg"])]
+    [InlineData("\t\"test\" \"arg\" ", (string[])["test", "arg"])]
     public static void Should_Split_By_Whitespace(string input, string[] expected)
     {
-        Assert.Equal(expected, input.AsMemory().Split(' ').Select(r => input.AsMemory(r).ToString()));
+        List<string> list = [];
+
+        foreach (var frame in Tokens.WhitespaceSeparatedTokens().EnumerateMatches(input))
+        {
+            ReadOnlyMemory<char> value = input.AsMemory(frame.Index, frame.Length).TrimQuotes().Trim();
+
+            if (!value.IsEmpty)
+            {
+                list.Add(value.ToString());
+            }
+        }
+
+        Assert.Equal(expected, list);
     }
 
     [Theory]

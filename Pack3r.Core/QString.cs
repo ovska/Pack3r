@@ -15,6 +15,8 @@ public readonly struct QString : IEquatable<QString>, IComparable<QString>, IEqu
     public ReadOnlyMemory<char> Value { get; }
     public ReadOnlySpan<char> Span => Value.Span;
 
+    public bool IsEmpty => Value.IsEmpty;
+
     public char this[int index] => Span[index];
 
     public QString this[Range range] => new(Value, range);
