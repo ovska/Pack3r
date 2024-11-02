@@ -41,11 +41,4 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, bool notPacked
             .Where(f => Tokens.PackableFile().IsMatch(f.FullName))
             .Select(f => new FileAsset(this, f));
     }
-
-    public override IAsset? GetShaderlist()
-    {
-        return new FileAsset(
-            this,
-            new FileInfo(Path.Combine(Directory.FullName, "scripts", "shaderlist.txt")));
-    }
 }

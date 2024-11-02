@@ -29,7 +29,6 @@
 - `-v, --verbosity` Log severity threshold [default: Info]
 - `-l, --loose` Complete packing even if some files are missing [default: False]
 - `-s, --source` Pack source files such as .map, editorimages, misc_models [default: False]
-- `-sl, --shaderlist` Only read shaders present in shaderlist.txt [default: False]
 - `-sd, --shaderdebug` Print shader resolution details (Debug verbosity needed) [default: False]
 - `-rd, --referencedebug` Print asset resolution details (Info verbosity needed) [default: False]
 - `-f, --force` Overwrite existing files in the output path with impunity [default: False]

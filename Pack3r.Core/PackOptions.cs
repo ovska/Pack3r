@@ -11,8 +11,6 @@ public class PackOptions
     [MemberNotNullWhen(false, nameof(Pk3File))]
     public bool DryRun { get; set; }
 
-    public bool UseShaderlist { get; set; }
-
     public bool ShaderDebug { get; set; }
 
     public bool ReferenceDebug { get; set; }

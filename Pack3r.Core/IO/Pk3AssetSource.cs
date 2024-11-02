@@ -56,20 +56,4 @@ public sealed class Pk3AssetSource(string path, bool notPacked) : AssetSource(no
             .Where(entry => entry.FullName.Length < Global.MAX_QPATH && Tokens.PackableFile().IsMatch(entry.FullName.GetExtension()))
             .Select(entry => new Pk3Asset(this, entry));
     }
-
-    public override IAsset? GetShaderlist()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        ZipArchiveEntry? entry =
-            _archive.GetEntry("scripts/shaderlist.txt") ??
-            _archive.GetEntry("scripts\\shaderlist.txt");
-
-        if (entry is not null)
-        {
-            return new Pk3Asset(this, entry);
-        }
-
-        return null;
-    }
 }
