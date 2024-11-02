@@ -5,16 +5,21 @@
     title="Zip icon created by Flat Icons"
     src="https://github.com/ovska/Pack3r/assets/68028366/5c628e71-bf3f-47e6-9a95-963144fcaa3e" />
   <h1 align="center">Pack3r</h1>
-  <p align="center">Create release-ready pk3 archives quickly from .map-files</p>
+  <h3 align="center">Create release-ready Wolfenstein: Enemy Territory pk3 archives quickly from .map-files</h3>
 </p>
+
+---
 
 ## Features
 
-- Parses through your map, shaders, mapscript, etc. and discovers files are needed for the map, while leaving out editorimages, lightimages and other files not needed for release (unless `-s` specified)
-- Performs compression in-memory, does not create or leave intermediate files, and never modifies the original files (see below)
-- Support for renaming the map to create release versions such as `b1`, with automatic renaming of bsp, mapscript, levelshots, arena and more, while the original files are left untouched (`-r`)
-- Extensive logging to trace why each file was included in the pk3, including the exact line in a source file / shader where the file was referenced (`-sd` and `-rd`)
+- Parses the map file, shaders, mapscript, etc. and discovers files are needed to play the map. Editorimages, misc_models etc. are left out of the archive (unless wanted)
+- Everything is performed in memory without creating any intermediate files, or modifying the originals
+- Support for renaming the map to create release versions such as `b1`, with automatic renaming of bsp, mapscript, levelshots, arena and more, while the original files are left untouched
+- Extensive logging to trace why each file was included in the pk3, including the exact line/byte offset where in the file the shader/file was referenced.
 - Support for file discovery from pk3's and pk3dirs, such as `sd-mapobjects.pk3` or a texture/model pack extracted into a separate pk3dir to keep etmain clean
+- Warnings about possible pitfalls such as lightmaps from another compile, or image/audio formats not supported by ET 2.60b
+
+---
 
 ## Usage
 `Pack3r <map> [options]`
@@ -23,33 +28,67 @@
 `<map>`  Path to the .map file [required]
 
 ### Options:
-- `-o, --output` Path to destination pk3 or directory, defaults to etmain
-- `-d, --dryrun` Discover packed files and estimate file size without creating a pk3 [default: False]
-- `-r, --rename` Map release name (bsp, lightmaps, mapscript, etc.)
-- `-v, --verbosity` Log severity threshold [default: Info]
-- `-l, --loose` Complete packing even if some files are missing [default: False]
-- `-s, --source` Pack source files such as .map, editorimages, misc_models [default: False]
-- `-sd, --shaderdebug` Print shader resolution details (Debug verbosity needed) [default: False]
-- `-rd, --referencedebug` Print asset resolution details (Info verbosity needed) [default: False]
-- `-f, --force` Overwrite existing files in the output path with impunity [default: False]
-- `-i, --includepk3` Include pk3 files and pk3dirs in etmain when indexing files [default: False]
-- `--ignore` Ignore some pk3 files or pk3dir directories [default: pak1.pk3|pak2.pk3|mp_bin.pk3]
-- `-e, --exclude` Never pack files found in these pk3s or directories [default: pak0.pk3|pak0.pk3dir]
-- `-m --mods` Adds pk3s in these mod folders to exclude-list
-- `-?, -h, --help` Show help and usage information
-- `--version` Show version information
+#### `-o, --output`
+Destination of the packing, defaults to `etmain`. Possible paths are filenames with `pk3` or `zip` extension, or directories.
+File name in case of directory is `mapname.pk3`, or `.zip` if using `--source`. This setting is ignored if using `--dryrun`.
 
-See below for examples.
+#### `-d, --dryrun`
+Run the packing operation without actually creating an archive.
+Useful if you just want to discover what files would be packed or are missing, or want to see the size of the pk3.
+
+#### `-r --rename`
+Name of the map after packing. Can be used to create different versions without changing project names, e.g. `mapname_b1`.
+Among things renamed are BSP, mapscript, lightmap folder, levelshots files and shaders.
+
+#### `-v --verbosity`
+The threshold for log messages to be printed. Default is `Info`, which may print too much or too little information depending
+on your needs. Available options (from least to most verbose): `None`, `Fatal`, `Error`, `Warn`, `Info`, `Debug`, `Trace`
+
+#### `-l, --loose`
+Creates the archive even if some files are missing. By default, missing files cause an error and don't result
+in a created file. Use this setting with care if you know some files are fine to be missing.
+
+#### `-s, --source`
+Pack a zip archive of source files instead of a map release, includes files such as .map, editorimages, misc_models, etc.
+
+#### `-f, --force`
+Writes the output file even if it already exists. By default Pack3r doesn't overwrite existing pk3/zip files.
+
+#### `-m --mods`
+Includes pk3s from mod folders when scanning for assets. Useful for things like tracemaps and speakerscripts that are
+created in fs_game directory.
+
+#### `-sd, --shaderdebug`
+Prints detailed information about which shaders are required by the map, and where they are referenced (at least `--verbosity Debug` needed)
+
+#### `-rd, --referencedebug`
+Prints detailed information about which files are required by the map, and where they are referenced (at least `--verbosity Info` needed)
+
+#### `-p, --pk3, --includepk3`
+Scan pk3 files and pk3dir-directories in etmain when indexing files (off by default for performance reasons).
+
+#### `-ns --noscan`
+Don't scan these pk3s/directories at all when indexing files.
+
+#### `-np --nopack`
+Scan these pk3s/directories, but don't pack their contents (for example pak0.pk3).
+
+#### `-?, -h, --help`
+Prints help about usage and possible options, and their default values
+
+#### `--version`
+Prints the build version, include this in bug reports
+
 
 ## Limitations
 - Usable only through CLI, no GUI application is planned
 - Only brush primitives map format is supported (NetRadiant default)
-- Shaders/textures are parsed from `ase`, `md3`, `mdc`, `skin` files. Other model formats such as `obj` are not yet supported (open an issue).
+- Shaders/textures are coarsely parsed from `ase`, `md3`, `mdc`, `skin` files. Other model formats such as `obj` are not yet supported (open an issue). Models created by esoteric tools might not be parsed correctly even though radiant supports them
 - `terrain` shaders (1to2 etc) are not supported (open an issue)
-- For performance reasons only a subset of files are considered for packing, see `PackableFile()` in file `Tokens.cs`
+- For performance reasons only a subset of file extensions are packed: `tga|jpg|md3|mdc|mdm|ase|obj|fbx|shader|wav|roq|skin`
 
 ## File priority order
-1. `pak0.pk3` (and other `--exclude` pk3s/directories), if a file or shader is found there, it won't be included in the release
+1. `pak0.pk3` (and other `--nopack` pk3s/directories), if a file or shader is found there, it won't be included in the release
 2. Files inside the _relative_ `etmain` of your map file (directory contaning `/maps`)
 3. `etmain`, if the map is for example in `some.pk3dir/maps/mymap.map`
 4. `pk3dir`-folders in `etmain`, in reverse alphabetical order
@@ -62,12 +101,12 @@ Mapscript must be in `etmain/void.pk3dir/maps/` in this case and not directly in
 
 ## Example usage
 
-### Pack a release-ready mymap.pk3 to etmain
+### Pack a release-ready archive to `C:\ET\etmain\mymap.pk3`
 ```bash
 .\Pack3r 'C:\ET\etmain\maps\mymap.map'
 ```
 
-### Pack a release-ready beta release mymap_b1_.pk3 to etmain
+### Pack a release-ready archive to `C:\ET\etmain\mymap_b1.pk3` with renamed bsp
 ```bash
 .\Pack3r 'C:\ET\etmain\maps\mymap.map' -r mymap_b1
 .\Pack3r 'C:\ET\etmain\maps\mymap.map' --rename mymap_b1
@@ -86,7 +125,6 @@ Mapscript must be in `etmain/void.pk3dir/maps/` in this case and not directly in
 ```
 
 ### Share map source with someone else
-You can optionally delete bsp and lightmaps from the zip after packing to reduce file size
 ```bash
 .\Pack3r 'C:\ET\etmain\maps\mymap.map' -s -l -o 'C:\mymap_source.zip'
 .\Pack3r 'C:\ET\etmain\maps\mymap.map' --source --loose --output 'C:\mymap_source.zip'
@@ -94,5 +132,5 @@ You can optionally delete bsp and lightmaps from the zip after packing to reduce
 
 ### Pack a map while ignoring some pk3s in etmain and including others
 ```bash
-.\Pack3r 'C:\ET\etmain\maps\mymap.map' --includepk3 --ignore skies_MASTER.pk3
+.\Pack3r 'C:\ET\etmain\maps\mymap.map' --pk3 --noscan skies_MASTER.pk3
 ```
