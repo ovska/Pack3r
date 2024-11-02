@@ -35,29 +35,17 @@ public class ShaderParser(
         ConcurrentDictionary<QPath, Shader> allShaders = [];
         ConcurrentDictionary<QPath, List<Shader>> duplicateShaders = [];
 
-        var whitelistsBySource = await ParseShaderLists(map, cancellationToken);
         int shaderFileCount = 0;
 
         using (var progress = progressManager.Create("Parsing shader files", max: null))
         {
             await Parallel.ForEachAsync(map.AssetSources, Global.ParallelOptions(cancellationToken), async (source, ct) =>
             {
-                var whitelist = whitelistsBySource.GetValueOrDefault(source);
-
                 bool skipPredicate(string name)
                 {
                     progress.Report(Interlocked.Increment(ref shaderFileCount));
 
                     string fileName = Path.GetFileNameWithoutExtension(name);
-
-                    if (whitelist is not null &&
-                        !fileName.StartsWithF("levelshots") &&
-                        !whitelist.Contains(fileName))
-                    {
-                        if (options.ShaderDebug)
-                            logger.Debug($"Skipped parsing shaders from {getName()} (not in shaderlist)");
-                        return true;
-                    }
 
                     if (fileName.EqualsF("q3shadersCopyForRadiant"))
                     {
@@ -496,43 +484,6 @@ public class ShaderParser(
         }
 
         return false;
-    }
-
-    private async Task<Dictionary<AssetSource, HashSet<QString>>> ParseShaderLists(
-        Map map,
-        CancellationToken cancellationToken)
-    {
-        if (!options.UseShaderlist)
-            return [];
-
-        var dict = new Dictionary<AssetSource, HashSet<QString>>();
-
-        foreach (var source in map.AssetSources)
-        {
-            var shaderlistAsset = source.GetShaderlist();
-
-            if (shaderlistAsset is null)
-                continue;
-
-            try
-            {
-                HashSet<QString> allowedFiles = [];
-
-                await foreach (var line in reader.ReadLines(shaderlistAsset, default, cancellationToken))
-                {
-                    allowedFiles.Add(line.Value);
-                }
-
-                dict.Add(source, allowedFiles);
-            }
-            catch (Exception e)
-            {
-                logger.Exception(e, $"Could not read shaderlist '{shaderlistAsset.FullPath}'");
-                throw new ControlledException();
-            }
-        }
-
-        return dict;
     }
 
     private static readonly ImmutableArray<string> _skySuffixes =

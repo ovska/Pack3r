@@ -55,11 +55,6 @@ public class RootCommand
     public bool Source { get; set; }
 
     [CliOption(
-        Description = "Only read shaders present in shaderlist.txt if one exists",
-        Aliases = ["-sl"])]
-    public bool Shaderlist { get; set; }
-
-    [CliOption(
         Description = "Print shader resolution details (Debug verbosity needed)",
         Aliases = ["-sd"])]
     public bool ShaderDebug { get; set; }
@@ -126,10 +121,9 @@ public class RootCommand
             LogLevel = Verbosity,
             Rename = Rename,
             RequireAllAssets = !Loose,
-            UseShaderlist = Shaderlist,
             ShaderDebug = ShaderDebug,
             ReferenceDebug = ReferenceDebug,
-        }); ; ;
+        });
     }
 
     private FileInfo ResolveMap()
