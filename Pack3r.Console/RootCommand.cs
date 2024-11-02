@@ -8,7 +8,8 @@ namespace Pack3r.Console;
 
 [CliCommand(
     Description = "Pack3r, tool to create release-ready pk3s from NetRadiant maps",
-    NameCasingConvention = CliNameCasingConvention.LowerCase)]
+    NameCasingConvention = CliNameCasingConvention.LowerCase,
+    ShortFormAutoGenerate = false)]
 public class RootCommand
 {
     [CliArgument(
@@ -21,28 +22,36 @@ public class RootCommand
     [CliOption(
         Description = "Path to destination pk3/zip (or directory where it will be written), defaults to etmain/mapname.pk3",
         Required = false,
-        ValidationRules = CliValidationRules.LegalPath)]
+        ValidationRules = CliValidationRules.LegalPath,
+        Aliases = ["-o"])]
     public FileSystemInfo? Output { get; set; }
 
-    [CliOption(Description = "Discover packed files and estimate file size without creating a pk3")]
+    [CliOption(
+        Description = "Discover packed files and estimate file size without creating a pk3",
+        Aliases = ["-d"])]
     public bool DryRun { get; set; }
 
     [CliOption(
         Description = "Name of the map after packing (renames bsp, lightmaps, mapscript etc.)",
         Required = false,
-        ValidationRules = CliValidationRules.LegalFileName)]
+        ValidationRules = CliValidationRules.LegalFileName,
+        Aliases = ["-r"])]
     public string? Rename { get; set; }
 
     [CliOption(
         Description = "Log severity threshold",
-        Arity = CliArgumentArity.ZeroOrOne)]
+        Arity = CliArgumentArity.ZeroOrOne,
+        Aliases = ["-v"])]
     public LogLevel Verbosity { get; set; } = LogLevel.Info;
 
-    [CliOption(Description = "Complete packing even if some files are missing")]
+    [CliOption(
+        Description = "Complete packing even if some files are missing",
+        Aliases = ["-l"])]
     public bool Loose { get; set; }
 
     [CliOption(
-        Description = "Pack only source files (.map, editorimages, misc_models) without packing BSP & lightmaps")]
+        Description = "Pack only source files (.map, editorimages, misc_models) without packing BSP & lightmaps",
+        Aliases = ["-s"])]
     public bool Source { get; set; }
 
     [CliOption(
@@ -67,7 +76,7 @@ public class RootCommand
 
     [CliOption(
         Description = "Include pk3 files and pk3dirs in etmain when indexing files",
-        Aliases = ["-pk3"])]
+        Aliases = ["-p", "--pk3"])]
     public bool IncludePk3 { get; set; }
 
     [CliOption(
