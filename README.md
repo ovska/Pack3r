@@ -85,7 +85,7 @@ Prints the build version, include this in bug reports
 - Only brush primitives map format is supported (NetRadiant default)
 - Shaders/textures are coarsely parsed from `ase`, `md3`, `mdc`, `skin` files. Other model formats such as `obj` are not yet supported (open an issue). Models created by esoteric tools might not be parsed correctly even though radiant supports them
 - `terrain` shaders (1to2 etc) are not supported (open an issue)
-- For performance reasons only a subset of file extensions are packed: `tga|jpg|md3|mdc|mdm|ase|obj|fbx|shader|wav|roq|skin`
+- For performance reasons only a subset of file extensions are packed: `tga` `jpg` `md3` `mdc` `mdm` `ase` `obj` `fbx` `shader` `wav` `roq` `skin`
 
 ## File priority order
 1. `pak0.pk3` (and other `--nopack` pk3s/directories), if a file or shader is found there, it won't be included in the release
