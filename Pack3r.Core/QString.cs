@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 
@@ -6,6 +7,8 @@ namespace Pack3r;
 
 public readonly struct QString : IEquatable<QString>, IComparable<QString>, IEquatable<string>
 {
+    public static readonly ComparerImpl Comparer = new();
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static implicit operator ReadOnlySpan<char>(QString value) => value.Span;
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static implicit operator ReadOnlyMemory<char>(QString value) => value.Value;
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static implicit operator QString(string value) => new(value);
@@ -67,4 +70,13 @@ public readonly struct QString : IEquatable<QString>, IComparable<QString>, IEqu
     public static bool operator <=(QString left, QString right) => left.CompareTo(right) <= 0;
     public static bool operator >(QString left, QString right) => left.CompareTo(right) > 0;
     public static bool operator >=(QString left, QString right) => left.CompareTo(right) >= 0;
+
+    public sealed class ComparerImpl : IEqualityComparer<QString>, IAlternateEqualityComparer<ReadOnlySpan<char>, QString>
+    {
+        public QString Create(ReadOnlySpan<char> alternate) => new(alternate.ToString());
+        public bool Equals(ReadOnlySpan<char> alternate, QString other) => alternate.Equals(other.Value.Span, StringComparison.OrdinalIgnoreCase);
+        public bool Equals(QString x, QString y) => x.Value.Span.Equals(y.Value.Span, StringComparison.OrdinalIgnoreCase);
+        public int GetHashCode(ReadOnlySpan<char> alternate) => CultureInfo.InvariantCulture.CompareInfo.GetHashCode(alternate, CompareOptions.OrdinalIgnoreCase);
+        public int GetHashCode([DisallowNull] QString obj) => CultureInfo.InvariantCulture.CompareInfo.GetHashCode(obj.Span, CompareOptions.OrdinalIgnoreCase);
+    }
 }

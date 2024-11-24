@@ -94,7 +94,7 @@ public class AssetService(
             }
             else
             {
-                logger.Info($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
+                logger.Trace($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
             }
         }
         else
@@ -120,7 +120,7 @@ public class AssetService(
         }
         else
         {
-            logger.Info($"Objdata skipped, file not found in '{objdata.FullName}'");
+            logger.Trace($"Objdata skipped, file not found in '{objdata.FullName}'");
         }
 
         var arena = new FileInfo(Path.Combine(map.GetMapRoot(), "scripts", $"{map.Name}.arena"));
@@ -152,7 +152,7 @@ public class AssetService(
         }
         else
         {
-            logger.Info($"Arena skipped, file not found in '{arena.FullName}'");
+            logger.Trace($"Arena skipped, file not found in '{arena.FullName}'");
         }
 
         if (TryGetLevelshot(out FileInfo levelshot))
@@ -168,7 +168,7 @@ public class AssetService(
         }
         else
         {
-            logger.Info(
+            logger.Trace(
                 $"Levelshot skipped, file not found in '{Path.GetFileNameWithoutExtension(levelshot.FullName.AsSpan())}.tga/.jpg'");
         }
 

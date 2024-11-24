@@ -1,5 +1,4 @@
-﻿using Pack3r.Extensions;
-using Pack3r.Logging;
+﻿using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Progress;
 

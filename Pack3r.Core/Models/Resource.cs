@@ -24,7 +24,7 @@ public sealed class Resource : IEquatable<Resource>
 
     public bool Equals(Resource? other)
     {
-        return IsShader == other?.IsShader && Value.Equals(other.Value);
+        return IsShader == other!.IsShader && Value.Equals(other.Value);
     }
 
     public override int GetHashCode()

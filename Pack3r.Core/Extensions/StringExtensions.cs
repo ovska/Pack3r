@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Text.RegularExpressions;
-using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r.Extensions;

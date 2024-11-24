@@ -1,7 +1,5 @@
-﻿using System.Collections.Generic;
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.IO;
-using Pack3r.Models;
 
 namespace Pack3r.Tests.ExtensionTests;
 
@@ -116,16 +114,30 @@ public static class MemoryTests
         Assert.Equal(expected, tokens);
     }
 
-    public static IEnumerable<object[]> MapscriptTokens => (((string, string[])[])[
-        ("remapshader testi testi", ["remapshader", "testi", "testi"]),
-        ("remapshader \"testi\" testi", ["remapshader", "testi", "testi"]),
-        ("remapshader \"testi\" \"testi\"", ["remapshader", "testi", "testi"]),
-        ("\"origin\" \"-1 -5 -99\"", ["origin", "-1 -5 -99"]),
-        ("\"origin\" \"-24 -72 -96\"", ["origin", "-24 -72 -96"]),
-        ("\"-24 -72 -96\" \"origin\"", [ "-24 -72 -96", "origin"]),
-        ("\"message\" \"hello, world\"", ["message", "hello, world"]),
-    ])
-    .SelectMany(x => new[] { x, (x.Item1.Replace("\" \"", "\"\t\""), x.Item2) })
-    .Select(x => new object[] { x.Item1, x.Item2 });
+    public static TheoryData<string, string[]> MapscriptTokens
+    {
+        get
+        {
+            var data = new TheoryData<string, string[]>();
+
+            (string, string[])[] cases =
+            [
+                ("remapshader testi testi", ["remapshader", "testi", "testi"]),
+                ("remapshader \"testi\" testi", ["remapshader", "testi", "testi"]),
+                ("remapshader \"testi\" \"testi\"", ["remapshader", "testi", "testi"]),
+                ("\"origin\" \"-1 -5 -99\"", ["origin", "-1 -5 -99"]),
+                ("\"origin\" \"-24 -72 -96\"", ["origin", "-24 -72 -96"]),
+                ("\"-24 -72 -96\" \"origin\"", [ "-24 -72 -96", "origin"]),
+                ("\"message\" \"hello, world\"", ["message", "hello, world"]),
+            ];
+
+            foreach (var x in cases.SelectMany(x => new[] { x, (x.Item1.Replace("\" \"", "\"\t\""), x.Item2) }))
+            {
+                data.Add(x.Item1, x.Item2);
+            }
+
+            return data;
+        }
+    }
 
 }

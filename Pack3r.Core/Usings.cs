@@ -1,0 +1,1 @@
+﻿global using ResourceList = System.Collections.Generic.HashSet<Pack3r.Models.Resource>;

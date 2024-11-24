@@ -26,7 +26,7 @@ public class MapFileParser(
         State state = State.None;
         char expect = default;
 
-        Dictionary<QString, (QString value, Line line)> entitydata = [];
+        Dictionary<QString, (QString value, Line line)> entitydata = new(QString.Comparer);
         HashSet<QString> nonPrefixedShaders = [];
         ResourceList shaders = [];
         ResourceList resources = [];
@@ -189,6 +189,8 @@ public class MapFileParser(
 
         void HandleKeysAndClear()
         {
+            var lu = entitydata.GetAlternateLookup<ReadOnlySpan<char>>();
+
             foreach (var (_key, (value, line)) in entitydata)
             {
                 var key = _key.Span;
@@ -210,7 +212,7 @@ public class MapFileParser(
                 {
                     if (key.Length == 5)
                     {
-                        bool isMiscModel = IsClassName("misc_model");
+                        bool isMiscModel = IsClassName(in lu, "misc_model");
                         var res = new Resource(value, isShader: false, in line, sourceOnly: isMiscModel);
 
                         if (options.OnlySource || !isMiscModel)
@@ -222,9 +224,7 @@ public class MapFileParser(
                         if (!miscModels.TryGetValue(res, out var list))
                             miscModels[res] = list = [];
 
-                        list.Add(new ReferenceMiscModel(
-                            value,
-                            entitydata.Select(kvp => (kvp.Key, kvp.Value.value))));
+                        list.Add(new ReferenceMiscModel(value, entitydata));
                     }
                     else if (key.Length == 6 && key[5] == '2')
                     {
@@ -239,7 +239,7 @@ public class MapFileParser(
                     resources.Add(res);
                     referenceResources.Add(res);
                 }
-                else if (key.EqualsF("noise") || (key.EqualsF("sound") && IsClassName("dlight")))
+                else if (key.EqualsF("noise") || (key.EqualsF("sound") && IsClassName(in lu, "dlight")))
                 {
                     if (!value.Span.EqualsF("NOSOUND"))
                         resources.Add(Resource.File(value, in line));
@@ -248,8 +248,7 @@ public class MapFileParser(
                 {
                     // terrains require some extra trickery
                     QPath val = value;
-                    if (entitydata.ContainsKey("terrain".AsMemory()) &&
-                        !value.Span.StartsWithF("textures/"))
+                    if (lu.ContainsKey("terrain") && !value.Span.StartsWithF("textures/"))
                     {
                         val = $"textures/{value}".AsMemory();
                         unsupTerrains.Add(currentEntity);
@@ -269,7 +268,7 @@ public class MapFileParser(
                 {
                     shaders.Add(Resource.Shader(value, in line));
                 }
-                else if (!hasStyleLights && key.EqualsF("style") && IsClassName("light"))
+                else if (!hasStyleLights && key.EqualsF("style") && IsClassName(in lu, "light"))
                 {
                     hasStyleLights = true;
                 }
@@ -279,9 +278,11 @@ public class MapFileParser(
             entitydata.Clear();
         }
 
-        bool IsClassName(string className)
+        static bool IsClassName(
+            ref readonly Dictionary<QString, (QString value, Line line)>.AlternateLookup<ReadOnlySpan<char>> lookup,
+            string className)
         {
-            return entitydata.GetValueOrDefault("classname".AsMemory()).value.Equals(className);
+            return lookup.TryGetValue("classname", out var value) && value.value.Equals(className);
         }
     }
 
@@ -291,47 +292,40 @@ public class MapFileParser(
     /// <param name="shaderPart"><c>pgm/holo 0 0 0</c></param>
     private static bool CanSkip(QPath shaderPart)
     {
-        var span = shaderPart.Span;
-
-        const string common = "common/";
-        const string caulk = "caulk ";
-        const string nodraw = "nodraw ";
-        const string trigger = "trigger ";
-
-        if (span.Length > 12 &&
+        if (shaderPart.Span is { Length: > 12 } span &&
             span[0] == 'c' &&
             span[6] == '/' &&
             span.StartsWith("common/"))
         {
-            span = span[common.Length..];
+            span = span["common/".Length..];
 
             return span[0] switch
             {
-                'c' when span.StartsWith(caulk) => true,
-                'n' when span.StartsWith(nodraw) => true,
-                't' when span.StartsWith(trigger) => true,
+                'c' when span.StartsWith("caulk ") => true,
+                'n' when span.StartsWith("nodraw ") => true,
+                't' when span.StartsWith("trigger ") => true,
                 _ => false
             };
         }
 
         return false;
     }
+}
 
-    private enum State : byte
-    {
-        /// <summary>Top level, expecting entity</summary>
-        None = 0,
+file enum State : byte
+{
+    /// <summary>Top level, expecting entity</summary>
+    None = 0,
 
-        /// <summary>Entity header read, </summary>
-        Entity = 1,
+    /// <summary>Entity header read, </summary>
+    Entity = 1,
 
-        /// <summary>BrushDef started</summary>
-        BrushDef = 2,
+    /// <summary>BrushDef started</summary>
+    BrushDef = 2,
 
-        /// <summary>PatchDef started</summary>
-        PatchDef = 3,
+    /// <summary>PatchDef started</summary>
+    PatchDef = 3,
 
-        /// <summary>BrushDef/PatchDef ended</summary>
-        AfterDef = 4,
-    }
+    /// <summary>BrushDef/PatchDef ended</summary>
+    AfterDef = 4,
 }
