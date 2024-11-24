@@ -39,8 +39,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DotMake.CommandLine" Version="1.8.7" />
-    <PackageReference Include="Pure.DI" Version="2.1.10">
+    <PackageReference Include="DotMake.CommandLine" Version="1.8.8" />
+    <PackageReference Include="Pure.DI" Version="2.1.40">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

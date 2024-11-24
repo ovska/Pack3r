@@ -140,10 +140,8 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger, AppLifeti
             stream.CopyTo(ms);
         }
 
-        if (!ms.TryGetBuffer(out ArraySegment<byte> buffer))
-            buffer = ms.ToArray();
-
-        ReadOnlySpan<ushort> bytePairs = MemoryMarshal.Cast<byte, ushort>(buffer.AsSpan());
+        ReadOnlySpan<byte> buffer = ms.GetSpan();
+        ReadOnlySpan<ushort> bytePairs = MemoryMarshal.Cast<byte, ushort>(buffer);
 
         // A progressive DCT-based JPEG can be identified by bytes “0xFF, 0xC2″
         // Also, progressive JPEG images usually contain .. a couple of “Start of Scan” matches (bytes: “0xFF, 0xDA”)

@@ -1,4 +1,5 @@
 ﻿using Pack3r.Extensions;
+using Pack3r.IO;
 
 namespace Pack3r.Models;
 
@@ -37,14 +38,14 @@ public sealed class ReferenceMiscModel
 
     public ReferenceMiscModel(
         QPath model,
-        IEnumerable<(QString key, QString value)> entitydata)
+        Dictionary<QString, (QString value, Line line)> entitydata)
     {
         Model = model;
         Remaps = [];
 
-        Span<Range> ranges = stackalloc Range[16];
+        Span<Range> ranges = stackalloc Range[2];
 
-        foreach (var (key, value) in entitydata)
+        foreach (var (key, (value, _)) in entitydata)
         {
             if (!key.Span.StartsWithF("_remap"))
             {

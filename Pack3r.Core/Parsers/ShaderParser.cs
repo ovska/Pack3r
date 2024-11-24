@@ -486,10 +486,8 @@ public class ShaderParser(
         return false;
     }
 
-    private static readonly ImmutableArray<string> _skySuffixes =
-    [
-        "_bk", "_dn", "_ft", "_up", "_rt", "_lf"
-    ];
+    private static ReadOnlySpan<string> _skySuffixes => _skySuffixesArr;
+    private static readonly string[] _skySuffixesArr = ["_bk", "_dn", "_ft", "_up", "_rt", "_lf"];
 
     private static readonly ImmutableArray<string> _simpleShaderRefPrefixes =
     [
@@ -506,12 +504,9 @@ public class ShaderParser(
         "q3map_normalImage",
     ];
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool CanSkipShaderDirective(ReadOnlySpan<char> line)
     {
-        // shouldn't happen
-        if (line.IsEmpty)
-            return true;
-
         return (line[0] | 0x20) switch
         {
             'q' => !options.OnlySource && line.StartsWithF("qer_"),
