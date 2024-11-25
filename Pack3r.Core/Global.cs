@@ -30,13 +30,13 @@ internal static class Global
         throw new InvalidDataException($"QPath is too long ({path.Length}, max 64): '{path.ToString().NormalizePath()}'");
     }
 
-    public static readonly object ConsoleLock = new();
+    public static readonly Lock ConsoleLock = new();
 
     public static readonly RecyclableMemoryStreamManager StreamManager = new(new()
     {
         AggressiveBufferReturn = true,
         GenerateCallStacks = Debugger.IsAttached,
-        ThrowExceptionOnToArray = false,
+        ThrowExceptionOnToArray = true,
     });
 
     public static string Version => typeof(Global).Assembly.GetName().Version?.ToString(3) ?? "?.?.?";

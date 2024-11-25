@@ -375,7 +375,7 @@ public class ShaderParser(
                         token = shader.Name;
                     }
 
-                    foreach (var suffix in _skySuffixes)
+                    foreach (var suffix in SkySuffixes)
                     {
                         shader.Resources.Add($"{token}{suffix}".AsMemory());
                     }
@@ -486,7 +486,7 @@ public class ShaderParser(
         return false;
     }
 
-    private static ReadOnlySpan<string> _skySuffixes => _skySuffixesArr;
+    private static ReadOnlySpan<string> SkySuffixes => _skySuffixesArr;
     private static readonly string[] _skySuffixesArr = ["_bk", "_dn", "_ft", "_up", "_rt", "_lf"];
 
     private static readonly ImmutableArray<string> _simpleShaderRefPrefixes =
