@@ -102,7 +102,8 @@ public class RootCommand
         Description = "Adds all pk3s in mod directories to exclude-list",
         Arity = CliArgumentArity.ZeroOrMore,
         ValidationRules = CliValidationRules.LegalPath,
-        AllowMultipleArgumentsPerToken = true)]
+        AllowMultipleArgumentsPerToken = true,
+        Aliases = ["-m"])]
     public List<string> Mods { get; set; } = [];
 
     public Task<int> RunAsync()
