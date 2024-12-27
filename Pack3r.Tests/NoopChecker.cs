@@ -9,7 +9,7 @@ public sealed class NoopChecker : IIntegrityChecker
     {
     }
 
-    ValueTask IIntegrityChecker.CheckIntegrity(IAsset asset)
+    void IIntegrityChecker.CheckIntegrity(IAsset asset)
     {
         throw new NotImplementedException();
     }
