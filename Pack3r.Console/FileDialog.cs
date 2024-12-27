@@ -93,68 +93,72 @@ internal partial class OpenFileDialog
         fixed (char* windowTitle = "Open map file (run as CLI for more options)")
         {
             OpenFileName ofn = new();
-            ofn.structSize = Marshal.SizeOf(ofn);
-            ofn.filter = filter;
-            ofn.fileTitle = fileTitle;
-            ofn.initialDir = initialDir;
-            ofn.title = windowTitle;
-            ofn.flags = (int)(
-                OpenFileNameFlags.OFN_DONTADDTORECENT |
-                OpenFileNameFlags.OFN_HIDEREADONLY |
-                OpenFileNameFlags.OFN_EXPLORER |
-                OpenFileNameFlags.OFN_FILEMUSTEXIST |
-                OpenFileNameFlags.OFN_PATHMUSTEXIST
-                );
 
-            // Create buffer for file names
-            ofn.file = Marshal.AllocHGlobal(MAX_FILE_LENGTH * Marshal.SystemDefaultCharSize);
-            ofn.maxFile = MAX_FILE_LENGTH;
-
-            // Initialize buffer with NULL bytes
-            for (int i = 0; i < MAX_FILE_LENGTH * Marshal.SystemDefaultCharSize; i++)
+            try
             {
-                Marshal.WriteByte(ofn.file, i, 0);
-            }
+                ofn.structSize = Marshal.SizeOf(ofn);
+                ofn.filter = filter;
+                ofn.fileTitle = fileTitle;
+                ofn.initialDir = initialDir;
+                ofn.title = windowTitle;
+                ofn.flags = (int)(
+                    OpenFileNameFlags.OFN_DONTADDTORECENT |
+                    OpenFileNameFlags.OFN_HIDEREADONLY |
+                    OpenFileNameFlags.OFN_EXPLORER |
+                    OpenFileNameFlags.OFN_FILEMUSTEXIST |
+                    OpenFileNameFlags.OFN_PATHMUSTEXIST
+                    );
 
-            if (Multiselect)
-            {
-                ofn.flags |= (int)OpenFileNameFlags.OFN_ALLOWMULTISELECT;
-            }
+                // Create buffer for file names
+                ofn.file = Marshal.AllocHGlobal(MAX_FILE_LENGTH * Marshal.SystemDefaultCharSize);
+                ofn.maxFile = MAX_FILE_LENGTH;
 
-            Success = GetOpenFileName(ref ofn);
+                // Initialize buffer with NULL bytes
+                new Span<byte>((void*)ofn.file, Marshal.SystemDefaultCharSize).Clear();
 
-            if (Success)
-            {
-                nint filePointer = ofn.file;
-                long pointer = filePointer;
-                string file = Marshal.PtrToStringAuto(filePointer);
-                List<string> strList = [];
-
-                // Retrieve file names
-                while (file.Length > 0)
+                if (Multiselect)
                 {
-                    strList.Add(file);
-
-                    pointer += file.Length * Marshal.SystemDefaultCharSize + Marshal.SystemDefaultCharSize;
-                    filePointer = (nint)pointer;
-                    file = Marshal.PtrToStringAuto(filePointer);
+                    ofn.flags |= (int)OpenFileNameFlags.OFN_ALLOWMULTISELECT;
                 }
 
-                if (strList.Count > 1)
+                Success = GetOpenFileName(ref ofn);
+
+                if (Success)
                 {
-                    Files = new string[strList.Count - 1];
-                    for (int i = 1; i < strList.Count; i++)
+                    nint filePointer = ofn.file;
+                    long pointer = filePointer;
+                    string file = Marshal.PtrToStringAuto(filePointer);
+                    List<string> strList = [];
+
+                    // Retrieve file names
+                    while (file.Length > 0)
                     {
-                        Files[i - 1] = Path.Combine(strList[0], strList[i]);
+                        strList.Add(file);
+
+                        pointer += file.Length * Marshal.SystemDefaultCharSize + Marshal.SystemDefaultCharSize;
+                        filePointer = (nint)pointer;
+                        file = Marshal.PtrToStringAuto(filePointer);
+                    }
+
+                    if (strList.Count > 1)
+                    {
+                        Files = new string[strList.Count - 1];
+                        for (int i = 1; i < strList.Count; i++)
+                        {
+                            Files[i - 1] = Path.Combine(strList[0], strList[i]);
+                        }
+                    }
+                    else
+                    {
+                        Files = [.. strList];
                     }
                 }
-                else
-                {
-                    Files = [..strList];
-                }
             }
-
-            Marshal.FreeHGlobal(ofn.file);
+            finally
+            {
+                if (ofn.file != IntPtr.Zero)
+                    Marshal.FreeHGlobal(ofn.file);
+            }
         }
     }
 }

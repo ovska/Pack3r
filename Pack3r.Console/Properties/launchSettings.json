@@ -20,6 +20,10 @@
       "commandName": "Project",
       "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\unsung.map\" --mods etjump_stable -r unsung_packertest"
     },
+    "tmp": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sunjump.map\" -d -m etjump_stable"
+    },
     "noargs": {
       "commandName": "Project",
       "commandLineArgs": ""

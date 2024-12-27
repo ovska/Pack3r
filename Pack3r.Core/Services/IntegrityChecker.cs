@@ -1,5 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using CommunityToolkit.HighPerformance;
+using CommunityToolkit.HighPerformance.Buffers;
 using NAudio.Wave;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -83,7 +85,7 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger, AppLifeti
 
         if (extension.EqualsF(".jpg"))
         {
-            VerifyJpg(fullPath, stream, useAsync: asset.Source is not Pk3AssetSource);
+            VerifyJpg(fullPath, stream);
             return;
         }
 
@@ -124,24 +126,15 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger, AppLifeti
         }
     }
 
-    private void VerifyJpg(string fullPath, Stream stream, bool useAsync)
+    private void VerifyJpg(string fullPath, Stream stream)
     {
         lifetime.CancellationToken.ThrowIfCancellationRequested();
 
         // some light testing determined the average jpg to be <85kb
-        using var ms = Global.StreamManager.GetStream(nameof(VerifyJpg), requiredSize: 1024 * 128, asContiguousBuffer: true);
+        using var writer = new ArrayPoolBufferWriter<byte>(initialCapacity: 1024 * 128);
+        stream.CopyTo(writer.AsStream());
 
-        if (useAsync)
-        {
-            stream.CopyToAsync(ms, lifetime.CancellationToken).GetAwaiter().GetResult();
-        }
-        else
-        {
-            stream.CopyTo(ms);
-        }
-
-        ReadOnlySpan<byte> buffer = ms.GetSpan();
-        ReadOnlySpan<ushort> bytePairs = MemoryMarshal.Cast<byte, ushort>(buffer);
+        ReadOnlySpan<ushort> bytePairs = MemoryMarshal.Cast<byte, ushort>(writer.WrittenSpan);
 
         // A progressive DCT-based JPEG can be identified by bytes “0xFF, 0xC2″
         // Also, progressive JPEG images usually contain .. a couple of “Start of Scan” matches (bytes: “0xFF, 0xDA”)
@@ -149,7 +142,7 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger, AppLifeti
         const ushort DCTbytes = 0xFF | (0xC2 << 8);
         const ushort SOSbytes = 0xFF | (0xDA << 8);
 
-        if (bytePairs.IndexOf(DCTbytes) >= 0 && bytePairs.Count(SOSbytes) >= 6)
+        if (bytePairs.IndexOf(DCTbytes) >= 0 && System.MemoryExtensions.Count(bytePairs, SOSbytes) >= 6)
         {
             _jpgs.Add(fullPath.NormalizePath());
         }

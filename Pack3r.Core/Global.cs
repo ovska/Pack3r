@@ -1,5 +1,4 @@
-﻿using Microsoft.IO;
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -32,14 +31,7 @@ internal static class Global
 
     public static readonly Lock ConsoleLock = new();
 
-    public static readonly RecyclableMemoryStreamManager StreamManager = new(new()
-    {
-        AggressiveBufferReturn = true,
-        GenerateCallStacks = Debugger.IsAttached,
-        ThrowExceptionOnToArray = true,
-    });
-
-    public static string Version => typeof(Global).Assembly.GetName().Version?.ToString(3) ?? "?.?.?";
+    public static string Version { get; } = typeof(Global).Assembly.GetName().Version?.ToString(3) ?? "?.?.?";
 
     public static string Disclaimer { get; } = $"// Modified by Pack3r {Version}";
 

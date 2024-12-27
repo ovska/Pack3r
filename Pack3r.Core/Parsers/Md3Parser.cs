@@ -14,24 +14,11 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
 
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".md3") || resource.EndsWithF(".mdc");
 
-    public async Task<ResourceList?> Parse(
-        IAsset asset,
-        CancellationToken cancellationToken)
+    public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)
     {
-        using var memoryStream = Global.StreamManager.GetStream(
-            tag: "Md3ParseFile",
-            requiredSize: 1024 * 64,
-            asContiguousBuffer: true);
+        using var data = await asset.GetBytes(1024 * 64, cancellationToken);
 
-        await using (var fileStream = asset.OpenRead(isAsync: true))
-        {
-            await fileStream.CopyToAsync(memoryStream, cancellationToken);
-        }
-
-        if (!memoryStream.TryGetBuffer(out ArraySegment<byte> buffer))
-            buffer = memoryStream.ToArray();
-
-        if (Impl(asset.FullPath, buffer, out var resources, out var error))
+        if (Impl(asset.FullPath, data.Memory.Span, cancellationToken, out var resources, out var error))
         {
             return resources;
         }
@@ -45,17 +32,19 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
     private static bool Impl(
         string fileName,
         ReadOnlySpan<byte> bytes,
+        CancellationToken cancellationToken,
         [NotNullWhen(true)] out ResourceList? resources,
         [NotNullWhen(false)] out string? error)
     {
         return fileName.GetExtension().Equals(".mdc", StringComparison.OrdinalIgnoreCase)
-            ? Impl<MdcHeader, MdcSurface>(fileName, bytes, out resources, out error)
-            : Impl<Md3Header, Md3Surface>(fileName, bytes, out resources, out error);
+            ? Impl<MdcHeader, MdcSurface>(fileName, bytes, cancellationToken, out resources, out error)
+            : Impl<Md3Header, Md3Surface>(fileName, bytes, cancellationToken, out resources, out error);
     }
 
     private static bool Impl<THeader, TSurface>(
         string path,
         ReadOnlySpan<byte> bytes,
+        CancellationToken cancellationToken,
         [NotNullWhen(true)] out ResourceList? resources,
         [NotNullWhen(false)] out string? error)
         where THeader : struct, IModelFormatHeader
@@ -91,6 +80,8 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
 
         for (int i = 0; i < header.SurfaceCount; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             TSurface surface = MemoryMarshal.Read<TSurface>(bytes[surfaceOffset..]);
 
             var surfaceIdent = surface.Ident;
