@@ -18,7 +18,7 @@
     },
     "unsung": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\unsung.map\" -d -m etjump_stable -r unsung_t1"
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\unsung.map\" --mods etjump_stable -r unsung_packertest"
     },
     "noargs": {
       "commandName": "Project",
