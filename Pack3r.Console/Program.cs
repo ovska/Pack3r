@@ -65,10 +65,11 @@ public class Program
             !options.Overwrite &&
             options.Pk3File is { Exists: true } pk3File)
         {
-            if (options.LogLevel == LogLevel.None || !PromptOverwrite(pk3File))
-            {
+            if (options.LogLevel == LogLevel.None)
+                return -1;
+
+            if (!PromptOverwrite(pk3File))
                 return 0;
-            }
         }
 
         try
