@@ -67,8 +67,10 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
+    - name: Restore
+      run: dotnet restore Pack3r.Console --force --disable-build-servers
     - name: Publish
-      run: dotnet publish Pack3r.Console --self-contained -c Release -o release_dir -r ${{ matrix.config.rid }}
+      run: dotnet publish Pack3r.Console --no-restore --disable-build-servers --nologo --self-contained -c Release -o release_dir -r ${{ matrix.config.rid }}
     - name: Create Zip File
       run: 7z a -r pack3r-release.zip ./release_dir/*
     - name: Upload release asset
