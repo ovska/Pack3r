@@ -10,23 +10,6 @@ public static class StringExtensions
 {
     public static string NormalizePath(this string path) => path.Replace(Path.DirectorySeparatorChar, '/');
 
-    public static QString ChangeExtension(this ReadOnlyMemory<char> file, ReadOnlySpan<char> extension)
-    {
-        ReadOnlySpan<char> current = file.GetExtension();
-
-        if (extension.IsEmpty)
-        {
-            return file[..^current.Length];
-        }
-
-        if (current.SequenceEqual(extension))
-        {
-            return file;
-        }
-
-        return $"{file[..^current.Length]}{extension}".AsMemory();
-    }
-
     public static TextureExtension GetTextureExtension(this string path) => GetTextureExtension(path.AsSpan());
     public static TextureExtension GetTextureExtension(this ReadOnlySpan<char> path)
     {

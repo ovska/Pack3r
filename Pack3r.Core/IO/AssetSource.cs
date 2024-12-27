@@ -53,7 +53,9 @@ public abstract class AssetSource : IDisposable
 
     private Dictionary<QString, IAsset> InitializeAssets()
     {
-        Dictionary<QString, IAsset> dict = [];
+        Dictionary<QString, IAsset> dict = new(QString.Comparer);
+        var lookup = dict.GetAlternateLookup<ReadOnlySpan<char>>();
+        Span<char> buffer = stackalloc char[128];
 
         foreach (var asset in EnumerateAssets())
         {
@@ -72,10 +74,19 @@ public abstract class AssetSource : IDisposable
                 dict[key] = asset;
 
                 // add tga since "downcasting" works from tga to jpg
-                dict.TryAdd(key.Value.ChangeExtension(".tga"), asset);
+                if (key.Length <= buffer.Length)
+                {
+                    key.Span[..^4].CopyTo(buffer);
+                    ".tga".CopyTo(buffer[(key.Length - 4)..]);
+                    lookup.TryAdd(buffer[..key.Length], asset);
+                }
+                else
+                {
+                    dict.TryAdd($"{key.Value.Span[..^4]}.tga", asset);
+                }
 
                 // try to add extensionless asset for textures without shader
-                dict.TryAdd(key.Value.ChangeExtension(""), asset);
+                dict.TryAdd(key.TrimExtension(), asset);
                 continue;
             }
             else if (texExt == TextureExtension.Tga)
@@ -83,7 +94,7 @@ public abstract class AssetSource : IDisposable
                 dict[key] = asset;
 
                 // tga takes prio over jpg if there is no texture
-                dict[key.Value.ChangeExtension("")] = asset;
+                dict[key.TrimExtension()] = asset;
             }
         }
 

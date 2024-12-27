@@ -1,4 +1,5 @@
-﻿using System.IO.Compression;
+﻿using System.Buffers;
+using System.IO.Compression;
 using Pack3r.IO;
 
 namespace Pack3r.Models;
@@ -25,6 +26,11 @@ public interface IAsset
     /// </summary>
     /// <returns></returns>
     Stream OpenRead(bool isAsync = false);
+
+    /// <summary>
+    /// Reads the contents as bytes.
+    /// </summary>
+    ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken);
 
     /// <summary>
     /// Creates a new entry to destination archive.
