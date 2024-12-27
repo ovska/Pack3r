@@ -1,6 +1,5 @@
 ﻿using System.Buffers;
 using System.IO.Compression;
-using CommunityToolkit.HighPerformance.Buffers;
 using Pack3r.IO;
 using Pack3r.Models;
 
@@ -20,12 +19,18 @@ internal class FileAsset(string path) : IAsset
 
     public async ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken)
     {
-        var data = await File.ReadAllBytesAsync(path, cancellationToken);
-        var owner = MemoryOwner<byte>.Allocate(data.Length);
-        return owner;
+        return new NoopMemoryOwner(await File.ReadAllBytesAsync(path, cancellationToken));
     }
 
     public Stream OpenRead(bool isAsync = false) => File.OpenRead(FullPath);
+
+    private sealed class NoopMemoryOwner(Memory<byte> data) : IMemoryOwner<byte>
+    {
+        public Memory<byte> Memory => data;
+        public void Dispose()
+        {
+        }
+    }
 }
 
 internal class MockAsset : IAsset
