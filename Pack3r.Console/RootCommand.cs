@@ -180,11 +180,6 @@ public class RootCommand
             Error($"Invalid output path (not pk3 or zip): '{pk3.FullName}'");
         }
 
-        if (!Force && pk3.Exists)
-        {
-            Error($"Output file already exists, use the force-option to overwrite it: '{pk3.FullName}'");
-        }
-
         return pk3;
     }
 

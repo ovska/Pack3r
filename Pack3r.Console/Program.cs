@@ -61,6 +61,16 @@ public class Program
         CancellationToken cancellationToken = app.Lifetime.CancellationToken;
         bool fileCreated = false;
 
+        if (!options.DryRun &&
+            !options.Overwrite &&
+            options.Pk3File is { Exists: true } pk3File)
+        {
+            if (options.LogLevel == LogLevel.None || !PromptOverwrite(pk3File))
+            {
+                return 0;
+            }
+        }
+
         try
         {
             string mapName = Path.GetFileNameWithoutExtension(options.MapFile.FullName);
@@ -135,6 +145,20 @@ public class Program
             app.Lifetime.HandleException(e);
             return -1;
         }
+    }
+
+    private static bool PromptOverwrite(FileInfo pk3)
+    {
+        var color = System.Console.ForegroundColor;
+        System.Console.ForegroundColor = ConsoleColor.Red;
+        System.Console.Write($"Output file already exists: ");
+        System.Console.ForegroundColor = color;
+        System.Console.WriteLine(pk3.FullName);
+        System.Console.Write("Overwrite? ");
+        System.Console.ForegroundColor = ConsoleColor.Cyan;
+        System.Console.WriteLine("Y/N");
+        System.Console.ForegroundColor = color;
+        return System.Console.ReadLine().AsSpan().Trim().EqualsF("y");
     }
 
     private static string[]? AskArgs()
