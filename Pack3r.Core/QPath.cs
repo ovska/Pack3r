@@ -4,7 +4,11 @@ using System.Runtime.CompilerServices;
 
 namespace Pack3r;
 
-public readonly struct QPath : IEquatable<QPath>, IComparable<QPath>, IEquatable<string>
+public readonly struct QPath :
+    IEquatable<QPath>,
+    IComparable<QPath>,
+    IEquatable<string>,
+    ISpanFormattable
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static implicit operator ReadOnlySpan<char>(QPath path) => path.Span;
     [MethodImpl(MethodImplOptions.AggressiveInlining)] public static implicit operator ReadOnlyMemory<char>(QPath path) => path.Value;
@@ -63,6 +67,20 @@ public readonly struct QPath : IEquatable<QPath>, IComparable<QPath>, IEquatable
     public override string ToString() => Value.ToString();
 
     public bool Equals(string? other) => other.AsSpan().Equals(Span, StringComparison.OrdinalIgnoreCase);
+
+    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+    {
+        if (Value.Span.TryCopyTo(destination))
+        {
+            charsWritten = Value.Length;
+            return true;
+        }
+
+        charsWritten = 0;
+        return false;
+    }
+
+    string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => Value.ToString();
 
     public static bool operator ==(QPath left, QPath right) => left.Equals(right);
     public static bool operator !=(QPath left, QPath right) => !(left == right);

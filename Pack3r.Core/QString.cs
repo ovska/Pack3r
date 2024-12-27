@@ -5,7 +5,11 @@ using Pack3r.Extensions;
 
 namespace Pack3r;
 
-public readonly struct QString : IEquatable<QString>, IComparable<QString>, IEquatable<string>
+public readonly struct QString :
+    IEquatable<QString>,
+    IComparable<QString>,
+    IEquatable<string>,
+    ISpanFormattable
 {
     public static readonly ComparerImpl Comparer = new();
 
@@ -75,6 +79,20 @@ public readonly struct QString : IEquatable<QString>, IComparable<QString>, IEqu
 
         return this;
     }
+
+    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+    {
+        if (Value.Span.TryCopyTo(destination))
+        {
+            charsWritten = Value.Length;
+            return true;
+        }
+
+        charsWritten = 0;
+        return false;
+    }
+
+    string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => Value.ToString();
 
     public static bool operator ==(QString left, QString right) => left.Equals(right);
     public static bool operator !=(QString left, QString right) => !(left == right);

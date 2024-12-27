@@ -74,6 +74,7 @@ public abstract class AssetSource : IDisposable
                 dict[key] = asset;
 
                 // add tga since "downcasting" works from tga to jpg
+                // extension is .jpg so it has a known length of 4
                 if (key.Length <= buffer.Length)
                 {
                     key.Span[..^4].CopyTo(buffer);
@@ -82,7 +83,7 @@ public abstract class AssetSource : IDisposable
                 }
                 else
                 {
-                    dict.TryAdd($"{key.Value.Span[..^4]}.tga", asset);
+                    dict.TryAdd($"{key[..^4]}.tga", asset);
                 }
 
                 // try to add extensionless asset for textures without shader
