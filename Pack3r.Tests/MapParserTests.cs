@@ -12,7 +12,7 @@ public static class MapParserTests
     }
 
     [Theory, InlineData(true), InlineData(false)]
-    public static async Task Should_Include_Dev_Assets(bool include)
+    public static void Should_Include_Dev_Assets(bool include)
     {
         var reader = new StringLineReader("""
             // entity 0
@@ -28,7 +28,7 @@ public static class MapParserTests
             }
             """);
 
-        var map = await CreateParser(reader, new PackOptions { OnlySource = include, MapFile = null! })
+        var map = CreateParser(reader, new PackOptions { OnlySource = include, MapFile = null! })
             .ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         if (include)
@@ -43,7 +43,7 @@ public static class MapParserTests
     }
 
     [Fact]
-    public static async Task Should_Parse_Simple_Map()
+    public static void Should_Parse_Simple_Map()
     {
         var reader = new StringLineReader("""
             // entity 0
@@ -67,14 +67,14 @@ public static class MapParserTests
 
         var parser = CreateParser(reader);
 
-        var map = await parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
+        var map = parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         Assert.Single(map.Shaders);
         Assert.Equal("textures/pgm_props/crate_01", map.Shaders.First().Value.ToString());
     }
 
     [Fact]
-    public static async Task Should_Parse_Complex_Map()
+    public static void Should_Parse_Complex_Map()
     {
         var reader = new StringLineReader("""
         // entity 0
@@ -460,7 +460,7 @@ public static class MapParserTests
 
         var parser = CreateParser(reader);
 
-        var map = await parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
+        var map = parser.ParseMapAssets("C:/ET/etmain/maps/test.map", default);
 
         Assert.Single(map.Shaders);
         Assert.Equal("textures/pgm/holo", map.Shaders.First().Value.ToString());

@@ -22,7 +22,7 @@ public class MapscriptParser(
     {
         HashSet<QString> unsupported = [];
 
-        await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
+        await foreach (var line in reader.ReadLines(path, cancellationToken).ConfigureAwait(false))
         {
             // skip everything except: playsound, remapshader, set, create
             if ((line.FirstChar | 0x20) is not ('p' or 'r' or 's' or 'c'))

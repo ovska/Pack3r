@@ -38,7 +38,6 @@ public readonly struct Line : IEquatable<Line>, IResourceSource
         Path = path;
         Index = index;
         Raw = rawValue ?? "";
-        Value = keepRaw ? Raw.AsMemory() : Raw.AsMemory().Trim();
 
         if (keepRaw)
         {

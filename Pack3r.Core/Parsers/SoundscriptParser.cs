@@ -16,7 +16,7 @@ public class SoundscriptParser(
         string path,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await foreach (var line in reader.ReadLines(path, default, cancellationToken).ConfigureAwait(false))
+        await foreach (var line in reader.ReadLines(path, cancellationToken).ConfigureAwait(false))
         {
             if (line.MatchKeyword("sound", out var token))
             {

@@ -8,7 +8,7 @@ namespace Pack3r.Parsers;
 
 public interface IMapFileParser
 {
-    Task<MapAssets> ParseMapAssets(
+    MapAssets ParseMapAssets(
         string path,
         CancellationToken cancellationToken);
 }
@@ -19,7 +19,7 @@ public class MapFileParser(
     PackOptions options)
     : IMapFileParser
 {
-    public async Task<MapAssets> ParseMapAssets(
+    public MapAssets ParseMapAssets(
         string path,
         CancellationToken cancellationToken)
     {
@@ -41,7 +41,7 @@ public class MapFileParser(
         int lineCount = 0;
         var timer = Stopwatch.StartNew();
 
-        await foreach (var line in reader.ReadLines(path, new LineOptions(KeepRaw: true), cancellationToken))
+        foreach (var line in reader.ReadRawLines(path))
         {
             lineCount = line.Index;
 
@@ -84,17 +84,21 @@ public class MapFileParser(
 
             if (state == State.None)
             {
-                if (!line.Raw.StartsWith("// entity ", StringComparison.Ordinal))
+                if (line.Raw.StartsWith("// entity ", StringComparison.Ordinal))
+                {
+                    currentEntity = line.Value["// entity ".Length..];
+                    state = State.Entity;
+                    expect = '{';
+                    continue;
+                }
+                else
                 {
                     logger.Fatal($"Expected line {line.Index} in file '{path}' to contain entity ID, actual value: {line.Raw}");
                     throw new ControlledException();
                 }
-
-                currentEntity = line.Value["// entity ".Length..];
-                state = State.Entity;
-                expect = '{';
-                continue;
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (state == State.Entity)
             {
@@ -139,7 +143,7 @@ public class MapFileParser(
 
                     if (space > 1)
                     {
-                        AddTexture(line.Raw.AsMemory(lastParen + 2, space));
+                        AddTexture(shaders, nonPrefixedShaders, in line, line.Raw.AsMemory(lastParen + 2, space));
                     }
                     else
                     {
@@ -160,13 +164,19 @@ public class MapFileParser(
                 }
 
                 // only non-paren starting line in a patchDef should be the texture
-                AddTexture(line.Value);
+                AddTexture(shaders, nonPrefixedShaders, in line, line.Value);
             }
 
-            void AddTexture(QPath value)
+            static void AddTexture(
+                ResourceList shaders,
+                HashSet<QString> nonPrefixedShaders,
+                ref readonly Line line,
+                QPath value)
             {
                 if (nonPrefixedShaders.Add(value))
+                {
                     shaders.Add(Resource.Shader($"textures/{value}", in line));
+                }
             }
         }
 
@@ -290,9 +300,9 @@ public class MapFileParser(
     /// Whether the shader is one of the most common ones and should be skipped.
     /// </summary>
     /// <param name="shaderPart"><c>pgm/holo 0 0 0</c></param>
-    private static bool CanSkip(QPath shaderPart)
+    private static bool CanSkip(ReadOnlySpan<char> span)
     {
-        if (shaderPart.Span is { Length: > 12 } span &&
+        if (span.Length > 12 &&
             span[0] == 'c' &&
             span[6] == '/' &&
             span.StartsWith("common/"))

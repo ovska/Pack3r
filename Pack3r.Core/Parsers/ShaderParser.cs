@@ -225,7 +225,7 @@ public class ShaderParser(
         ReadOnlyMemory<char> token;
         bool inComment = false;
 
-        await foreach (var _line in reader.ReadLines(asset, default, cancellationToken).ConfigureAwait(false))
+        await foreach (var _line in reader.ReadLines(asset, cancellationToken).ConfigureAwait(false))
         {
             Line line = _line;
 
