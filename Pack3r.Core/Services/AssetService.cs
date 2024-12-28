@@ -33,7 +33,7 @@ public class AssetService(
             _ => throw new EnvironmentException($"maps-directory should be in etmain or etmain/*.pk3dir: '{options.MapFile.FullName}'"),
         };
 
-        MapAssets assets = await mapFileParser.ParseMapAssets(options.MapFile.FullName, cancellationToken);
+        MapAssets assets = mapFileParser.ParseMapAssets(options.MapFile.FullName, cancellationToken);
 
         Map map = new(options)
         {

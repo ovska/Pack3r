@@ -18,7 +18,7 @@ public partial class AseParser(
     {
         ResourceList resouces = [];
 
-        await foreach (var line in reader.ReadLines(asset, default, cancellationToken))
+        await foreach (var line in reader.ReadLines(asset, cancellationToken))
         {
             if (Comment().IsMatch(line.Value.Span))
             {
