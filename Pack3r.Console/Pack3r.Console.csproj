@@ -16,6 +16,9 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- This has ~400kB bigger release than Size, but expected ~10% faster throughput -->
+    <OptimizationPreference>Speed</OptimizationPreference>
+
     <StripSymbols>true</StripSymbols>
     <DebuggerSupport>false</DebuggerSupport>
     <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
