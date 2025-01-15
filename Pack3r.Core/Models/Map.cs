@@ -53,6 +53,10 @@ public sealed class Map : MapAssets, IDisposable
     /// </summary>
     public Dictionary<IAsset, List<Func<string, int, string>>> ShaderConvert { get; } = new(ReferenceEqualityComparer.Instance);
 
+    private bool? _isRegionCompile;
+
+    public bool IsRegionCompile => _isRegionCompile ??= Path.EndsWith(".reg", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// Gets the relative etmain of the map.<br/>
     /// <c>ET/etmain/maps/file.map</c> -> <c>ET/etmain/</c>

@@ -251,6 +251,12 @@ public sealed class Packager(
                     return;
             }
 
+            if (map.IsRegionCompile && resource.IsShader && resource.Value.Equals("textures/NULL"))
+            {
+                logger.Warn($"Region compile shader 'textures/NULL' not found, but was included in {resource.Source.Format(map)}");
+                return;
+            }
+
             if (options.OnlySource && resource.SourceOnly)
                 devResource = true;
 
