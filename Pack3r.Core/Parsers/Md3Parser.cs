@@ -22,11 +22,9 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
         {
             return resources;
         }
-        else
-        {
-            logger.Warn($"Failed to parse MD3 shader '{asset.FullPath}': {error}");
-            return null;
-        }
+
+        logger.Warn($"Failed to parse MD3 shader '{asset.FullPath}': {error}");
+        return null;
     }
 
     private static bool Impl(

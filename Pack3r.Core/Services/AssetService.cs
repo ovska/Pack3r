@@ -242,7 +242,12 @@ public class AssetService(
 
         foreach (var (resource, _) in referencedResources)
         {
-            (resource.IsShader ? map.Shaders : map.Resources).Add(resource);
+            (resource switch
+            {
+                { CanReferenceResources: true } => map.ReferenceResources,
+                { IsShader: true } => map.Shaders,
+                _ => map.Resources,
+            }).Add(resource);
         }
 
         await referenceParser.ParseReferences(map, cancellationToken);

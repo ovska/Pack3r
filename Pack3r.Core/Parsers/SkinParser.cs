@@ -14,7 +14,7 @@ public class SkinParser(ILineReader reader) : IReferenceParser
     {
         ResourceList result = [];
 
-        await foreach (var line in reader.ReadLines(asset, cancellationToken).WithCancellation(cancellationToken))
+        await foreach (var line in reader.ReadLines(asset, cancellationToken))
         {
             int comma = line.Value.Span.IndexOf(',');
 
