@@ -20,6 +20,10 @@ public static partial class Tokens
     [GeneratedRegex("""\.(tga|jp[e]?g|md3|mdc|mdm|ase|obj|fbx|shader|wav|roq|skin)$""", Options, Timeout)]
     public static partial Regex PackableFile();
 
+    public static bool IncludeAsset(ReadOnlySpan<char> fullPath)
+        => !fullPath.Contains("_pack3rignore_", StringComparison.OrdinalIgnoreCase) &&
+            PackableFile().IsMatch(fullPath);
+
     /// <summary>
     /// Matches quoted/notquoted tokens separated by whitespace.
     /// </summary>
