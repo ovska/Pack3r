@@ -1,4 +1,5 @@
-﻿using Pack3r.Parsers;
+﻿using Pack3r.Logging;
+using Pack3r.Parsers;
 
 namespace Pack3r.Tests;
 
@@ -30,7 +31,7 @@ public static class SpeakerScriptTests
             }
             """);
 
-        var parser = new SpeakerScriptParser(reader);
+        var parser = new SpeakerScriptParser(reader, NullLogger<SpeakerScriptParser>.Instance);
 
         var results = await parser.Parse("a.sps", default).ToList();
 
