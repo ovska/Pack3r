@@ -1,12 +1,14 @@
 ﻿using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
+using Pack3r.Logging;
 using Pack3r.Models;
 
 namespace Pack3r.Parsers;
 
 public class SpeakerScriptParser(
-    ILineReader reader) : IResourceParser
+    ILineReader reader,
+    ILogger<SpeakerScriptParser> logger) : IResourceParser
 {
     public string Description => "speakerscript";
 
@@ -20,7 +22,17 @@ public class SpeakerScriptParser(
         {
             if (line.MatchKeyword("noise", out var token))
             {
-                yield return new(token.Trim('"').Trim(), isShader: false, in line);
+                var noise = token.Trim('"').Trim();
+
+                if (noise.GetExtension().IsEmpty)
+                {
+                    logger.Warn(
+                        $"Speakerscript has a missing file extension on line {line.Index}: '{noise}' (will not work on 2.60b)");
+                }
+                else
+                {
+                    yield return new(noise, isShader: false, in line);
+                }
             }
         }
     }
