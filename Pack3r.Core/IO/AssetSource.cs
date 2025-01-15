@@ -33,7 +33,7 @@ public abstract class AssetSource : IDisposable
     protected AssetSource(bool notPacked)
     {
         NotPacked = notPacked;
-        _assetsLazy = new(InitializeAssets, LazyThreadSafetyMode.ExecutionAndPublication);
+        _assetsLazy = new(InitializeAssets);
     }
 
     public virtual void Dispose()
@@ -70,13 +70,12 @@ public abstract class AssetSource : IDisposable
             }
             else if (texExt == TextureExtension.Jpg)
             {
-                // if a jpg path was already added by a tga file, overwrite it
                 dict[key] = asset;
 
-                // add tga since "downcasting" works from tga to jpg
-                // extension is .jpg so it has a known length of 4
+                // a texture with .tga extension will work with .jpg files as well
                 if (key.Length <= buffer.Length)
                 {
+                    // extension is .jpg so it has a known length of 4
                     key.Span[..^4].CopyTo(buffer);
                     ".tga".CopyTo(buffer[(key.Length - 4)..]);
                     lookup.TryAdd(buffer[..key.Length], asset);
@@ -86,15 +85,14 @@ public abstract class AssetSource : IDisposable
                     dict.TryAdd($"{key[..^4]}.tga", asset);
                 }
 
-                // try to add extensionless asset for textures without shader
+                // try to add extensionless asset for textures without a shader (see below)
                 dict.TryAdd(key.TrimExtension(), asset);
-                continue;
             }
             else if (texExt == TextureExtension.Tga)
             {
                 dict[key] = asset;
 
-                // tga takes prio over jpg if there is no texture
+                // overwrite; tga takes priority over jpg if there is no texture
                 dict[key.TrimExtension()] = asset;
             }
         }

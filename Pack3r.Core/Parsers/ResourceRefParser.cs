@@ -23,7 +23,7 @@ public class ResourceRefParser(
         CancellationToken cancellationToken)
     {
         int counter = 0;
-        
+
         using var progress = progressManager.Create(
             "Parsing md3, ase and skin files for assets",
             map.ReferenceResources.Count + map.MiscModels.Count);
@@ -39,10 +39,8 @@ public class ResourceRefParser(
 
             ResourceList? result = await TryParse(map, resource, cancellationToken);
 
-            if (result is not { Count: > 0 })
-            {
+            if (result is null || result.Count == 0)
                 continue;
-            }
 
             // if the misc_model is still present, this resource is ONLY a misc_model
             // and we can try to trim the values
@@ -69,11 +67,12 @@ public class ResourceRefParser(
 
                         if (options.OnlySource)
                         {
-                            result.Add(new Resource(
-                                item.Value,
-                                item.IsShader,
-                                item.Source,
-                                sourceOnly: true));
+                            result.Add(
+                                new Resource(
+                                    item.Value,
+                                    item.IsShader,
+                                    item.Source,
+                                    sourceOnly: true));
                         }
                     }
                 }
@@ -112,15 +111,30 @@ public class ResourceRefParser(
             return null;
         }
 
+        bool found = false;
+
         foreach (var source in map.AssetSources)
         {
             if (source.Assets.TryGetValue(resource.Value, out IAsset? asset))
             {
-                return await parser.Parse(asset, cancellationToken);
+                // shut up the logger about missing file, but don't bother parsing it since
+                // the asset is not packed, its likely the resources aren't either
+                if (source.NotPacked)
+                {
+                    found = true;
+                }
+                else
+                {
+                    return await parser.Parse(asset, cancellationToken);
+                }
             }
         }
 
-        logger.Warn($"Can't resolve files used by {parser.Description}, file not found: '{resource.Value}'");
+        if (!found)
+        {
+            logger.Warn($"Can't resolve files used by {parser.Description}, file not found: '{resource.Value}'");
+        }
+
         return null;
     }
 }
