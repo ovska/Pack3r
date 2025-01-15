@@ -407,10 +407,8 @@ public sealed class Packager(
                 logger.Fatal(ref handler);
                 throw new ControlledException();
             }
-            else
-            {
-                logger.Log(devResource ? LogLevel.Warn : LogLevel.Error, ref handler);
-            }
+
+            logger.Log(devResource || !options.RequireAllAssets ? LogLevel.Warn : LogLevel.Error, ref handler);
         }
     }
 
