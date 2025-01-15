@@ -87,7 +87,7 @@ internal partial class OpenFileDialog
         Success = false;
         Files = null;
 
-        fixed (char* filter = "Radiant map files (*.map)\0*.map\0")
+        fixed (char* filter = "Radiant map files (*.map, *.reg)\0*.map;*.reg\0")
         fixed (char* fileTitle = new char[MAX_FILE_LENGTH])
         fixed (char* initialDir = InitialDirectory)
         fixed (char* windowTitle = "Open map file (run as CLI for more options)")
