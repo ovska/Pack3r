@@ -129,6 +129,13 @@ public class RootCommand
 
     private FileInfo ResolveMap()
     {
+        var ext = Map.FullName.GetExtension();
+
+        if (!ext.EqualsF(".map") && !ext.EqualsF(".reg"))
+        {
+            Error("Invalid map file extension, expected .map or .reg");
+        }
+
         var bspPath = Path.ChangeExtension(Map.FullName, "bsp");
 
         if (!File.Exists(bspPath))
