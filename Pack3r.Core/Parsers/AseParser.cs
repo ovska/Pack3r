@@ -16,7 +16,7 @@ public partial class AseParser(
 
     public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)
     {
-        ResourceList resouces = [];
+        ResourceList resources = [];
 
         await foreach (var line in reader.ReadLines(asset, cancellationToken))
         {
@@ -34,7 +34,7 @@ public partial class AseParser(
                     !token.EqualsF("\"NOSHADER\"") &&
                     !token.EqualsF("\"textures/common/nodraw\""))
                 {
-                    resouces.Add(Resource.Shader(token.Trim('"'), in line));
+                    resources.Add(Resource.Shader(token.Trim('"'), in line));
                 }
             }
             else if (line.Value.Span.StartsWithF("*GEOMOBJECT"))
@@ -43,7 +43,7 @@ public partial class AseParser(
             }
         }
 
-        return resouces;
+        return resources;
     }
 
     [GeneratedRegex("""\*COMMENT\s""", RegexOptions.Singleline, 1000)]

@@ -24,7 +24,7 @@ public class MapscriptParser(
 
         await foreach (var line in reader.ReadLines(path, cancellationToken).ConfigureAwait(false))
         {
-            // skip everything except: playsound, remapshader, set, create
+            // skip everything except: playsound, remapshader, set, create, changeskin
             if ((line.FirstChar | 0x20) is not ('p' or 'r' or 's' or 'c'))
             {
                 continue;
@@ -43,7 +43,7 @@ public class MapscriptParser(
         if (unsupported.Count > 0)
         {
             var keywords = string.Join(", ", unsupported.Select(l => $"'{l}'"));
-            logger.Warn($"Mapscript has keyword(s) ({keywords}) that can include undiscoverable resources such as dynamically loaded models, please manually ensure they are included");
+            logger.Warn($"Mapscript has keyword(s) ({keywords}) that can include un-discoverable resources such as dynamically loaded models, please manually ensure they are included");
         }
     }
 
@@ -71,6 +71,18 @@ public class MapscriptParser(
                 if (enumerator.MoveNext() && enumerator.MoveNext())
                 {
                     resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), isShader: true, in line);
+                    return true;
+                }
+            }
+            else if (keyword.EqualsF("changemodel") || keyword.EqualsF("changeskin"))
+            {
+                // first token is the skin/model
+                if (enumerator.MoveNext())
+                {
+                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), isShader: false, in line)
+                    {
+                        CanReferenceResources = true
+                    };
                     return true;
                 }
             }

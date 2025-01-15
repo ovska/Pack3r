@@ -17,10 +17,11 @@ public sealed class Resource : IEquatable<Resource>
 
     public static Resource FromModel(QPath value, IResourceSource source) => new(value, source);
 
-    public QString Value { get; } // should this be a QPath ?
+    public QString Value { get; } // should this be a QPath?
     public bool IsShader { get; }
     public IResourceSource Source { get; }
     public bool SourceOnly { get; }
+    public bool CanReferenceResources { get; init; }
 
     public bool Equals(Resource? other)
     {
@@ -44,8 +45,7 @@ public sealed class Resource : IEquatable<Resource>
     {
 
     }
-    /// <param name="Value">Path to the resource</param>
-    /// <param name="IsShader">Whether the path is to a shader and not a file</param>
+
     public Resource(
         QString value,
         bool isShader,
