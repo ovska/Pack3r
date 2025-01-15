@@ -38,7 +38,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, bool notPacked
     {
         return Directory
             .EnumerateFiles("*", SearchOption.AllDirectories)
-            .Where(f => Tokens.PackableFile().IsMatch(f.FullName))
+            .Where(f => Tokens.IncludeAsset(f.FullName))
             .Select(f => new FileAsset(this, f));
     }
 }

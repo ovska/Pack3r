@@ -52,8 +52,9 @@ public sealed class Pk3AssetSource(string path, bool notPacked) : AssetSource(no
     protected override IEnumerable<IAsset> EnumerateAssets()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _archive.Entries
-            .Where(entry => entry.FullName.Length < Global.MAX_QPATH && Tokens.PackableFile().IsMatch(entry.FullName.GetExtension()))
+        return _archive
+            .Entries
+            .Where(entry => entry.FullName.Length < Global.MAX_QPATH && Tokens.IncludeAsset(entry.FullName))
             .Select(entry => new Pk3Asset(this, entry));
     }
 }
