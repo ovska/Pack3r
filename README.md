@@ -28,19 +28,20 @@
 `<map>`  Path to the .map file [required]
 
 ### Options:
-#### `-o, --output`
+#### `-o, --output` `<output file or dir name>`
 Destination of the packing, defaults to `etmain`. Possible paths are filenames with `pk3` or `zip` extension, or directories.
 File name in case of directory is `mapname.pk3`, or `.zip` if using `--source`. This setting is ignored if using `--dryrun`.
+Example: `-o C:/ET/mapreleases`
 
 #### `-d, --dryrun`
 Run the packing operation without actually creating an archive.
 Useful if you just want to discover what files would be packed or are missing, or want to see the size of the pk3.
 
-#### `-r --rename`
+#### `-r --rename` `<output map/pk3 name>`
 Name of the map after packing. Can be used to create different versions without changing project names, e.g. `mapname_b1`.
 Among things renamed are BSP, mapscript, lightmap folder, levelshots files and shaders.
 
-#### `-v --verbosity`
+#### `-v --verbosity` `<level>`
 The threshold for log messages to be printed. Default is `Info`, which may print too much or too little information depending
 on your needs. Available options (from least to most verbose): `None`, `Fatal`, `Error`, `Warn`, `Info`, `Debug`, `Trace`
 
@@ -54,9 +55,9 @@ Pack a zip archive of source files instead of a map release, includes files such
 #### `-f, --force`
 Writes the output file even if it already exists. By default Pack3r doesn't overwrite existing pk3/zip files.
 
-#### `-m --mods`
+#### `-m --mods` `<one or more mod directories>`
 Includes pk3s from mod folders when scanning for assets. Useful for things like tracemaps and speakerscripts that are
-created in fs_game directory.
+created in fs_game directory. Example: `--mods etjump_dev`
 
 #### `-sd, --shaderdebug`
 Prints detailed information about which shaders are required by the map, and where they are referenced (at least `--verbosity Debug` needed)
@@ -67,11 +68,11 @@ Prints detailed information about which files are required by the map, and where
 #### `-p, --pk3, --includepk3`
 Scan pk3 files and pk3dir-directories in etmain when indexing files (off by default for performance reasons).
 
-#### `-ns --noscan`
-Don't scan these pk3s/directories at all when indexing files.
+#### `-ns --noscan` `<one or more pk3s or dirs>`
+Don't scan these pk3s/directories at all when indexing files. Example: `--noscan skies_MASTER.pk3`
 
-#### `-np --nopack`
-Scan these pk3s/directories, but don't pack their contents (for example pak0.pk3).
+#### `-np --nopack` `<one or more pk3s or dirs>`
+Scan these pk3s/directories, but don't pack their contents. Example: `--nopack pak0.pk3 pak0.pk3dir`
 
 #### `-?, -h, --help`
 Prints help about usage and possible options, and their default values
@@ -81,14 +82,14 @@ Prints the build version, include this in bug reports
 
 
 ## Limitations
-- Usable only through CLI, no GUI application is planned
+- Usable only through CLI
 - Only brush primitives map format is supported (NetRadiant default)
 - Shaders/textures are coarsely parsed from `ase`, `md3`, `mdc`, `skin` files. Other model formats such as `obj` are not yet supported (open an issue). Models created by esoteric tools might not be parsed correctly even though radiant supports them
 - `terrain` shaders (1to2 etc) are not supported (open an issue)
 - For performance reasons only a subset of file extensions are packed: `tga` `jpg` `md3` `mdc` `mdm` `ase` `obj` `fbx` `shader` `wav` `roq` `skin`
 
 ## File priority order
-1. `pak0.pk3` (and other `--nopack` pk3s/directories), if a file or shader is found there, it won't be included in the release
+1. `pak0.pk3` (and other `--nopack` pk3s/directories), if a file/shader is found there, it won't be included in the release
 2. Files inside the _relative_ `etmain` of your map file (directory contaning `/maps`)
 3. `etmain`, if the map is for example in `some.pk3dir/maps/mymap.map`
 4. `pk3dir`-folders in `etmain`, in reverse alphabetical order
