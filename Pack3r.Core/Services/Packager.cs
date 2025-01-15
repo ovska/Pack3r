@@ -254,9 +254,26 @@ public sealed class Packager(
             if (options.OnlySource && resource.SourceOnly)
                 devResource = true;
 
+            string suffix = "";
+
+            if (shader is not null && relativePath.Span.GetTextureExtension() is TextureExtension.Jpg)
+            {
+                foreach (var src in map.AssetSources)
+                {
+                    if (src.Assets.ContainsKey(Path.ChangeExtension(relativePath.ToString(), ".tga")))
+                    {
+                        suffix = $" TGA was found, do you need to fix the shader? (in: {src.Name})";
+                        break;
+                    }
+                }
+            }
+
             string sourceOnly = devResource ? " (source file)" : "";
             string referencedIn = $"(referenced in {resource.Source.Format(map)})";
-            OnFailedAddFile(false, $"{(resource.IsShader ? "Shader" : "File")} not found: {relativePath}{sourceOnly} {referencedIn}", devResource);
+            OnFailedAddFile(
+                false,
+                $"Asset not found: {relativePath}{sourceOnly} {referencedIn}{suffix}",
+                devResource);
         }
 
         bool TryAddFileFromSource(
@@ -378,7 +395,7 @@ public sealed class Packager(
             {
                 if (!required && options.RequireAllAssets)
                 {
-                    handler = $"{handler.ToStringAndClear()} (use --loose to ignore missing files)";
+                    handler = $"{handler.ToStringAndClear()}\r\n        Use --loose to ignore missing files)";
                 }
 
                 logger.Fatal(ref handler);
