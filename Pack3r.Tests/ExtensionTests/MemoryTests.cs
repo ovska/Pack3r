@@ -50,13 +50,13 @@ public static class MemoryTests
     }
 
     [Theory]
-    [InlineData("test", (string[])["test"])]
-    [InlineData("test arg", (string[])["test", "arg"])]
-    [InlineData("test arg arg2", (string[])["test", "arg", "arg2"])]
-    [InlineData("test arg ", (string[])["test", "arg"])]
-    [InlineData("test \"arg\" ", (string[])["test", "arg"])]
-    [InlineData("test\t\t\"arg\" ", (string[])["test", "arg"])]
-    [InlineData("\t\"test\" \"arg\" ", (string[])["test", "arg"])]
+    [InlineData("test", new[] { "test" })]
+    [InlineData("test arg", new[] { "test", "arg" })]
+    [InlineData("test arg arg2", new[] { "test", "arg", "arg2" })]
+    [InlineData("test arg ", new[] { "test", "arg" })]
+    [InlineData("test \"arg\" ", new[] { "test", "arg" })]
+    [InlineData("test\t\t\"arg\" ", new[] { "test", "arg" })]
+    [InlineData("\t\"test\" \"arg\" ", new[] { "test", "arg" })]
     public static void Should_Split_By_Whitespace(string input, string[] expected)
     {
         List<string> list = [];
@@ -127,7 +127,7 @@ public static class MemoryTests
                 ("remapshader \"testi\" \"testi\"", ["remapshader", "testi", "testi"]),
                 ("\"origin\" \"-1 -5 -99\"", ["origin", "-1 -5 -99"]),
                 ("\"origin\" \"-24 -72 -96\"", ["origin", "-24 -72 -96"]),
-                ("\"-24 -72 -96\" \"origin\"", [ "-24 -72 -96", "origin"]),
+                ("\"-24 -72 -96\" \"origin\"", ["-24 -72 -96", "origin"]),
                 ("\"message\" \"hello, world\"", ["message", "hello, world"]),
             ];
 
@@ -139,5 +139,4 @@ public static class MemoryTests
             return data;
         }
     }
-
 }
