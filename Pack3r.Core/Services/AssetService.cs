@@ -267,7 +267,10 @@ public class AssetService(
 
         if (files.Count > 1)
         {
-            logger.Debug($"File '{relativePath.NormalizePath()}' found in multiple folders, picking the newest: '{files[0].FullName}'");
+            var newest = files.OrderByDescending(f => f.LastWriteTimeUtc).First();
+            logger.Debug(
+                $"File '{relativePath.NormalizePath()}' found in multiple folders, picking the newest: '{newest.FullName.NormalizePath()}'");
+            return newest;
         }
 
         return files[0];
