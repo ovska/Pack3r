@@ -2,12 +2,11 @@
   <img
     width="256"
     height="305"
-    title="Zip icon created by Flat Icons"
+    title="Zip format icons created by juicy_fish - Flaticon"
     src="https://github.com/ovska/Pack3r/assets/68028366/5c628e71-bf3f-47e6-9a95-963144fcaa3e" />
   <h1 align="center">Pack3r</h1>
   <h3 align="center">Create release-ready Wolfenstein: Enemy Territory pk3 archives quickly from .map-files</h3>
 </p>
-
 ---
 
 ## Features
