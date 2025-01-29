@@ -86,7 +86,7 @@ public sealed class Packager(
 
         bool styleLights = map.HasStyleLights;
 
-        using (var progress = progressManager.Create("Compressing files referenced by shaders", map.Shaders.Count))
+        using (var progress = progressManager.Create("Compressing shaders and textures", map.Shaders.Count))
         {
             int count = 1;
 

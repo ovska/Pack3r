@@ -161,7 +161,7 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger, AppLifeti
             List<string> errors = [];
 
             if (fmt.Channels is not 1)
-                errors.Add($"expected mono instead of {fmt.Channels} channels");
+                errors.Add($"expected mono instead of {(fmt.Channels == 2 ? "stereo" : "multi-channel audio")}");
 
             if (fmt.BitsPerSample is not (8 or 16))
                 errors.Add($"expected 8 or 16 bits per sample instead of {fmt.BitsPerSample}");
