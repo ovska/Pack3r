@@ -172,11 +172,13 @@ public sealed class IntegrityChecker(ILogger<IntegrityChecker> logger, AppLifeti
             if (fmt.Channels is not 1)
                 errors.Add($"expected mono instead of {fmt.Channels} channels");
 
-            if (fmt.BitsPerSample is not (8 or 16 or 32))
+            if (fmt.BitsPerSample is not (8 or 16))
                 errors.Add($"expected 8 or 16 bits per sample instead of {fmt.BitsPerSample}");
 
             if (fmt.SampleRate is not (44100 or 44100 / 2 or 44100 / 4))
-                errors.Add($"expected 44.1 kHz supported sample rate instead of {fmt.SampleRate}");
+                errors.Add(fmt.SampleRate > 44100
+                    ? $"excessively high sample rate ({fmt.SampleRate / 1000}kHz > 44.1kHz), downsampling will occur"
+                    : $"expected 44.1/22/11kHz sample rate instead of {fmt.SampleRate / 1000}kHz, resampling will occur");
 
             if (errors.Count > 0)
                 return $"invalid audio format: {string.Join(" | ", errors)}";
