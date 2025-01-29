@@ -50,14 +50,14 @@ public class ShaderParser(
                     if (fileName.EqualsF("q3shadersCopyForRadiant"))
                     {
                         if (options.ShaderDebug)
-                            logger.Debug($"Skipped parsing Radiant specific file {getName()}");
+                            logger.Debug($"Skipped parsing Radiant specific shaderfile {getName()}");
                         return true;
                     }
 
                     if (fileName.StartsWithF("q3map_") || fileName.StartsWithF("q3map2_"))
                     {
                         if (options.ShaderDebug)
-                            logger.Debug($"Skipped shader parsing from compiler generated file '{getName()}'");
+                            logger.Debug($"Skipped shaderfile parsing from compiler generated file '{getName()}'");
                         return true;
                     }
 

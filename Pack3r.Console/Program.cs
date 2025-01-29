@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Text;
 using DotMake.CommandLine;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -74,32 +76,17 @@ public class Program
 
         try
         {
-            string mapName = Path.GetFileNameWithoutExtension(options.MapFile.FullName);
+            PrintDetails(options, app.Logger);
 
-            if (!options.DryRun)
-            {
-                if (options.Rename != null)
-                    mapName += "' as '" + options.Rename;
+            var startTime = Stopwatch.GetTimestamp();
 
-                string force = options.Overwrite && options.Pk3File.Exists
-                    ? " (overwriting existing file)"
-                    : "";
-
-                app.Logger.System($"Packaging '{mapName}' to '{options.Pk3File.FullName}'{force}");
-            }
-            else
-            {
-                app.Logger.System($"Running dry run for '{mapName}' without creating a pk3");
-            }
-
-            var timer = Stopwatch.StartNew();
-
-            Stream destination;
             PackResult result;
 
-            // map keeps read-locks for pk3s it encounters, so keep it alive for at little time as possible
+            // map keeps read-locks for pk3s it encounters, so keep it alive for as little time as possible
             using (Map map = await app.AssetService.GetPackingData(cancellationToken))
             {
+                Stream destination;
+
                 if (!options.DryRun)
                 {
                     destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
@@ -116,16 +103,12 @@ public class Program
                 }
             }
 
-            timer.Stop();
+            TimeSpan elapsed = Stopwatch.GetElapsedTime(startTime);
 
             app.Logger.Drain();
 
-            string op = options.DryRun ? "Dry run" : "Packaging";
-            string output = !options.DryRun
-                    ? $" to '{options.Pk3File.FullName}'"
-                    : "";
-            app.Logger.System(
-                $"{op} finished in {timer.Elapsed.TotalSeconds:F1} seconds, {result}, pk3 size: {result.Size()}{output}");
+            string output = !options.DryRun ? $" to '{options.Pk3File.FullName}'" : "";
+            app.Logger.System($"Finished in {elapsed.TotalSeconds:F1} seconds, {result}, pk3 size: {result.Size()}{output}");
 
             return 0;
         }
@@ -146,6 +129,61 @@ public class Program
             app.Lifetime.HandleException(e);
             return -1;
         }
+    }
+
+    private static void PrintDetails(PackOptions options, ILogger<Program> appLogger)
+    {
+        StringBuilder sb = new();
+
+        sb.Append(options.DryRun ? "Running a dry run for map " : "Packing map ");
+        sb.Append(Path.GetFileNameWithoutExtension(options.MapFile.Name.AsSpan()));
+
+        if (options.OnlySource)
+        {
+            sb.Append(" source");
+        }
+
+        if (!options.DryRun)
+        {
+            if (options.Rename is { Length: > 0 })
+            {
+                sb.Append(" as ");
+                sb.Append(options.Rename);
+            }
+
+            sb.Append(" to ");
+            sb.Append(options.Pk3File?.FullName ?? "<n/a>");
+
+            if (options is { Overwrite: true, Pk3File.Exists: true })
+            {
+                sb.Append(" (overwriting existing file)");
+            }
+        }
+        else
+        {
+            sb.Append(" without creating a pk3");
+        }
+
+        sb.Append('.');
+
+        sb.Append(
+            options.RequireAllAssets
+                ? " All assets are required."
+                : " Missing assets are ignored.");
+
+        sb.Append(options.LoadPk3s ? " Pk3s in etmain are scanned." : " Pk3s in etmain are not scanned.");
+
+        sb.Append(" Logging verbosity is '");
+        sb.Append(options.LogLevel);
+        sb.Append("'.");
+
+        if (options.ModFolders is { Count : > 0 })
+        {
+            sb.Append(" Mod folders are scanned: ");
+            sb.AppendJoin(", ", options.ModFolders);
+        }
+
+        appLogger.System($"{sb.ToString()}");
     }
 
     private static bool PromptOverwrite(FileInfo pk3)

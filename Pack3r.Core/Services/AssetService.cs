@@ -52,13 +52,13 @@ public class AssetService(
             string srcMsg = string.Join(
                 Environment.NewLine,
                 map.AssetSources.Select(src => $"\t{src.RootPath}{(src.NotPacked ? " (not packed)" : "")}"));
-            logger.System($"Using sources for discovery: {Environment.NewLine}{srcMsg}");
+            logger.System($"Scanning: {Environment.NewLine}{srcMsg}");
         }
         else
         {
             string pk3msg = options.LoadPk3s ? " and pk3s" : "";
             string dirMsg = string.Join(Environment.NewLine + '\t', map.AssetDirectories.Select(d => FormatDir(etmainDirectory, d)));
-            logger.System($"Using directories{pk3msg} for discovery: {Environment.NewLine}\t{dirMsg}");
+            logger.System($"Scanning directories{pk3msg} for assets: {Environment.NewLine}\t{dirMsg}");
         }
 
         if (!options.OnlySource)
@@ -94,7 +94,7 @@ public class AssetService(
             }
             else
             {
-                logger.Trace($"Lightmaps skipped, files not found in '{lightmapDir.FullName}'");
+                logger.Trace($"Lightmaps skipped, not found in '{lightmapDir.FullName}'");
             }
         }
         else
@@ -147,7 +147,7 @@ public class AssetService(
 
             if (options.Rename is not null)
             {
-                logger.Info($"Packed {arena.Name} will be modified to account for --rename");
+                logger.Info($"Renamed version of '{arena.Name}' be packed");
             }
         }
         else
@@ -185,7 +185,8 @@ public class AssetService(
             }
             else
             {
-                logger.Trace($"Tracemap skipped, not found in any directory.");
+                string searchDest = options.ModFolders is { Count: > 0} ? "etmain or mod folders" : "etmain";
+                logger.Trace($"Tracemap skipped, {map.Name}_tracemap.tga not found in {searchDest}.");
             }
         }
 
@@ -269,7 +270,7 @@ public class AssetService(
         {
             var newest = files.OrderByDescending(f => f.LastWriteTimeUtc).First();
             logger.Debug(
-                $"File '{relativePath.NormalizePath()}' found in multiple folders, picking the newest: '{newest.FullName.NormalizePath()}'");
+                $"File '{relativePath.NormalizePath()}' found in multiple mod folders, picking the newest: '{newest.FullName.NormalizePath()}'");
             return newest;
         }
 
