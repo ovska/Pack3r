@@ -96,6 +96,24 @@ public class ShaderParser(
                                 return a.NeededInPk3 ? b : a;
                             }
 
+                            if (ReferenceEquals(a.Asset, b.Asset))
+                            {
+                                // not packed, don't care
+                                if (a.Source.NotPacked) return a;
+
+                                // ET uses the first shader in the file in case of duplicates
+                                var first = a.Line < b.Line ? a : b;
+
+                                if (options.ShaderDebug)
+                                {
+                                    logger.Debug(
+                                        $"Shader {first} found multiple times in {first.Asset.FullPath}, " +
+                                        $"using the first from line {first.Line}");
+                                }
+
+                                return first;
+                            }
+
                             if (!a.Source.NotPacked || !b.Source.NotPacked)
                             {
                                 duplicate.AddOrUpdate(
@@ -124,11 +142,17 @@ public class ShaderParser(
             0,
             cancellationToken);
 
-        // should not happen, duplicateShaders must be empty at this point
         foreach (var (name, duplicates) in duplicateShaders)
         {
-            var display = string.Join(", ", duplicates.Select(s => $"'{s.GetAbsolutePath()}'"));
-            logger.Warn($"Shader '{name}' found in multiple sources: {display}");
+            if (duplicates.DistinctBy(s => s.Asset).Count() == 1)
+            {
+                logger.Warn($"Shader '{name}' multiple times in file: {duplicates[0].GetAbsolutePath()}");
+            }
+            else
+            {
+                var display = string.Join("\n\t", duplicates.Select(s => $"'{s.GetAbsolutePath()}'"));
+                logger.Warn($"Shader '{name}' found in multiple files:\n\t{display}");
+            }
         }
 
         return included;

@@ -10,7 +10,7 @@
     },
     "sungilarity d": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\" -d -i -e pak0.pk3 void.pk3dir"
+      "commandLineArgs": "\"C:\\Temp\\ET\\map\\ET\\etmain\\maps\\sungilarity.map\" -d"
     },
     "sungilarity src": {
       "commandName": "Project",
