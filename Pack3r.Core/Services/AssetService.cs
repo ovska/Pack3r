@@ -57,8 +57,8 @@ public class AssetService(
         else
         {
             string pk3msg = options.LoadPk3s ? " and pk3s" : "";
-            string dirMsg = string.Join(", ", map.AssetDirectories.Select(d => FormatDir(etmainDirectory, d)));
-            logger.System($"Using directories{pk3msg} for discovery: {dirMsg}");
+            string dirMsg = string.Join(Environment.NewLine + '\t', map.AssetDirectories.Select(d => FormatDir(etmainDirectory, d)));
+            logger.System($"Using directories{pk3msg} for discovery: {Environment.NewLine}\t{dirMsg}");
         }
 
         if (!options.OnlySource)
