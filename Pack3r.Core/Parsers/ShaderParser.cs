@@ -375,7 +375,7 @@ public class ShaderParser(
                         token = shader.Name;
                     }
 
-                    foreach (var suffix in SkySuffixes)
+                    foreach (var suffix in _skySuffixes)
                     {
                         shader.Resources.Add($"{token}{suffix}".AsMemory());
                     }
@@ -486,10 +486,9 @@ public class ShaderParser(
         return false;
     }
 
-    private static ReadOnlySpan<string> SkySuffixes => _skySuffixesArr;
-    private static readonly string[] _skySuffixesArr = ["_bk", "_dn", "_ft", "_up", "_rt", "_lf"];
+    private static readonly string[] _skySuffixes = ["_bk", "_dn", "_ft", "_up", "_rt", "_lf"];
 
-    private static readonly ImmutableArray<string> _simpleShaderRefPrefixes =
+    private static readonly string[] _simpleShaderRefPrefixes =
     [
         "q3map_backShader",
         "q3map_baseShader",
@@ -497,7 +496,7 @@ public class ShaderParser(
         "q3map_remapShader",
     ];
 
-    private static readonly ImmutableArray<string> _devTexturePrefixes =
+    private static readonly string[] _devTexturePrefixes =
     [
         "q3map_lightImage",
         "qer_editorImage",
