@@ -28,7 +28,7 @@ public class ResourceRefParser(
             "Parsing md3, ase and skin files for assets",
             map.ReferenceResources.Count + map.MiscModels.Count);
 
-        HashSet<Resource> handled = [];
+        ResourceList handled = [];
 
         foreach (var resource in map.ReferenceResources.Concat(map.MiscModels.Keys))
         {
@@ -74,6 +74,14 @@ public class ResourceRefParser(
                                     item.Source,
                                     sourceOnly: true));
                         }
+                    }
+                }
+
+                foreach (var instance in instances)
+                {
+                    foreach (var (_, target) in instance.Remaps)
+                    {
+                        map.Shaders.Add(Resource.Shader((QString)target, in instance.Line));
                     }
                 }
             }
