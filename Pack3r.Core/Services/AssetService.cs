@@ -185,7 +185,7 @@ public class AssetService(
             }
             else
             {
-                string searchDest = options.ModFolders is { Count: > 0} ? "etmain or mod folders" : "etmain";
+                string searchDest = options.ModFolders is { Count: > 0 } ? "etmain or mod folders" : "etmain";
                 logger.Trace($"Tracemap skipped, {map.Name}_tracemap.tga not found in {searchDest}.");
             }
         }
@@ -243,12 +243,12 @@ public class AssetService(
 
         foreach (var (resource, _) in referencedResources)
         {
-            (resource switch
+            if (resource.CanReferenceResources)
             {
-                { CanReferenceResources: true } => map.ReferenceResources,
-                { IsShader: true } => map.Shaders,
-                _ => map.Resources,
-            }).Add(resource);
+                map.ReferenceResources.Add(resource);
+            }
+
+            (resource.IsShader ? map.Shaders : map.Resources).Add(resource);
         }
 
         await referenceParser.ParseReferences(map, cancellationToken);
