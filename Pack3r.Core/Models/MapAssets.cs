@@ -36,12 +36,16 @@ public sealed class ReferenceMiscModel
     public QPath Model { get; }
     public Dictionary<QPath, QPath> Remaps { get; }
 
+    public readonly Line Line;
+
     public ReferenceMiscModel(
         QPath model,
-        Dictionary<QString, (QString value, Line line)> entitydata)
+        Dictionary<QString, (QString value, Line line)> entitydata,
+        in Line line)
     {
         Model = model;
         Remaps = [];
+        Line = line;
 
         Span<Range> ranges = stackalloc Range[2];
 
