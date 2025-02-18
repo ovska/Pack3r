@@ -123,7 +123,7 @@ public sealed class Packager(
                     if (!handledFiles.Contains(shader.DestinationPath.AsMemory()))
                         AddShaderFile(shader, shaderResource);
 
-                    if (shader.ImplicitMapping is { } implicitMapping)
+                    if (shader.ImplicitMapping is { } implicitMapping && !IsHandledOrExcluded(implicitMapping))
                     {
                         AddFileRelative(implicitMapping, shaderResource, shader);
                     }
@@ -291,18 +291,23 @@ public sealed class Packager(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (!source.Assets.TryGetValue(relativePath, out IAsset? asset))
+                return false;
+
+            bool added = handledFiles.Add(asset.Name) | handledFiles.Add(relativePath);
+
+            // already added via tga/jpg downcasting?
+            if (!added)
+                return false;
+
             try
             {
                 ZipArchiveEntry? entry;
-                IAsset? asset = null;
 
                 if (shader is not null &&
                     map.ShaderConvert.Count > 0 &&
                     map.ShaderConvert.TryGetValue(shader.Asset, out var convertList))
                 {
-                    if (!source.Assets.TryGetValue(relativePath, out asset))
-                        return false;
-
                     if (!shader.Asset.Name.EqualsF(relativePath))
                         convertList = [];
 
@@ -315,9 +320,6 @@ public sealed class Packager(
                 }
                 else
                 {
-                    if (!source.Assets.TryGetValue(relativePath, out asset))
-                        return false;
-
                     if (source.NotPacked)
                     {
                         // file found from an excluded source
@@ -332,13 +334,11 @@ public sealed class Packager(
                     }
                 }
 
-                handledFiles.Add(relativePath);
-
                 if (entry is not null)
                 {
                     includedFiles.Add(new IncludedFile(
                         source,
-                        asset != null ? (QString)asset.Name : relativePath,
+                        entry.FullName,
                         resource,
                         shader,
                         devResource));
@@ -348,6 +348,9 @@ public sealed class Packager(
             }
             catch (IOException ex)
             {
+                handledFiles.Remove(relativePath);
+                handledFiles.Remove(asset.Name);
+
                 if (options.LogLevel == LogLevel.Trace)
                 {
                     logger.Exception(ex, $"Failed to pack file '{relativePath}' from source {source}");
