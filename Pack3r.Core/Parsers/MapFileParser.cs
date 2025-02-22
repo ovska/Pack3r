@@ -234,7 +234,7 @@ public class MapFileParser(
                         if (!miscModels.TryGetValue(res, out var list))
                             miscModels[res] = list = [];
 
-                        list.Add(new ReferenceMiscModel(value, entitydata));
+                        list.Add(new ReferenceMiscModel(value, entitydata, in line));
                     }
                     else if (key.Length == 6 && key[5] == '2')
                     {

@@ -23,6 +23,13 @@ public interface IResourceSource
     }
 }
 
+public sealed class ShaderResourceSource(Shader shader) : IResourceSource
+{
+    public int Position => shader.Line;
+    public PositionType Type => PositionType.Line;
+    public string File => shader.Asset.FullPath;
+}
+
 public sealed class BinaryResourceSource(string filePath, int bytePosition) : IResourceSource
 {
     public int Position => bytePosition;

@@ -28,7 +28,7 @@ public class ResourceRefParser(
             "Parsing md3, ase and skin files for assets",
             map.ReferenceResources.Count + map.MiscModels.Count);
 
-        HashSet<Resource> handled = [];
+        ResourceList handled = [];
 
         foreach (var resource in map.ReferenceResources.Concat(map.MiscModels.Keys))
         {
@@ -39,50 +39,61 @@ public class ResourceRefParser(
 
             ResourceList? result = await TryParse(map, resource, cancellationToken);
 
-            if (result is null || result.Count == 0)
-                continue;
-
             // if the misc_model is still present, this resource is ONLY a misc_model
             // and we can try to trim the values
             if (map.MiscModels.TryGetValue(resource, out var instances))
             {
-                foreach (var item in result.ToArray()) // loop over a copy
+                if (result is not null)
                 {
-                    bool allRemapped = true;
-
-                    foreach (ReferenceMiscModel instance in instances)
+                    foreach (var item in result.ToArray()) // loop over a copy
                     {
-                        if (!instance.Remaps.TryGetValue(item.Value, out var remap) ||
-                            item.Value.Equals(remap))
+                        bool allRemapped = true;
+
+                        foreach (ReferenceMiscModel instance in instances)
                         {
-                            allRemapped = false;
-                            break;
+                            if (!instance.Remaps.TryGetValue(item.Value, out var remap) ||
+                                item.Value.Equals(remap))
+                            {
+                                allRemapped = false;
+                                break;
+                            }
+                        }
+
+                        // this resource is remapped on all instances using this
+                        if (allRemapped)
+                        {
+                            result.Remove(item);
+
+                            if (options.OnlySource)
+                            {
+                                result.Add(
+                                    new Resource(
+                                        item.Value,
+                                        item.IsShader,
+                                        item.Source,
+                                        sourceOnly: true));
+                            }
                         }
                     }
+                }
 
-                    // this resource is remapped on all instances using this
-                    if (allRemapped)
+                foreach (var instance in instances)
+                {
+                    foreach (var (_, target) in instance.Remaps)
                     {
-                        result.Remove(item);
-
-                        if (options.OnlySource)
-                        {
-                            result.Add(
-                                new Resource(
-                                    item.Value,
-                                    item.IsShader,
-                                    item.Source,
-                                    sourceOnly: true));
-                        }
+                        map.Shaders.Add(Resource.Shader((QString)target, in instance.Line));
                     }
                 }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            foreach (var item in result)
+            if (result is not null)
             {
-                (item.IsShader ? map.Shaders : map.Resources).Add(item);
+                foreach (var item in result)
+                {
+                    (item.IsShader ? map.Shaders : map.Resources).Add(item);
+                }
             }
         }
     }
