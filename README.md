@@ -18,8 +18,6 @@
 - Support for file discovery from pk3's and pk3dirs, such as `sd-mapobjects.pk3` or a texture/model pack extracted into a separate pk3dir to keep etmain clean
 - Warnings about possible pitfalls such as lightmaps from another compile, or image/audio formats not supported by ET 2.60b
 
----
-
 ## Usage
 `Pack3r <map> [options]`
 
