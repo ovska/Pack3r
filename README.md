@@ -7,7 +7,6 @@
   <h1 align="center">Pack3r</h1>
   <h3 align="center">Create release-ready Wolfenstein: Enemy Territory pk3 archives quickly from .map-files</h3>
 </p>
----
 
 ## Features
 
