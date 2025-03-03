@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 namespace Pack3r;
 
-internal static class Global
+public static class Global
 {
     public const int MAX_QPATH = 64;
 
