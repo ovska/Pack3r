@@ -38,10 +38,9 @@ public sealed class AppLifetime : IDisposable
         {
             lock (Global.ConsoleLock)
             {
-                var old = Console.ForegroundColor;
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("Operation canceled by user");
-                Console.ForegroundColor = old;
+                Console.ResetColor();
             }
             return; // don't drain log on cancellations
         }
