@@ -107,9 +107,6 @@ public sealed class LoggerBase : ILogger
             return;
         }
 
-        var defaultForeground = Console.ForegroundColor;
-        var defaultBackground = Console.BackgroundColor;
-
         TextWriter output = Console.Out;
 
         GetPrefix(
@@ -121,10 +118,14 @@ public sealed class LoggerBase : ILogger
 
         if (!prefix.IsEmpty)
         {
-            Console.BackgroundColor = backgroundColor ?? defaultBackground;
-            output.Write(' ');
-            Console.BackgroundColor = defaultBackground;
 
+            if (backgroundColor.HasValue)
+            {
+                Console.BackgroundColor = backgroundColor.Value;
+            }
+
+            output.Write(' ');
+            Console.ResetColor();
             Console.ForegroundColor = prefixColor;
             output.Write(prefix);
         }
@@ -135,17 +136,21 @@ public sealed class LoggerBase : ILogger
 
         if (!string.IsNullOrEmpty(context))
         {
+            Console.ResetColor();
             Console.ForegroundColor = ConsoleColor.DarkGray;
             output.Write('[');
             output.Write(context);
             output.Write("] ");
+            Console.ResetColor();
         }
 
-        Console.ForegroundColor = messageColor ?? defaultForeground;
+        if (messageColor.HasValue)
+        {
+            Console.ForegroundColor = messageColor.Value;
+        }
         output.Write(message);
-
         output.Write(Environment.NewLine);
-        Console.ForegroundColor = defaultForeground;
+        Console.ResetColor();
     }
 
     private static void GetPrefix(

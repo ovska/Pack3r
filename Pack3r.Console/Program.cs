@@ -188,15 +188,14 @@ public class Program
 
     private static bool PromptOverwrite(FileInfo pk3)
     {
-        var color = System.Console.ForegroundColor;
         System.Console.ForegroundColor = ConsoleColor.Red;
         System.Console.Write($"Output file already exists: ");
-        System.Console.ForegroundColor = color;
+        System.Console.ResetColor();
         System.Console.WriteLine(pk3.FullName);
         System.Console.Write("Overwrite? ");
         System.Console.ForegroundColor = ConsoleColor.Cyan;
         System.Console.WriteLine("Y/N");
-        System.Console.ForegroundColor = color;
+        System.Console.ResetColor();
         return System.Console.ReadLine().AsSpan().Trim().EqualsF("y");
     }
 

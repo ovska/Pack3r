@@ -53,8 +53,6 @@ public sealed class ConsoleProgressMeter : IProgressMeter
                 Console.Out.Write('\r');
             }
 
-            var foreground = Console.ForegroundColor;
-
             Console.ForegroundColor = ConsoleColor.Gray;
 
             if (value >= _max)
@@ -66,7 +64,7 @@ public sealed class ConsoleProgressMeter : IProgressMeter
                 Console.Out.Write([' ', ' ', ' ', ' ', ' ', ' ', Spin, ' ']);
             }
 
-            Console.ForegroundColor = foreground;
+            Console.ResetColor();
 
             Console.Out.Write(_name);
             Console.Out.Write(' ');
@@ -84,8 +82,6 @@ public sealed class ConsoleProgressMeter : IProgressMeter
     {
         lock (Global.ConsoleLock)
         {
-            var foreground = Console.ForegroundColor;
-
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.Out.Write(" (");
             Console.Out.Write((int)Stopwatch.GetElapsedTime(_timestamp).TotalMilliseconds);
@@ -93,8 +89,9 @@ public sealed class ConsoleProgressMeter : IProgressMeter
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Out.Write("\r   DONE ");
-            Console.ForegroundColor = foreground;
             Console.WriteLine();
+
+            Console.ResetColor();
         }
     }
 }
