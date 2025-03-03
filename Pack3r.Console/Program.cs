@@ -135,7 +135,9 @@ public class Program
     {
         StringBuilder sb = new();
 
-        sb.Append(options.DryRun ? "Running a dry run for map " : "Packing map ");
+        sb.AppendLine($"Packer v{Global.Version} https://github.com/ovska/Pack3r/");
+
+        sb.Append(options.DryRun ? "\tRunning a dry run for map " : "\tPacking map ");
         sb.Append(Path.GetFileNameWithoutExtension(options.MapFile.Name.AsSpan()));
 
         if (options.OnlySource)
@@ -164,23 +166,26 @@ public class Program
             sb.Append(" without creating a pk3");
         }
 
-        sb.Append('.');
+        sb.AppendLine(".");
 
         sb.Append(
             options.RequireAllAssets
-                ? " All assets are required."
-                : " Missing assets are ignored.");
+                ? "\tAll assets are required."
+                : "\tMissing assets are ignored.");
 
-        sb.Append(options.LoadPk3s ? " Pk3s in etmain are scanned." : " Pk3s in etmain are not scanned.");
+        sb.AppendLine();
+        sb.Append(options.LoadPk3s ? "\tPk3s in etmain are scanned." : "\tPk3s in etmain are not scanned.");
 
-        sb.Append(" Logging verbosity is '");
+        sb.Append("\tLogging verbosity is '");
         sb.Append(options.LogLevel);
         sb.Append("'.");
+        sb.AppendLine();
 
-        if (options.ModFolders is { Count : > 0 })
+        if (options.ModFolders is { Count: > 0 })
         {
-            sb.Append(" Mod folders are scanned: ");
+            sb.Append("\tMod folders are scanned: ");
             sb.AppendJoin(", ", options.ModFolders);
+            sb.AppendLine();
         }
 
         appLogger.System($"{sb.ToString()}");
@@ -211,7 +216,7 @@ public class Program
             return null;
         }
 
-        System.Console.WriteLine($"Pack3r {typeof(PackOptions).Assembly.GetName().Version?.ToString(3)}");
+        System.Console.WriteLine($"Pack3r {Global.Version}");
         System.Console.WriteLine("For more options, run Pack3r through the command line");
         System.Console.WriteLine("Enter path to .map file:");
         string? res = System.Console.ReadLine()?.Trim();
