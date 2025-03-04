@@ -69,5 +69,11 @@ public sealed class Resource : IEquatable<Resource>
         IsShader = true;
         Source = source;
     }
+
+    public override string ToString()
+    {
+        if (!IsShader) return Value.ToString();
+        return $"{Value} (shader)";
+    }
 }
 
