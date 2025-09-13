@@ -52,7 +52,13 @@ public class Program
             args = valid;
         }
 
-        return Cli.RunAsync<RootCommand>(args);
+        return Cli.RunAsync<RootCommand>(args, new CliSettings
+        {
+            Theme = new CliTheme(CliTheme.Default)
+            {
+                DefaultBgColor = System.Console.BackgroundColor,
+            },
+        });
     }
 
     public static async Task<int> Execute(PackOptions options)

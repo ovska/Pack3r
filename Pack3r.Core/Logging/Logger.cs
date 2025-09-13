@@ -100,6 +100,8 @@ public sealed class LoggerBase : ILogger
 
     private void LogInternalNoLock(LogLevel level, string message, string? context)
     {
+        Console.ResetColor();
+
         if (_minimumLogLevel == LogLevel.None)
         {
             Debug.Assert(level is LogLevel.Fatal, $"Invalid None loglevel got through: {level}");
@@ -118,7 +120,6 @@ public sealed class LoggerBase : ILogger
 
         if (!prefix.IsEmpty)
         {
-
             if (backgroundColor.HasValue)
             {
                 Console.BackgroundColor = backgroundColor.Value;
