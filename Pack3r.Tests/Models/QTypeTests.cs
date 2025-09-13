@@ -5,13 +5,14 @@ public static class QTypeTests
     [Theory]
     [InlineData("test", "test")]
     [InlineData("path/to/texture.jpg", "path/to/texture.jpg")]
+    [InlineData("/path/to/texture.jpg", "path/to/texture.jpg")]
     [InlineData(@"path\to\texture.jpg", "path/to/texture.jpg")]
+    [InlineData(@"\path\to\texture.jpg", "path/to/texture.jpg")]
     public static void QPath_Should_Normalize_Separators(string input, string expected)
     {
         Assert.Equal(expected, new QPath(input).ToString());
         Assert.Equal(expected, new QPath(input.AsMemory()).ToString());
         Assert.Equal(expected, new QPath(input.ToCharArray()).ToString());
-        Assert.Equal(expected, new QPath(input)[Range.All].ToString());
     }
 
     [Fact]

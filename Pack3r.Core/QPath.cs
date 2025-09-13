@@ -19,15 +19,11 @@ public readonly struct QPath :
     public ReadOnlyMemory<char> Value { get; }
     public ReadOnlySpan<char> Span => Value.Span;
 
-    public char this[int index] => Span[index];
-
-    public QPath this[Range range] => new(Value, range);
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public QPath(string path)
     {
         Global.EnsureQPathLength(path);
-        Value = path.Replace('\\', '/').AsMemory();
+        Value = path.Replace('\\', '/').TrimStart('/').AsMemory();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -37,11 +33,11 @@ public readonly struct QPath :
 
         if (path.Span.Contains('\\'))
         {
-            Value = string.Create(path.Length, path, (dst, src) => src.Span.Replace(dst, '\\', '/')).AsMemory();
+            Value = string.Create(path.Length, path, (dst, src) => src.Span.Replace(dst, '\\', '/')).AsMemory().TrimStart('/');
         }
         else
         {
-            Value = path;
+            Value = path.TrimStart('/');
         }
     }
 
@@ -54,10 +50,10 @@ public readonly struct QPath :
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int CompareTo(QPath other) => CultureInfo.InvariantCulture.CompareInfo.Compare(Value.Span, other.Value.Span);
-    
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(QPath other) => Value.Span.Equals(other.Value.Span, StringComparison.OrdinalIgnoreCase);
-    
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override int GetHashCode() => CultureInfo.InvariantCulture.CompareInfo.GetHashCode(Value.Span, CompareOptions.OrdinalIgnoreCase);
 
