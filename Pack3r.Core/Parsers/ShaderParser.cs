@@ -1,5 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
@@ -453,6 +452,10 @@ public class ShaderParser(
                     if (token.Span[0] != '$')
                     {
                         shader.Resources.Add(token);
+                    }
+                    else
+                    {
+                        shader.HasDollarMapping = true;
                     }
                 }
                 else if (line.MatchKeyword("animMap", out token))
