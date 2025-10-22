@@ -216,7 +216,7 @@ public class MapFileParser(
                 }
                 else if (key.EqualsF("_celshader"))
                 {
-                    shaders.Add(new Resource($"textures/{value}".AsMemory(), isShader: true, in line));
+                    shaders.Add(new Resource($"textures/{value}", isShader: true, in line));
                 }
                 else if (key.StartsWithF("model"))
                 {
@@ -234,7 +234,7 @@ public class MapFileParser(
                         if (!miscModels.TryGetValue(res, out var list))
                             miscModels[res] = list = [];
 
-                        list.Add(new ReferenceMiscModel(value, entitydata, in line));
+                        list.Add(new ReferenceMiscModel(entitydata, in line));
                     }
                     else if (key.Length == 6 && key[5] == '2')
                     {
