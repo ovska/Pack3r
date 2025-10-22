@@ -33,17 +33,13 @@ public class MapAssets
 
 public sealed class ReferenceMiscModel
 {
-    public QPath Model { get; }
     public Dictionary<QPath, QPath> Remaps { get; }
-
-    public readonly Line Line;
+    public Line Line { get; }
 
     public ReferenceMiscModel(
-        QPath model,
         Dictionary<QString, (QString value, Line line)> entitydata,
         in Line line)
     {
-        Model = model;
         Remaps = [];
         Line = line;
 

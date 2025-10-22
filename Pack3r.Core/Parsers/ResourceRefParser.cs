@@ -81,7 +81,7 @@ public class ResourceRefParser(
                 {
                     foreach (var (_, target) in instance.Remaps)
                     {
-                        map.Shaders.Add(Resource.Shader((QString)target, in instance.Line));
+                        map.Shaders.Add(Resource.Shader((QString)target, instance.Line));
                     }
                 }
             }
