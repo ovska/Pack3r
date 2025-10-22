@@ -91,6 +91,11 @@ public class MapFileParser(
                     expect = '{';
                     continue;
                 }
+                else if (line.Raw.StartsWith("//@$&", StringComparison.Ordinal))
+                {
+                    // layers feature from netradiant-custom commit 1599d0a
+                    continue;
+                }
                 else
                 {
                     logger.Fatal($"Expected line {line.Index} in file '{path}' to contain entity ID, actual value: {line.Raw}");
