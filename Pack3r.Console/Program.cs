@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Text;
 using DotMake.CommandLine;
 using Pack3r.Extensions;
@@ -27,6 +26,7 @@ public class Program
             .Bind<IReferenceParser>(1).To<AseParser>()
             .Bind<IReferenceParser>(2).To<Md3Parser>()
             .Bind<IReferenceParser>(3).To<SkinParser>()
+            .Bind<IReferenceParser>(4).To<ObjParser>()
             .Bind<IResourceRefParser>().To<ResourceRefParser>()
             .Bind<IAssetService>().To<AssetService>()
             .Bind<LoggerBase>().To<LoggerBase>()
