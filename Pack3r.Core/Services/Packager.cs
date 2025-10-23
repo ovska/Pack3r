@@ -235,7 +235,25 @@ public sealed class Packager(
         void AddShaderFile(Shader shader, Resource resource)
         {
             if (shader.Source.NotPacked)
+            {
+                handledFiles.Add(shader.DestinationPath);
                 return;
+            }
+
+            foreach (var source in map.AssetSources)
+            {
+                if (source.NotPacked &&
+                    source.Assets.ContainsKey(shader.DestinationPath))
+                {
+                    if (options.ShaderDebug)
+                    {
+                        logger.Debug($"Shader not packed, also present in {source.Name}: '{shader.GetAbsolutePath()}'");
+                    }
+
+                    handledFiles.Add(shader.DestinationPath);
+                    return;
+                }
+            }
 
             if (TryAddFileFromSource(shader.Source, shader.DestinationPath.AsMemory(), resource, shader))
                 return;
