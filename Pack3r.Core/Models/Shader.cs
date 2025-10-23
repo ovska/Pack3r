@@ -32,7 +32,7 @@ public sealed class Shader(
     public bool HasLightStyles { get; set; }
 
     /// <summary>Shader includes references to any files needed in pk3</summary>
-    public bool NeededInPk3 => HasDollarMapping || Resources.Count > 0 || Shaders.Count > 0 || ImplicitMapping.HasValue;
+    public bool NeededInPk3 => ForcePk3Include || Resources.Count > 0 || Shaders.Count > 0 || ImplicitMapping.HasValue;
 
     public string GetAbsolutePath() => Path.Combine(Source.RootPath, DestinationPath).NormalizePath();
 
@@ -42,9 +42,9 @@ public sealed class Shader(
     public QPath? ImplicitMapping { get; set; }
 
     /// <summary>
-    /// Whether the shader has $whiteimage or $lightmap.
+    /// Whether the shader has a $whiteimage or $lightmap stage, fogparms, or other shader directives that require it to be included.
     /// </summary>
-    public bool HasDollarMapping { get; set; }
+    public bool ForcePk3Include { get; set; }
 
     public bool Equals(Shader? other)
     {

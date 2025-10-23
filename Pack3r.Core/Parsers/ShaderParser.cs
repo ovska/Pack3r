@@ -439,12 +439,6 @@ public class ShaderParser(
                     continue;
                 }
 
-                // only map, animmap, clampmap and videomap are valid
-                if ((line.FirstChar | 0x20) is not ('m' or 'a' or 'c' or 'v'))
-                {
-                    continue;
-                }
-
                 if (line.MatchKeyword("map", out token) ||
                     line.MatchKeyword("clampMap", out token))
                 {
@@ -455,7 +449,7 @@ public class ShaderParser(
                     }
                     else
                     {
-                        shader.HasDollarMapping = true;
+                        shader.ForcePk3Include = true;
                     }
                 }
                 else if (line.MatchKeyword("animMap", out token))
@@ -486,6 +480,10 @@ public class ShaderParser(
                 else if (line.MatchKeyword("videomap", out token))
                 {
                     shader.Resources.Add(token);
+                }
+                else if (!shader.ForcePk3Include && _forceIncludeKeywords.Contains(token))
+                {
+                    shader.ForcePk3Include = true;
                 }
 
                 continue;
@@ -558,4 +556,15 @@ public class ShaderParser(
         /// <summary>In a stage e.g. map $lightmap</summary>
         Stage = 3,
     }
+
+    private static readonly HashSet<QString> _forceIncludeKeywords = new(QString.Comparer)
+    {
+        "portal",
+        "fogvars",
+        "fogparms",
+        "skyfogvars",
+        "waterfogvars",
+        "lightgridmulamb",
+        "lightgridmuldir",
+    };
 }
