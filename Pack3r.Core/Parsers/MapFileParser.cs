@@ -57,6 +57,12 @@ public class MapFileParser(
                 throw new ControlledException();
             }
 
+            if (line.Raw.StartsWith("//@$&", StringComparison.Ordinal))
+            {
+                // layers feature from netradiant-custom commit 1599d0a
+                continue;
+            }
+
             if (line.FirstChar == '}')
             {
                 state = state switch
@@ -89,11 +95,6 @@ public class MapFileParser(
                     currentEntity = line.Value["// entity ".Length..];
                     state = State.Entity;
                     expect = '{';
-                    continue;
-                }
-                else if (line.Raw.StartsWith("//@$&", StringComparison.Ordinal))
-                {
-                    // layers feature from netradiant-custom commit 1599d0a
                     continue;
                 }
                 else
