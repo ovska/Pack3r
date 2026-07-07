@@ -45,6 +45,12 @@ public class MapFileParser(
         {
             lineCount = line.Index;
 
+            if (line.Raw.StartsWith("//@$&", StringComparison.Ordinal))
+            {
+                // layers feature from netradiant-custom commit 1599d0a
+                continue;
+            }
+
             if (expect != default)
             {
                 if (line.FirstChar == expect)
@@ -55,12 +61,6 @@ public class MapFileParser(
 
                 logger.Fatal($"Expected '{expect}' on line {line.Index}, actual value: {line.Raw}");
                 throw new ControlledException();
-            }
-
-            if (line.Raw.StartsWith("//@$&", StringComparison.Ordinal))
-            {
-                // layers feature from netradiant-custom commit 1599d0a
-                continue;
             }
 
             if (line.FirstChar == '}')
