@@ -81,6 +81,7 @@ jobs:
           gh release delete "${{ steps.release_metadata.outputs.release_tag }}" --repo "${{ github.repository }}" --cleanup-tag --yes
         fi
     - name: Create release
+      id: create_release
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -93,7 +94,7 @@ jobs:
   publish:
     runs-on: ${{ matrix.config.os }}
     needs: create_release
-    if: needs.create_release.result == 'success' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
 
     strategy:
       matrix:
