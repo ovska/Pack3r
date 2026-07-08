@@ -53,7 +53,7 @@ jobs:
       shell: bash
       run: |
         event_name="${{ github.event_name }}"
-        if [[ "$event_name" == "push" ]]; then
+        if [[ "$event_name" == "push" && "${{ github.ref }}" == "refs/heads/master" ]]; then
           timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo "release_tag=latest" >> "$GITHUB_OUTPUT"
           echo "release_name=${{ github.sha }}" >> "$GITHUB_OUTPUT"
@@ -78,6 +78,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        retry_sleep_seconds=5
         if gh release view "${{ steps.release_metadata.outputs.release_tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
           for attempt in 1 2 3; do
             if gh release delete "${{ steps.release_metadata.outputs.release_tag }}" --repo "${{ github.repository }}" --cleanup-tag --yes; then
@@ -87,7 +88,7 @@ jobs:
               echo "Failed to delete the existing latest release after 3 attempts."
               exit 1
             fi
-            sleep $((attempt * 5))
+            sleep $((attempt * retry_sleep_seconds))
           done
           for attempt in 1 2 3; do
             if ! gh release view "${{ steps.release_metadata.outputs.release_tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
@@ -97,7 +98,7 @@ jobs:
               echo "The latest release still exists after deletion attempts."
               exit 1
             fi
-            sleep $((attempt * 5))
+            sleep $((attempt * retry_sleep_seconds))
           done
         fi
     - name: Create release
@@ -105,6 +106,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        retry_sleep_seconds=5
         for attempt in 1 2 3; do
           if gh release create "${{ steps.release_metadata.outputs.release_tag }}" \
             --repo "${{ github.repository }}" \
@@ -117,7 +119,7 @@ jobs:
             echo "Failed to create release after 3 attempts."
             exit 1
           fi
-          sleep $((attempt * 5))
+          sleep $((attempt * retry_sleep_seconds))
         done
 
   publish:
@@ -147,6 +149,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        retry_sleep_seconds=5
         asset_name="pack3r-${{ needs.create_release.outputs.asset_version }}-${{ matrix.config.rid }}.zip"
         mv ./pack3r-release.zip "./$asset_name"
         for attempt in 1 2 3; do
@@ -157,5 +160,5 @@ jobs:
             echo "Failed to upload $asset_name after 3 attempts."
             exit 1
           fi
-          sleep $((attempt * 5))
+          sleep $((attempt * retry_sleep_seconds))
         done
