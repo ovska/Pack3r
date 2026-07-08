@@ -393,14 +393,13 @@ public class ShaderParser(
                         continue;
                     }
 
-                    if (token.Span.Length == 1 && token.Span.Equals("-", StringComparison.Ordinal))
+                    // '-' farbox means no envbox is loaded, see ParseSkyParms in tr_shader.c
+                    if (!(token.Span.Length == 1 && token.Span.Equals("-", StringComparison.Ordinal)))
                     {
-                        token = shader.Name;
-                    }
-
-                    foreach (var suffix in _skySuffixes)
-                    {
-                        shader.Resources.Add($"{token}{suffix}".AsMemory());
+                        foreach (var suffix in _skySuffixes)
+                        {
+                            shader.Resources.Add($"{token}{suffix}".AsMemory());
+                        }
                     }
                 }
                 else if (line.MatchKeyword("sunshader", out token))
