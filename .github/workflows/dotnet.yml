@@ -53,12 +53,13 @@ jobs:
       shell: bash
       run: |
         if [[ "${{ github.event_name }}" == "push" ]]; then
+          timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo "release_tag=latest" >> "$GITHUB_OUTPUT"
           echo "release_name=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           echo "asset_version=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           {
             echo "release_body<<EOF"
-            date -u +"%Y-%m-%dT%H:%M:%SZ"
+            echo "$timestamp"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
         else
@@ -92,7 +93,7 @@ jobs:
   publish:
     runs-on: ${{ matrix.config.os }}
     needs: create_release
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    if: needs.create_release.result == 'success' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
 
     strategy:
       matrix:
