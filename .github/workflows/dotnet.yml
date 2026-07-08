@@ -52,7 +52,8 @@ jobs:
       id: release_metadata
       shell: bash
       run: |
-        if [[ "${{ github.event_name }}" == "push" ]]; then
+        event_name="${{ github.event_name }}"
+        if [[ "$event_name" == "push" ]]; then
           timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           echo "release_tag=latest" >> "$GITHUB_OUTPUT"
           echo "release_name=${{ github.sha }}" >> "$GITHUB_OUTPUT"
@@ -82,8 +83,18 @@ jobs:
             if gh release delete "${{ steps.release_metadata.outputs.release_tag }}" --repo "${{ github.repository }}" --cleanup-tag --yes; then
               break
             fi
-            if [[ "$attempt" == "3" ]]; then
+            if [[ "$attempt" -eq 3 ]]; then
               echo "Failed to delete the existing latest release after 3 attempts."
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+          for attempt in 1 2 3; do
+            if ! gh release view "${{ steps.release_metadata.outputs.release_tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "The latest release still exists after deletion attempts."
               exit 1
             fi
             sleep $((attempt * 5))
@@ -102,7 +113,7 @@ jobs:
             --notes "${{ steps.release_metadata.outputs.release_body }}"; then
             break
           fi
-          if [[ "$attempt" == "3" ]]; then
+          if [[ "$attempt" -eq 3 ]]; then
             echo "Failed to create release after 3 attempts."
             exit 1
           fi
@@ -142,7 +153,7 @@ jobs:
           if gh release upload "${{ needs.create_release.outputs.release_tag }}" "./$asset_name" --repo "${{ github.repository }}" --clobber; then
             break
           fi
-          if [[ "$attempt" == "3" ]]; then
+          if [[ "$attempt" -eq 3 ]]; then
             echo "Failed to upload $asset_name after 3 attempts."
             exit 1
           fi
