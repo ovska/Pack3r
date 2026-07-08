@@ -62,6 +62,19 @@ public readonly struct QString :
 
     public bool Equals(string? other) => other.AsSpan().Equals(Span, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Replaces backslashes with forward slashes, mirroring <see cref="QPath"/>'s normalization.
+    /// Needed for values parsed directly from .map/.ase files, which may contain
+    /// Windows-style paths left over from authoring/exporting on Windows.
+    /// </summary>
+    public QString NormalizeSlashes()
+    {
+        if (!Value.Span.Contains('\\'))
+            return this;
+
+        return new QString(string.Create(Value.Length, Value, (dst, src) => src.Span.Replace(dst, '\\', '/')).AsMemory().TrimStart('/'));
+    }
+
     public QString TrimTextureExtension() => Value.Span.GetTextureExtension() switch
     {
         TextureExtension.Tga or TextureExtension.Jpg => new QString(Value[..^4]),
