@@ -52,6 +52,8 @@ public sealed class Resource : IEquatable<Resource>
         IResourceSource source,
         bool sourceOnly = false)
     {
+        value = value.NormalizeSlashes();
+
         if (isShader)
             value = value.TrimTextureExtension();
 
@@ -66,6 +68,7 @@ public sealed class Resource : IEquatable<Resource>
 
     private Resource(QString value, IResourceSource source)
     {
+        value = value.NormalizeSlashes();
         Global.EnsureQPathLength(value);
         Value = value.TrimTextureExtension();
         IsShader = true;
