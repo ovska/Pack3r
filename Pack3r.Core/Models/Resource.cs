@@ -55,7 +55,7 @@ public sealed class Resource : IEquatable<Resource>
         value = value.NormalizeSlashes();
 
         if (isShader)
-            value = value.TrimTextureExtension();
+            value = value.TrimExtension();
 
         if (!sourceOnly)
             Global.EnsureQPathLength(value);
@@ -70,7 +70,7 @@ public sealed class Resource : IEquatable<Resource>
     {
         value = value.NormalizeSlashes();
         Global.EnsureQPathLength(value);
-        Value = value.TrimTextureExtension();
+        Value = value.TrimExtension();
         IsShader = true;
         Source = source;
     }
