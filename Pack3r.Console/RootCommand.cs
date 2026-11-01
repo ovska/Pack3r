@@ -108,6 +108,8 @@ public class RootCommand
 
     public Task<int> RunAsync()
     {
+        ValidateFlags();
+
         return Program.Execute(new PackOptions
         {
             MapFile = ResolveMap(),
@@ -125,6 +127,19 @@ public class RootCommand
             ShaderDebug = ShaderDebug,
             ReferenceDebug = ReferenceDebug,
         });
+    }
+
+    private void ValidateFlags()
+    {
+        if (ShaderDebug && Verbosity > LogLevel.Debug)
+        {
+            Error($"Conflicting options: --shaderdebug (-sd) requires verbosity Debug or lower, but verbosity is {Verbosity}");
+        }
+
+        if (ReferenceDebug && Verbosity > LogLevel.Info)
+        {
+            Error($"Conflicting options: --referencedebug (-rd) requires verbosity Info or lower, but verbosity is {Verbosity}");
+        }
     }
 
     private FileInfo ResolveMap()
