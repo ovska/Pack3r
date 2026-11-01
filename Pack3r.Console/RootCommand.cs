@@ -55,7 +55,7 @@ public class RootCommand
     public bool Source { get; set; }
 
     [CliOption(
-        Description = "Print shader resolution details (Debug verbosity needed)",
+        Description = "Print shader resolution details (Debug verbosity needed, set automatically unless -v is given)",
         Aliases = ["-sd"])]
     public bool ShaderDebug { get; set; }
 
@@ -121,7 +121,7 @@ public class RootCommand
             DryRun = DryRun,
             OnlySource = Source,
             LoadPk3s = IncludePk3,
-            LogLevel = Verbosity ?? LogLevel.Info,
+            LogLevel = Verbosity ?? (ShaderDebug ? LogLevel.Debug : LogLevel.Info),
             Rename = Rename,
             RequireAllAssets = !Loose,
             ShaderDebug = ShaderDebug,
@@ -129,7 +129,7 @@ public class RootCommand
         });
     }
 
-    // Only checks explicitly passed verbosity; the default (Info) is never treated as a conflict.
+    // Only checks explicitly passed verbosity; the default (Info, or Debug with -sd) is never treated as a conflict.
     private void ValidateFlags()
     {
         if (Verbosity is not { } verbosity)
