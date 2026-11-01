@@ -56,10 +56,11 @@ Includes pk3s from mod folders when scanning for assets. Useful for things like 
 created in fs_game directory. Example: `--mods etjump_dev`
 
 #### `-sd, --shaderdebug`
-Prints detailed information about which shaders are required by the map, and where they are referenced (at least `--verbosity Debug` needed)
+Prints detailed information about which shaders are required by the map, and where they are referenced (at least `--verbosity Info` needed)
 
 #### `-rd, --referencedebug`
-Prints detailed information about which files are required by the map, and where they are referenced (at least `--verbosity Info` needed)
+Prints detailed information about which files are required by the map, and where they are referenced (at least `--verbosity Info` needed).
+Passing `-sd` or `-rd` together with a stricter `--verbosity` (e.g. `Warn`) is an error, as the output would never be printed.
 
 #### `-p, --pk3, --includepk3`
 Scan pk3 files and pk3dir-directories in etmain when indexing files (off by default for performance reasons).
