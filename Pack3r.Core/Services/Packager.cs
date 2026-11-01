@@ -247,7 +247,7 @@ public sealed class Packager(
                 {
                     if (options.ShaderDebug)
                     {
-                        logger.Debug($"Shader not packed, also present in {source.Name}: '{shader.GetAbsolutePath()}'");
+                        logger.Info($"Shader not packed, also present in {source.Name}: '{shader.GetAbsolutePath()}'");
                     }
 
                     handledFiles.Add(shader.DestinationPath);

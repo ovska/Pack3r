@@ -49,14 +49,14 @@ public class ShaderParser(
                     if (fileName.EqualsF("q3shadersCopyForRadiant"))
                     {
                         if (options.ShaderDebug)
-                            logger.Debug($"Skipped parsing Radiant specific shaderfile {getName()}");
+                            logger.Info($"Skipped parsing Radiant specific shaderfile {getName()}");
                         return true;
                     }
 
                     if (fileName.StartsWithF("q3map_") || fileName.StartsWithF("q3map2_"))
                     {
                         if (options.ShaderDebug)
-                            logger.Debug($"Skipped shaderfile parsing from compiler generated file '{getName()}'");
+                            logger.Info($"Skipped shaderfile parsing from compiler generated file '{getName()}'");
                         return true;
                     }
 
@@ -83,7 +83,7 @@ public class ShaderParser(
 
                                 if (options.ShaderDebug)
                                 {
-                                    logger.Debug($"Shader {a.Name} resolved from '{toReturn.Source}' instead of '{other.Source}'");
+                                    logger.Info($"Shader {a.Name} resolved from '{toReturn.Source}' instead of '{other.Source}'");
                                 }
 
                                 return toReturn;
@@ -105,7 +105,7 @@ public class ShaderParser(
 
                                 if (options.ShaderDebug)
                                 {
-                                    logger.Debug(
+                                    logger.Info(
                                         $"Shader {first} found multiple times in {first.Asset.FullPath}, " +
                                         $"using the first from line {first.Line}");
                                 }
