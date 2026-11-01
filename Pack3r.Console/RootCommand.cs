@@ -42,7 +42,7 @@ public class RootCommand
         Description = "Log severity threshold",
         Arity = CliArgumentArity.ZeroOrOne,
         Aliases = ["-v"])]
-    public LogLevel Verbosity { get; set; } = LogLevel.Info;
+    public LogLevel? Verbosity { get; set; }
 
     [CliOption(
         Description = "Complete packing even if some files are missing",
@@ -121,7 +121,7 @@ public class RootCommand
             DryRun = DryRun,
             OnlySource = Source,
             LoadPk3s = IncludePk3,
-            LogLevel = Verbosity,
+            LogLevel = Verbosity ?? LogLevel.Info,
             Rename = Rename,
             RequireAllAssets = !Loose,
             ShaderDebug = ShaderDebug,
@@ -129,16 +129,20 @@ public class RootCommand
         });
     }
 
+    // Only checks explicitly passed verbosity; the default (Info) is never treated as a conflict.
     private void ValidateFlags()
     {
-        if (ShaderDebug && Verbosity > LogLevel.Debug)
+        if (Verbosity is not { } verbosity)
+            return;
+
+        if (ShaderDebug && verbosity > LogLevel.Debug)
         {
-            Error($"Conflicting options: --shaderdebug (-sd) requires verbosity Debug or lower, but verbosity is {Verbosity}");
+            Error($"Conflicting options: -sd requires verbosity Debug or lower, but -v {verbosity} was given");
         }
 
-        if (ReferenceDebug && Verbosity > LogLevel.Info)
+        if (ReferenceDebug && verbosity > LogLevel.Info)
         {
-            Error($"Conflicting options: --referencedebug (-rd) requires verbosity Info or lower, but verbosity is {Verbosity}");
+            Error($"Conflicting options: -rd requires verbosity Info or lower, but -v {verbosity} was given");
         }
     }
 
