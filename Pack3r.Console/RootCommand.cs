@@ -42,7 +42,7 @@ public class RootCommand
         Description = "Log severity threshold",
         Arity = CliArgumentArity.ZeroOrOne,
         Aliases = ["-v"])]
-    public LogLevel? Verbosity { get; set; }
+    public LogLevel Verbosity { get; set; } = LogLevel.Info;
 
     [CliOption(
         Description = "Complete packing even if some files are missing",
@@ -55,7 +55,7 @@ public class RootCommand
     public bool Source { get; set; }
 
     [CliOption(
-        Description = "Print shader resolution details (Debug verbosity needed, set automatically unless -v is given)",
+        Description = "Print shader resolution details (Info verbosity needed)",
         Aliases = ["-sd"])]
     public bool ShaderDebug { get; set; }
 
@@ -121,7 +121,7 @@ public class RootCommand
             DryRun = DryRun,
             OnlySource = Source,
             LoadPk3s = IncludePk3,
-            LogLevel = Verbosity ?? (ShaderDebug ? LogLevel.Debug : LogLevel.Info),
+            LogLevel = Verbosity,
             Rename = Rename,
             RequireAllAssets = !Loose,
             ShaderDebug = ShaderDebug,
@@ -129,20 +129,17 @@ public class RootCommand
         });
     }
 
-    // Only checks explicitly passed verbosity; the default (Info, or Debug with -sd) is never treated as a conflict.
+    // The default verbosity (Info) satisfies both debug flags, so only an explicit -v can conflict.
     private void ValidateFlags()
     {
-        if (Verbosity is not { } verbosity)
-            return;
-
-        if (ShaderDebug && verbosity > LogLevel.Debug)
+        if (ShaderDebug && Verbosity > LogLevel.Info)
         {
-            Error($"Conflicting options: -sd requires verbosity Debug or lower, but -v {verbosity} was given");
+            Error($"Conflicting options: -sd requires verbosity Info or lower, but -v {Verbosity} was given");
         }
 
-        if (ReferenceDebug && verbosity > LogLevel.Info)
+        if (ReferenceDebug && Verbosity > LogLevel.Info)
         {
-            Error($"Conflicting options: -rd requires verbosity Info or lower, but -v {verbosity} was given");
+            Error($"Conflicting options: -rd requires verbosity Info or lower, but -v {Verbosity} was given");
         }
     }
 
