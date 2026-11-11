@@ -1,5 +1,4 @@
 ﻿using System.Buffers;
-using System.IO.Compression;
 using Pack3r.IO;
 
 namespace Pack3r.Models;
@@ -33,7 +32,12 @@ public interface IAsset
     ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Creates a new entry to destination archive.
+    /// Queues the asset to be compressed into the destination archive. Called on the packaging thread; the data
+    /// is read on a compression thread, so anything not safe to read concurrently is read before this returns.
     /// </summary>
-    ZipArchiveEntry CreateEntry(ZipArchive archive);
+    /// <param name="writer">Destination archive</param>
+    /// <param name="archivePath">Path in the archive, defaults to <see cref="Name"/></param>
+    /// <param name="transform">Optional function to modify the data, see <see cref="Pk3Writer.Add"/></param>
+    /// <exception cref="IOException">The asset could not be opened</exception>
+    void AddTo(Pk3Writer writer, string? archivePath = null, Action<Stream, Stream>? transform = null);
 }

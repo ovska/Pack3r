@@ -1,0 +1,291 @@
+using System.IO.Compression;
+using System.IO.Hashing;
+using System.Text;
+using Pack3r.Extensions;
+using Pack3r.IO;
+
+namespace Pack3r.Tests;
+
+public class Pk3WriterTests
+{
+    private static readonly DateTime _timestamp = new(2024, 5, 17, 13, 37, 42);
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4)]
+    public async Task Should_Roundtrip_Entries_In_Order(int threads)
+    {
+        var entries = new List<(string name, byte[] data)>
+        {
+            ("maps/test.bsp", Compressible(3_000_000, seed: 1)),
+            ("maps/test/lm_0000.tga", Compressible(5_000_000, seed: 2)),
+            ("maps/test/lm_0001.tga", Compressible(1_000_000, seed: 3)),
+            ("textures/random.jpg", Random(200_000, seed: 4)),
+            ("textures/empty.tga", []),
+            ("sound/tiny.wav", [1, 2, 3]),
+            ("textures/ääkköset.tga", Compressible(10_000, seed: 5)),
+        };
+
+        // lots of small entries to go past the in-flight limit
+        for (int i = 0; i < 300; i++)
+        {
+            entries.Add(($"models/small_{i:000}.md3", Compressible(1000 + i * 37, seed: 100 + i)));
+        }
+
+        using var destination = new MemoryStream();
+        long size;
+
+        await using (var writer = new Pk3Writer(destination, comment: "Created with test", maxDegreeOfParallelism: threads))
+        {
+            foreach (var (name, data) in entries)
+            {
+                writer.Add(name, _timestamp, new MemoryStream(data));
+            }
+
+            Assert.Equal(entries.Count, writer.EntriesAdded);
+            size = await writer.CompleteAsync();
+            Assert.Equal(entries.Count, writer.EntriesWritten);
+        }
+
+        Assert.Equal(destination.Length, size);
+
+        destination.Position = 0;
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Read);
+
+        Assert.Equal("Created with test", archive.Comment);
+        Assert.Equal(entries.Select(e => e.name), archive.Entries.Select(e => e.FullName));
+
+        foreach (var ((name, data), entry) in entries.Zip(archive.Entries))
+        {
+            Assert.Equal(data.Length, entry.Length);
+            Assert.Equal(Crc32.HashToUInt32(data), entry.Crc32);
+            Assert.Equal(_timestamp, entry.LastWriteTime.DateTime);
+            Assert.Equal(data, ReadAll(entry));
+
+            if (data.Length > 100_000 && name.EndsWith(".tga"))
+            {
+                Assert.True(entry.CompressedLength < entry.Length / 2, $"{name} was not compressed");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Should_Write_Same_Compressed_Data_As_ZipArchive()
+    {
+        byte[] data = Compressible(2_000_000, seed: 7);
+
+        using var expected = new MemoryStream();
+
+        using (var archive = new ZipArchive(expected, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var entry = archive.CreateEntry("maps/test/lm_0000.tga", CompressionLevel.Optimal);
+            using var stream = entry.Open();
+            stream.Write(data);
+        }
+
+        using var actual = new MemoryStream();
+
+        await using (var writer = new Pk3Writer(actual))
+        {
+            writer.Add("maps/test/lm_0000.tga", _timestamp, new MemoryStream(data));
+            await writer.CompleteAsync();
+        }
+
+        Assert.Equal(CompressedLength(expected), CompressedLength(actual));
+
+        static long CompressedLength(MemoryStream stream)
+        {
+            stream.Position = 0;
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+            return archive.Entries.Single().CompressedLength;
+        }
+    }
+
+    [Fact]
+    public async Task Should_Apply_Transform()
+    {
+        using var destination = new MemoryStream();
+
+        await using (var writer = new Pk3Writer(destination))
+        {
+            writer.Add(
+                "scripts/test.arena",
+                _timestamp,
+                new MemoryStream(Encoding.UTF8.GetBytes("map \"test\"\nlongname \"Test\"\n")),
+                (input, output) =>
+                {
+                    using var reader = new StreamReader(input);
+                    using var textWriter = new StreamWriter(output, Encoding.UTF8);
+                    string? line;
+
+                    while ((line = reader.ReadLine()) is not null)
+                    {
+                        textWriter.WriteLine(line.Replace("test", "renamed"));
+                    }
+                });
+
+            await writer.CompleteAsync();
+        }
+
+        destination.Position = 0;
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Read);
+        byte[] bytes = ReadAll(archive.Entries.Single());
+
+        // same as writing to a zip entry stream with StreamWriter: UTF-8 preamble is included
+        Assert.Equal(Encoding.UTF8.Preamble.ToArray(), bytes[..3]);
+        Assert.Equal(
+            $"map \"renamed\"{Environment.NewLine}longname \"Test\"{Environment.NewLine}",
+            Encoding.UTF8.GetString(bytes[3..]));
+    }
+
+    [Fact]
+    public async Task Should_Write_To_NonSeekable_Stream()
+    {
+        using var destination = new CountingStream();
+
+        await using var writer = new Pk3Writer(destination);
+        writer.Add("a.txt", _timestamp, new MemoryStream(Compressible(10_000, seed: 1)));
+        writer.Add("b.txt", _timestamp, new MemoryStream(Compressible(10_000, seed: 2)));
+        long size = await writer.CompleteAsync();
+
+        Assert.Equal(destination.Position, size);
+    }
+
+    [Fact]
+    public async Task Should_Throw_Original_Exception_From_Failed_Entry()
+    {
+        using var destination = new MemoryStream();
+        var sources = new List<TrackingStream>();
+
+        await using var writer = new Pk3Writer(destination, maxDegreeOfParallelism: 2);
+
+        writer.Add("ok.txt", _timestamp, Track(new TrackingStream(new byte[1000])));
+        writer.Add("bad.txt", _timestamp, Track(new TrackingStream(new byte[1000])), (_, _) => throw new InvalidDataException("bad data"));
+
+        // keeps adding until the failure is observed, or the archive is completed
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(async () =>
+        {
+            for (int i = 0; i < 1000; i++)
+            {
+                writer.Add($"more_{i}.txt", _timestamp, Track(new TrackingStream(new byte[1000])));
+            }
+
+            await writer.CompleteAsync();
+        });
+
+        Assert.Equal("bad data", exception.Message);
+
+        await writer.DisposeAsync();
+        Assert.All(sources, s => Assert.True(s.Disposed));
+
+        TrackingStream Track(TrackingStream stream)
+        {
+            sources.Add(stream);
+            return stream;
+        }
+    }
+
+    [Fact]
+    public async Task Should_Release_Sources_When_Disposed_Without_Completing()
+    {
+        using var destination = new MemoryStream();
+        var sources = Enumerable.Range(0, 5).Select(_ => new TrackingStream(Compressible(100_000, seed: 1))).ToList();
+
+        var writer = new Pk3Writer(destination, maxDegreeOfParallelism: 1);
+
+        foreach (var source in sources)
+        {
+            writer.Add("file.tga", _timestamp, source);
+        }
+
+        await writer.DisposeAsync();
+
+        Assert.All(sources, s => Assert.True(s.Disposed));
+        Assert.Throws<ObjectDisposedException>(() => writer.Add("x", _timestamp, new MemoryStream()));
+    }
+
+    [Fact]
+    public async Task Should_Dispose_Source_If_Add_Fails()
+    {
+        using var destination = new MemoryStream();
+        await using var writer = new Pk3Writer(destination);
+        await writer.CompleteAsync();
+
+        var source = new TrackingStream([1, 2, 3]);
+        Assert.Throws<InvalidOperationException>(() => writer.Add("late.txt", _timestamp, source));
+        Assert.True(source.Disposed);
+    }
+
+    [Fact]
+    public async Task Should_Throw_When_Canceled()
+    {
+        using var cts = new CancellationTokenSource();
+        using var destination = new MemoryStream();
+        await using var writer = new Pk3Writer(destination, maxDegreeOfParallelism: 1, cancellationToken: cts.Token);
+
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            for (int i = 0; i < 1000; i++)
+            {
+                writer.Add($"file_{i}.txt", _timestamp, new MemoryStream(new byte[1000]));
+            }
+
+            await writer.CompleteAsync();
+        });
+    }
+
+    [Theory]
+    [InlineData(1970, 1, 1, 0, 0, 0, 0x00210000u)] // too early, clamped to 1980-01-01
+    [InlineData(1980, 1, 1, 0, 0, 0, 0x00210000u)]
+    [InlineData(2024, 5, 17, 13, 37, 42, 0x58B16CB5u)]
+    public void Should_Convert_Dos_Time(int year, int month, int day, int hour, int minute, int second, uint expected)
+    {
+        Assert.Equal(expected, Pk3Writer.ToDosTime(new DateTime(year, month, day, hour, minute, second)));
+    }
+
+    private static byte[] ReadAll(ZipArchiveEntry entry)
+    {
+        using var stream = entry.Open();
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
+    }
+
+    /// <summary>Repetitive data that compresses roughly like a texture.</summary>
+    private static byte[] Compressible(int length, int seed)
+    {
+        var random = new Random(seed);
+        var data = new byte[length];
+        byte value = 0;
+
+        for (int i = 0; i < data.Length; i++)
+        {
+            if (random.Next(16) == 0)
+                value = (byte)random.Next(8);
+
+            data[i] = value;
+        }
+
+        return data;
+    }
+
+    private static byte[] Random(int length, int seed)
+    {
+        var data = new byte[length];
+        new Random(seed).NextBytes(data);
+        return data;
+    }
+
+    private sealed class TrackingStream(byte[] data) : MemoryStream(data)
+    {
+        public bool Disposed { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = true;
+            base.Dispose(disposing);
+        }
+    }
+}
