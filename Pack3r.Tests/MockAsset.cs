@@ -1,5 +1,4 @@
 ﻿using System.Buffers;
-using System.IO.Compression;
 using Pack3r.IO;
 using Pack3r.Models;
 
@@ -12,7 +11,7 @@ internal class FileAsset(string path) : IAsset
     public string FullPath => Path.GetFullPath(path);
     public AssetSource Source { get; }
 
-    public ZipArchiveEntry CreateEntry(ZipArchive archive)
+    public void AddTo(Pk3Writer writer, string archivePath = null, Action<Stream, Stream> transform = null)
     {
         throw new NotImplementedException();
     }
@@ -39,7 +38,7 @@ internal class MockAsset : IAsset
     public string FullPath { get; }
     public AssetSource Source { get; }
 
-    public ZipArchiveEntry CreateEntry(ZipArchive archive)
+    public void AddTo(Pk3Writer writer, string archivePath = null, Action<Stream, Stream> transform = null)
     {
         throw new NotImplementedException();
     }

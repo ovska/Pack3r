@@ -1,6 +1,5 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
-using System.IO.Compression;
 using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Buffers;
 using Pack3r.Extensions;
@@ -23,7 +22,11 @@ public sealed class FileAsset(DirectoryAssetSource source, FileInfo file) : IAss
         bufferSize: 4096,
         FileOptions.SequentialScan | (isAsync ? FileOptions.Asynchronous : 0));
 
-    public ZipArchiveEntry CreateEntry(ZipArchive archive) => archive.CreateEntryFromFile(FullPath, Name, CompressionLevel.Optimal);
+    public void AddTo(Pk3Writer writer, string? archivePath = null, Action<Stream, Stream>? transform = null)
+    {
+        // opened here so a locked or missing file is reported to the caller, which can try another source
+        writer.Add(archivePath ?? Name, file.LastWriteTime, OpenRead(), transform);
+    }
 
     public async ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken)
     {

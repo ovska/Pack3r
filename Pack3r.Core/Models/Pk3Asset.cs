@@ -17,15 +17,19 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
 
     public Stream OpenRead(bool isAsync = false) => entry.Open();
 
-    public ZipArchiveEntry CreateEntry(ZipArchive archive)
+    public void AddTo(Pk3Writer writer, string? archivePath = null, Action<Stream, Stream>? transform = null)
     {
-        ZipArchiveEntry destination = archive.CreateEntry(Name, CompressionLevel.Optimal);
-        destination.LastWriteTime = entry.LastWriteTime;
+        // the source archive shares one file stream between its entries, so decompress it on this thread
+        // and let the writer compress the copy in parallel
+        var buffer = new MemoryStream(capacity: (int)Math.Min(entry.Length, Array.MaxLength));
 
-        using Stream sourceStream = entry.Open();
-        using Stream destinationStream = destination.Open();
-        sourceStream.CopyTo(destinationStream);
-        return destination;
+        using (Stream sourceStream = entry.Open())
+        {
+            sourceStream.CopyTo(buffer);
+        }
+
+        buffer.Position = 0;
+        writer.Add(archivePath ?? Name, entry.LastWriteTime.DateTime, buffer, transform);
     }
 
     public ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken)

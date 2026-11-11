@@ -1,6 +1,4 @@
-﻿using System.IO.Compression;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -43,8 +41,11 @@ public sealed class Packager(
 
         var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
 
-        using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: false);
-        archive.Comment = $"Created with Pack3r {Global.Version}";
+        // entries are compressed on worker threads while the assets are being resolved here
+        await using var archive = new Pk3Writer(
+            destination,
+            comment: $"Created with Pack3r {Global.Version}",
+            cancellationToken: cancellationToken);
 
         // contains both actual and alternate files added
         HashSet<QPath> handledFiles = [];
@@ -182,6 +183,22 @@ public sealed class Packager(
             }
         }
 
+        long archiveSize;
+
+        using (var progress = progressManager.Create("Finishing compression", archive.EntriesAdded))
+        {
+            Task<long> completion = archive.CompleteAsync();
+
+            while (!completion.IsCompleted)
+            {
+                progress.Report(archive.EntriesWritten);
+                await Task.WhenAny(completion, Task.Delay(100, CancellationToken.None));
+            }
+
+            archiveSize = await completion;
+            progress.Report(archive.EntriesAdded);
+        }
+
         if (options.LogLevel <= LogLevel.Info && options.ReferenceDebug)
         {
             foreach (var file in includedFiles.OrderBy(x => x.ArchivePath))
@@ -206,7 +223,7 @@ public sealed class Packager(
         return new PackResult(
             Packed: includedFiles.Count,
             Missing: missingFiles,
-            Bytes: destination.Position);
+            Bytes: archiveSize);
 
         bool IsHandledOrExcluded(QPath relativePath)
         {
@@ -320,7 +337,7 @@ public sealed class Packager(
 
             try
             {
-                ZipArchiveEntry? entry;
+                string? entry;
 
                 if (shader is not null &&
                     map.ShaderConvert.Count > 0 &&
@@ -334,7 +351,8 @@ public sealed class Packager(
                         ? $"scripts/levelshots_{options.Rename ?? map.Name}.shader"
                         : shader.Asset.Name;
 
-                    entry = CreateRenamableShader(archive, asset, archivePath, convertList, cancellationToken);
+                    CreateRenamableShader(archive, asset, archivePath, convertList, cancellationToken);
+                    entry = archivePath;
                 }
                 else
                 {
@@ -348,7 +366,8 @@ public sealed class Packager(
                         if (!resource.SourceOnly && !devResource)
                             integrityChecker.CheckIntegrity(asset);
 
-                        entry = asset.CreateEntry(archive);
+                        asset.AddTo(archive);
+                        entry = asset.Name;
                     }
                 }
 
@@ -356,7 +375,7 @@ public sealed class Packager(
                 {
                     includedFiles.Add(new IncludedFile(
                         source,
-                        entry.FullName,
+                        entry,
                         resource,
                         shader,
                         devResource));
@@ -395,7 +414,7 @@ public sealed class Packager(
 
             try
             {
-                archive.CreateEntryFromFile(absolutePath, archivePath);
+                archive.Add(archivePath, File.GetLastWriteTime(absolutePath), OpenFile(absolutePath));
                 handledFiles.Add(archivePath.AsMemory());
                 includedFiles.Add(new IncludedFile(sourcePath: absolutePath, archivePath: archivePath));
                 return true;
@@ -433,8 +452,8 @@ public sealed class Packager(
         }
     }
 
-    private static ZipArchiveEntry CreateRenamableShader(
-        ZipArchive archive,
+    private static void CreateRenamableShader(
+        Pk3Writer archive,
         IAsset asset,
         string archivePath,
         List<Func<string, int, string>> convertList,
@@ -442,88 +461,88 @@ public sealed class Packager(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        ZipArchiveEntry entry = archive.CreateEntry(archivePath, CompressionLevel.Optimal);
-
         if (convertList.Count == 0)
         {
-            using var input = asset.OpenRead();
-            using var output = entry.Open();
-            input.CopyTo(output);
-            return entry;
+            asset.AddTo(archive, archivePath);
+            return;
         }
 
-        using var reader = new StreamReader(asset.OpenRead(), Encoding.UTF8);
-        using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
+        // the conversion runs on a compression thread
+        Func<string, int, string>[] converters = [.. convertList];
 
-        string? line;
-        int index = 1;
-
-        ReadOnlySpan<Func<string, int, string>> span = CollectionsMarshal.AsSpan(convertList);
-
-        while ((line = reader.ReadLine()) != null)
+        asset.AddTo(archive, archivePath, (input, output) =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            using var reader = new StreamReader(input, Encoding.UTF8);
+            using var writer = new StreamWriter(output, Encoding.UTF8);
 
-            foreach (var func in span)
+            string? line;
+            int index = 1;
+
+            while ((line = reader.ReadLine()) != null)
             {
-                line = func(line, index);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                foreach (var func in converters)
+                {
+                    line = func(line, index);
+                }
+
+                writer.WriteLine(line);
+                index++;
             }
-
-            writer.WriteLine(line);
-            index++;
-        }
-
-        return entry;
+        });
     }
 
     private static void CreateRenamable(
-        ZipArchive archive,
+        Pk3Writer archive,
         PackOptions options,
         RenamableResource resource,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        DateTime lastWrite = File.GetLastWriteTime(resource.AbsolutePath);
+
         if (options.Rename is null || resource.Convert is null)
         {
-            archive.CreateEntryFromFile(resource.AbsolutePath, resource.ArchivePath);
+            archive.Add(resource.ArchivePath, lastWrite, OpenFile(resource.AbsolutePath));
             return;
         }
 
-        var entry = archive.CreateEntry(resource.ArchivePath);
+        var convert = resource.Convert;
 
-        // see ZipArchive.CreateEntryFromFile
+        // the conversion runs on a compression thread
+        archive.Add(resource.ArchivePath, lastWrite, OpenFile(resource.AbsolutePath), (input, output) =>
         {
-            DateTime lastWrite = File.GetLastWriteTime(resource.AbsolutePath);
+            using var reader = new StreamReader(
+                input,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: false,
+                bufferSize: 4096,
+                leaveOpen: false);
 
-            // If file to be archived has an invalid last modified time, use the first datetime representable in the Zip timestamp format
-            // (midnight on January 1, 1980):
-            if (lastWrite.Year < 1980 || lastWrite.Year > 2107)
-                lastWrite = new DateTime(1980, 1, 1, 0, 0, 0);
+            using var writer = new StreamWriter(output, Encoding.UTF8, leaveOpen: false);
 
-            entry.LastWriteTime = lastWrite;
-        }
+            string? line;
 
-        using var reader = new StreamReader(
-            File.OpenRead(resource.AbsolutePath),
-            Encoding.UTF8,
-            detectEncodingFromByteOrderMarks: false,
-            bufferSize: 4096,
-            leaveOpen: false);
-
-        using var writer = new StreamWriter(entry.Open(), Encoding.UTF8, leaveOpen: false);
-
-        string? line;
-
-        while ((line = reader.ReadLine()) != null)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            writer.WriteLine(resource.Convert(line, options));
-        }
+            while ((line = reader.ReadLine()) != null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                writer.WriteLine(convert(line, options));
+            }
+        });
     }
 
+    private static FileStream OpenFile(string path) => new(
+        path,
+        FileMode.Open,
+        FileAccess.Read,
+        FileShare.Read,
+        bufferSize: 4096,
+        FileOptions.SequentialScan);
+
     private static void AddRenamedStylelightShader(
-        ZipArchive archive,
+        Pk3Writer archive,
         FileInfo stylelightShaderFile,
         Map map,
         string rename,
