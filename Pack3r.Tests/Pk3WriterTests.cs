@@ -236,6 +236,81 @@ public class Pk3WriterTests
         });
     }
 
+    [Fact]
+    public async Task Should_Copy_Raw_Entries_As_Is()
+    {
+        byte[] data = Compressible(1_000_000, seed: 3);
+        byte[] deflated = Deflate(data, CompressionLevel.Fastest);
+
+        using var destination = new MemoryStream();
+
+        await using (var writer = new Pk3Writer(destination, maxDegreeOfParallelism: 2))
+        {
+            writer.Add("compressed.tga", _timestamp, new MemoryStream(data));
+            writer.AddRaw("raw.tga", _timestamp, 8, Crc32.HashToUInt32(data), deflated.Length, data.Length, new MemoryStream(deflated));
+            writer.AddRaw("stored.txt", _timestamp, 0, Crc32.HashToUInt32("abc"u8), 3, 3, new MemoryStream("abc"u8.ToArray()));
+            writer.AddRaw("empty.txt", _timestamp, 0, 0, 0, 0, new MemoryStream());
+            await writer.CompleteAsync();
+        }
+
+        destination.Position = 0;
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Read);
+
+        Assert.Equal(["compressed.tga", "raw.tga", "stored.txt", "empty.txt"], archive.Entries.Select(e => e.FullName));
+        Assert.Equal(data, ReadAll(archive.GetEntry("compressed.tga")!));
+        Assert.Equal(data, ReadAll(archive.GetEntry("raw.tga")!));
+        Assert.Equal(deflated.Length, archive.GetEntry("raw.tga")!.CompressedLength);
+        Assert.Equal("abc"u8.ToArray(), ReadAll(archive.GetEntry("stored.txt")!));
+        Assert.Empty(ReadAll(archive.GetEntry("empty.txt")!));
+    }
+
+    [Fact]
+    public async Task Should_Throw_If_Raw_Data_Is_Truncated()
+    {
+        using var destination = new MemoryStream();
+        await using var writer = new Pk3Writer(destination);
+
+        writer.AddRaw("raw.tga", _timestamp, 8, 0, compressedSize: 100, uncompressedSize: 1000, new MemoryStream(new byte[50]));
+
+        await Assert.ThrowsAsync<InvalidDataException>(writer.CompleteAsync);
+    }
+
+    [Fact]
+    public async Task Should_Validate_Raw_Entry()
+    {
+        using var destination = new MemoryStream();
+        await using var writer = new Pk3Writer(destination);
+
+        var source = new TrackingStream([1, 2, 3]);
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.AddRaw("x", _timestamp, 9, 0, 3, 3, source));
+        Assert.True(source.Disposed);
+
+        source = new TrackingStream([1, 2, 3]);
+        Assert.Throws<ArgumentException>(() => writer.AddRaw("x", _timestamp, 0, 0, 3, 4, source));
+        Assert.True(source.Disposed);
+
+        // the failed adds released their slots
+        for (int i = 0; i < 100; i++)
+        {
+            writer.AddRaw($"ok_{i}", _timestamp, 0, 0, 0, 0, new MemoryStream());
+        }
+
+        await writer.CompleteAsync();
+        Assert.Equal(100, writer.EntriesWritten);
+    }
+
+    private static byte[] Deflate(byte[] data, CompressionLevel level)
+    {
+        using var output = new MemoryStream();
+
+        using (var deflate = new DeflateStream(output, level, leaveOpen: true))
+        {
+            deflate.Write(data);
+        }
+
+        return output.ToArray();
+    }
+
     [Theory]
     [InlineData(1970, 1, 1, 0, 0, 0, 0x00210000u)] // too early, clamped to 1980-01-01
     [InlineData(1980, 1, 1, 0, 0, 0, 0x00210000u)]

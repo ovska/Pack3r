@@ -19,8 +19,44 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
 
     public void AddTo(Pk3Writer writer, string? archivePath = null, Action<Stream, Stream>? transform = null)
     {
-        // the source archive shares one file stream between its entries, so decompress it on this thread
-        // and let the writer compress the copy in parallel
+        string name = archivePath ?? Name;
+        DateTime lastWriteTime = entry.LastWriteTime.DateTime;
+
+        if (source.TryGetEntryData(entry, out ZipDirectory.Entry data, out long dataOffset))
+        {
+            Stream compressed = source.OpenData(dataOffset, data.CompressedSize);
+
+            if (data.Method == DeflateMethod && transform is null)
+            {
+                // already deflated, so the writer copies the bytes as is: no decompression, compression or buffering
+                writer.AddRaw(
+                    name,
+                    lastWriteTime,
+                    data.Method,
+                    data.Crc32,
+                    data.CompressedSize,
+                    data.UncompressedSize,
+                    compressed);
+                return;
+            }
+
+            if (data.Method is DeflateMethod or StoredMethod)
+            {
+                // decompressed and compressed again on a compression thread.
+                // stored entries are compressed so they don't make the pk3 larger than necessary
+                Stream content = data.Method == DeflateMethod
+                    ? new DeflateStream(compressed, CompressionMode.Decompress, leaveOpen: false)
+                    : compressed;
+
+                writer.Add(name, lastWriteTime, content, transform);
+                return;
+            }
+
+            compressed.Dispose();
+        }
+
+        // unsupported archive or compression method (e.g. deflate64): ZipArchive shares one file stream between
+        // its entries, so decompress it on this thread and let the writer compress the copy in parallel
         var buffer = new MemoryStream(capacity: (int)Math.Min(entry.Length, Array.MaxLength));
 
         using (Stream sourceStream = entry.Open())
@@ -29,8 +65,11 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
         }
 
         buffer.Position = 0;
-        writer.Add(archivePath ?? Name, entry.LastWriteTime.DateTime, buffer, transform);
+        writer.Add(name, lastWriteTime, buffer, transform);
     }
+
+    private const ushort StoredMethod = 0;
+    private const ushort DeflateMethod = 8;
 
     public ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken)
     {
