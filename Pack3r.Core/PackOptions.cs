@@ -27,6 +27,11 @@ public class PackOptions
 
     public bool LoadPk3s { get; set; }
 
+    /// <summary>
+    /// Compress everything at the highest level, also files that are already compressed in source pk3s.
+    /// </summary>
+    public bool SmallestSize { get; set; }
+
     public List<string> UnscannedSources { get; init; } = null!;
 
     public List<string> UnpackedSources { get; init; } = null!;

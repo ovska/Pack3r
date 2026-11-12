@@ -182,6 +182,11 @@ public class Program
         sb.AppendLine();
         sb.Append(options.LoadPk3s ? "\tPk3s in etmain are scanned." : "\tPk3s in etmain are not scanned.");
 
+        if (options.SmallestSize)
+        {
+            sb.Append("\tCompressing at the highest level.");
+        }
+
         sb.Append("\tLogging verbosity is '");
         sb.Append(options.LogLevel);
         sb.Append("'.");

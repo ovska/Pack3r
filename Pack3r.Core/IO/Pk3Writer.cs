@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Compression;
 using System.IO.Hashing;
@@ -9,6 +9,21 @@ using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Buffers;
 
 namespace Pack3r.IO;
+
+/// <summary>
+/// Data that is already compressed with a zip compression method, see <see cref="Pk3Writer.Add"/>.
+/// </summary>
+/// <param name="Method">Compression method, 0 (stored) or 8 (deflate)</param>
+/// <param name="Crc32">CRC-32 of the uncompressed data</param>
+/// <param name="CompressedSize">Length of the compressed data</param>
+/// <param name="UncompressedSize">Length of the uncompressed data</param>
+/// <param name="Open">Opens a stream over the compressed data, called on the writer thread</param>
+public sealed record PrecompressedData(
+    ushort Method,
+    uint Crc32,
+    long CompressedSize,
+    long UncompressedSize,
+    Func<Stream> Open);
 
 /// <summary>
 /// Writes a zip archive while compressing its entries in parallel.
@@ -113,6 +128,9 @@ public sealed class Pk3Writer : IAsyncDisposable
             TaskScheduler.Default);
     }
 
+    /// <summary>Compression level of the entries compressed by this writer.</summary>
+    public CompressionLevel CompressionLevel => _compressionLevel;
+
     /// <summary>Number of entries queued with <see cref="Add"/>.</summary>
     public int EntriesAdded => _entriesAdded;
 
@@ -132,14 +150,48 @@ public sealed class Pk3Writer : IAsyncDisposable
     /// Optional function that writes the entry data, given the source and a destination stream.
     /// Runs on another thread. If <see langword="null"/>, the source is copied as is.
     /// </param>
+    /// <param name="alternative">
+    /// Optional copy of the same data that is already compressed, such as the entry in a source archive. It is
+    /// written instead if it's not larger than the result of compressing <paramref name="source"/>, and its CRC
+    /// matches. Can't be combined with <paramref name="transform"/>.
+    /// </param>
     /// <exception cref="OperationCanceledException">The token passed to the constructor was canceled</exception>
     /// <remarks>
     /// If compressing or writing a previous entry failed, that exception is thrown.
     /// </remarks>
-    public void Add(string name, DateTime lastWriteTime, Stream source, Action<Stream, Stream>? transform = null)
+    public void Add(
+        string name,
+        DateTime lastWriteTime,
+        Stream source,
+        Action<Stream, Stream>? transform = null,
+        PrecompressedData? alternative = null)
     {
         ArgumentNullException.ThrowIfNull(source);
-        Enqueue(source, () => new Job(name, lastWriteTime, source, transform), compress: true);
+
+        Enqueue(source, () =>
+        {
+            if (alternative is not null)
+            {
+                if (transform is not null)
+                    throw new ArgumentException("Precompressed alternative can't be used with a transform", nameof(alternative));
+
+                ValidateRaw(alternative.Method, alternative.CompressedSize, alternative.UncompressedSize);
+            }
+
+            return new Job(name, lastWriteTime, source, transform) { Alternative = alternative };
+        }, compress: true);
+    }
+
+    private static void ValidateRaw(ushort method, long compressedSize, long uncompressedSize)
+    {
+        if (method is not (MethodStored or MethodDeflate))
+            throw new ArgumentOutOfRangeException(nameof(method), method, "Only stored and deflate are supported");
+
+        ArgumentOutOfRangeException.ThrowIfNegative(compressedSize);
+        ArgumentOutOfRangeException.ThrowIfNegative(uncompressedSize);
+
+        if (method == MethodStored && compressedSize != uncompressedSize)
+            throw new ArgumentException("Stored entry must have equal compressed and uncompressed size");
     }
 
     /// <summary>
@@ -174,14 +226,7 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         Enqueue(compressedData, () =>
         {
-            if (method is not (MethodStored or MethodDeflate))
-                throw new ArgumentOutOfRangeException(nameof(method), method, "Only stored and deflate are supported");
-
-            ArgumentOutOfRangeException.ThrowIfNegative(compressedSize);
-            ArgumentOutOfRangeException.ThrowIfNegative(uncompressedSize);
-
-            if (method == MethodStored && compressedSize != uncompressedSize)
-                throw new ArgumentException("Stored entry must have equal compressed and uncompressed size");
+            ValidateRaw(method, compressedSize, uncompressedSize);
 
             return Job.Raw(name, lastWriteTime, method, crc32, compressedSize, uncompressedSize, compressedData);
         }, compress: false);
@@ -408,6 +453,8 @@ public sealed class Pk3Writer : IAsyncDisposable
         long compressedSize;
         ReadOnlySpan<byte> data = default;
 
+        job.UseAlternativeIfSmaller();
+
         if (job.IsRaw)
         {
             method = job.RawMethod;
@@ -571,9 +618,36 @@ public sealed class Pk3Writer : IAsyncDisposable
         public long UncompressedSize { get; private set; }
 
         /// <summary>Data is already compressed, and is copied from the source by the writer.</summary>
-        public bool IsRaw { get; private init; }
-        public ushort RawMethod { get; private init; }
-        public long RawCompressedSize { get; private init; }
+        public bool IsRaw { get; private set; }
+        public ushort RawMethod { get; private set; }
+        public long RawCompressedSize { get; private set; }
+
+        public PrecompressedData? Alternative { get; init; }
+
+        /// <summary>
+        /// Called by the writer after compressing: switches to the precompressed alternative if it's not larger.
+        /// The CRC of the alternative must match the data that was just compressed, so a mismatching source
+        /// is never copied.
+        /// </summary>
+        public void UseAlternativeIfSmaller()
+        {
+            if (Alternative is not { } alternative ||
+                IsRaw ||
+                UncompressedSize == 0 ||
+                alternative.Crc32 != Crc32 ||
+                alternative.UncompressedSize != UncompressedSize ||
+                alternative.CompressedSize > Compressed!.WrittenCount)
+            {
+                return;
+            }
+
+            _source = alternative.Open();
+            Compressed.Dispose();
+            Compressed = null;
+            IsRaw = true;
+            RawMethod = alternative.Method;
+            RawCompressedSize = alternative.CompressedSize;
+        }
 
         public static Job Raw(
             string name,

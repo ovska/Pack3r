@@ -1,4 +1,4 @@
-<p align="center">
+﻿<p align="center">
   <img
     width="256"
     height="305"
@@ -64,6 +64,12 @@ Passing `-sd` or `-rd` together with a stricter `--verbosity` (e.g. `Warn`) is a
 
 #### `-p, --pk3, --includepk3`
 Scan pk3 files and pk3dir-directories in etmain when indexing files (off by default for performance reasons).
+
+#### `--smallest`
+Compresses everything at the highest level, which is slower but creates a slightly smaller pk3. Files that are already
+compressed in source pk3s are compressed again, and the original is kept if it's smaller (e.g. when compressed with 7-Zip).
+Without this option, those files are copied as is, and other files use the default level.
+Files compressed at a higher level don't take longer to decompress in game.
 
 #### `-ns --noscan` `<one or more pk3s or dirs>`
 Don't scan these pk3s/directories at all when indexing files. Example: `--noscan skies_MASTER.pk3`

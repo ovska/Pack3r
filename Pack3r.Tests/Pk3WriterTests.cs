@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.IO.Hashing;
 using System.Text;
 using Pack3r.Extensions;
@@ -297,6 +297,59 @@ public class Pk3WriterTests
 
         await writer.CompleteAsync();
         Assert.Equal(100, writer.EntriesWritten);
+    }
+
+    [Theory]
+    [InlineData(true, true)] // alternative is smaller, and matches
+    [InlineData(false, true)] // alternative is larger
+    [InlineData(true, false)] // alternative is smaller, but has the wrong CRC
+    public async Task Should_Use_Alternative_If_Smaller(bool alternativeSmaller, bool crcMatches)
+    {
+        byte[] data = Compressible(500_000, seed: 4);
+        byte[] alternative = alternativeSmaller
+            ? Deflate(data, CompressionLevel.SmallestSize)
+            : Deflate(data, CompressionLevel.NoCompression);
+        long compressedByWriter = Deflate(data, CompressionLevel.Fastest).Length;
+
+        bool opened = false;
+        using var destination = new MemoryStream();
+
+        await using (var writer = new Pk3Writer(destination, compressionLevel: CompressionLevel.Fastest))
+        {
+            writer.Add("entry.tga", _timestamp, new MemoryStream(data), alternative: new PrecompressedData(
+                8,
+                crcMatches ? Crc32.HashToUInt32(data) : 12345u,
+                alternative.Length,
+                data.Length,
+                () =>
+                {
+                    opened = true;
+                    return new MemoryStream(alternative);
+                }));
+
+            await writer.CompleteAsync();
+        }
+
+        destination.Position = 0;
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Read);
+        var entry = archive.Entries.Single();
+
+        bool expectAlternative = alternativeSmaller && crcMatches;
+        Assert.Equal(data, ReadAll(entry));
+        Assert.Equal(expectAlternative, opened);
+        Assert.Equal(expectAlternative ? alternative.Length : compressedByWriter, entry.CompressedLength);
+    }
+
+    [Fact]
+    public async Task Should_Not_Allow_Alternative_With_Transform()
+    {
+        using var destination = new MemoryStream();
+        await using var writer = new Pk3Writer(destination);
+        var source = new TrackingStream([1, 2, 3]);
+
+        Assert.Throws<ArgumentException>(() => writer.Add(
+            "x", _timestamp, source, (i, o) => i.CopyTo(o), new PrecompressedData(8, 0, 3, 3, () => new MemoryStream())));
+        Assert.True(source.Disposed);
     }
 
     private static byte[] Deflate(byte[] data, CompressionLevel level)

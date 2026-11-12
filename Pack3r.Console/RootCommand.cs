@@ -75,6 +75,10 @@ public class RootCommand
     public bool IncludePk3 { get; set; }
 
     [CliOption(
+        Description = "Compress at the highest level, also files already compressed in pk3s if it makes them smaller (slower, smaller pk3)")]
+    public bool Smallest { get; set; }
+
+    [CliOption(
         Description = "Don't scan pk3/pk3dirs for assets",
         Arity = CliArgumentArity.ZeroOrMore,
         ValidationRules = CliValidationRules.LegalPath,
@@ -126,6 +130,7 @@ public class RootCommand
             RequireAllAssets = !Loose,
             ShaderDebug = ShaderDebug,
             ReferenceDebug = ReferenceDebug,
+            SmallestSize = Smallest,
         });
     }
 
