@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Compression;
 using System.IO.Hashing;
@@ -138,12 +139,60 @@ public sealed class Pk3Writer : IAsyncDisposable
     public void Add(string name, DateTime lastWriteTime, Stream source, Action<Stream, Stream>? transform = null)
     {
         ArgumentNullException.ThrowIfNull(source);
+        Enqueue(source, () => new Job(name, lastWriteTime, source, transform), compress: true);
+    }
 
+    /// <summary>
+    /// Queues an entry whose data is already compressed, such as one from another zip archive. The data is
+    /// copied to the destination as is on the writer thread, without being buffered. Blocks if too many entries
+    /// are waiting to be written.
+    /// </summary>
+    /// <param name="name">Path of the entry in the archive</param>
+    /// <param name="lastWriteTime">Timestamp of the entry</param>
+    /// <param name="method">Compression method of the data, 0 (stored) or 8 (deflate)</param>
+    /// <param name="crc32">CRC-32 of the uncompressed data</param>
+    /// <param name="compressedSize">Length of the compressed data</param>
+    /// <param name="uncompressedSize">Length of the uncompressed data</param>
+    /// <param name="compressedData">
+    /// Stream containing at least <paramref name="compressedSize"/> bytes of compressed data. Read on another thread,
+    /// so it must not share state with other streams. Disposed by this type, also if this method throws.
+    /// </param>
+    /// <remarks>
+    /// The data is not validated, so a corrupt source entry is copied as is.
+    /// If compressing or writing a previous entry failed, that exception is thrown.
+    /// </remarks>
+    public void AddRaw(
+        string name,
+        DateTime lastWriteTime,
+        ushort method,
+        uint crc32,
+        long compressedSize,
+        long uncompressedSize,
+        Stream compressedData)
+    {
+        ArgumentNullException.ThrowIfNull(compressedData);
+
+        Enqueue(compressedData, () =>
+        {
+            if (method is not (MethodStored or MethodDeflate))
+                throw new ArgumentOutOfRangeException(nameof(method), method, "Only stored and deflate are supported");
+
+            ArgumentOutOfRangeException.ThrowIfNegative(compressedSize);
+            ArgumentOutOfRangeException.ThrowIfNegative(uncompressedSize);
+
+            if (method == MethodStored && compressedSize != uncompressedSize)
+                throw new ArgumentException("Stored entry must have equal compressed and uncompressed size");
+
+            return Job.Raw(name, lastWriteTime, method, crc32, compressedSize, uncompressedSize, compressedData);
+        }, compress: false);
+    }
+
+    private void Enqueue(Stream source, Func<Job> createJob, bool compress)
+    {
         bool queued = false;
 
         try
         {
-            ArgumentException.ThrowIfNullOrEmpty(name);
             ObjectDisposedException.ThrowIf(_disposed, this);
 
             if (_completed)
@@ -160,12 +209,26 @@ public sealed class Pk3Writer : IAsyncDisposable
                 _failure.Throw();
             }
 
-            var job = new Job(name, lastWriteTime, source, transform);
+            Job job;
+
+            try
+            {
+                job = createJob();
+                ArgumentException.ThrowIfNullOrEmpty(job.Name, "name");
+            }
+            catch
+            {
+                _inFlight.Release();
+                throw;
+            }
 
             // writer sees jobs in the order they were added, workers may finish them in any order.
             // both channels are unbounded and only completed by this producer, so the writes always succeed
             _ordered.Writer.TryWrite(job);
-            _work.Writer.TryWrite(job);
+
+            if (compress)
+                _work.Writer.TryWrite(job);
+
             _entriesAdded++;
             queued = true;
         }
@@ -341,21 +404,39 @@ public sealed class Pk3Writer : IAsyncDisposable
         if (name.Length > ushort.MaxValue)
             throw new IOException($"Entry name is too long: '{job.Name}'");
 
-        // match ZipArchive: empty entries are stored without data
-        bool stored = job.UncompressedSize == 0;
-        ReadOnlySpan<byte> data = stored ? default : job.Compressed!.WrittenSpan;
+        ushort method;
+        long compressedSize;
+        ReadOnlySpan<byte> data = default;
 
-        if (job.UncompressedSize >= uint.MaxValue || _position >= uint.MaxValue)
+        if (job.IsRaw)
+        {
+            method = job.RawMethod;
+            compressedSize = job.RawCompressedSize;
+        }
+        else if (job.UncompressedSize == 0)
+        {
+            // match ZipArchive: empty entries are stored without data
+            method = MethodStored;
+            compressedSize = 0;
+        }
+        else
+        {
+            method = MethodDeflate;
+            data = job.Compressed!.WrittenSpan;
+            compressedSize = data.Length;
+        }
+
+        if (job.UncompressedSize >= uint.MaxValue || compressedSize >= uint.MaxValue || _position >= uint.MaxValue)
             throw new IOException($"Archive or entry '{job.Name}' is too large, zip64 is not supported");
 
         var record = new CentralDirectoryRecord(
             Name: name,
             Flags: utf8 ? FlagUtf8 : (ushort)0,
-            Method: stored ? MethodStored : MethodDeflate,
-            Version: stored ? VersionStored : VersionDeflate,
+            Method: method,
+            Version: method == MethodStored ? VersionStored : VersionDeflate,
             DosTime: ToDosTime(job.LastWriteTime),
             Crc32: job.Crc32,
-            CompressedSize: (uint)data.Length,
+            CompressedSize: (uint)compressedSize,
             UncompressedSize: (uint)job.UncompressedSize,
             Offset: (uint)_position);
 
@@ -373,10 +454,19 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         _destination.Write(header);
         _destination.Write(name);
-        _destination.Write(data);
+
+        if (job.IsRaw)
+        {
+            // streamed from the source archive, never buffered
+            job.CopyRawTo(_destination);
+        }
+        else
+        {
+            _destination.Write(data);
+        }
 
         _records.Add(record);
-        _position += header.Length + name.Length + data.Length;
+        _position += header.Length + name.Length + compressedSize;
     }
 
     private void WriteCentralDirectory()
@@ -479,6 +569,62 @@ public sealed class Pk3Writer : IAsyncDisposable
         public ArrayPoolBufferWriter<byte>? Compressed { get; private set; }
         public uint Crc32 { get; private set; }
         public long UncompressedSize { get; private set; }
+
+        /// <summary>Data is already compressed, and is copied from the source by the writer.</summary>
+        public bool IsRaw { get; private init; }
+        public ushort RawMethod { get; private init; }
+        public long RawCompressedSize { get; private init; }
+
+        public static Job Raw(
+            string name,
+            DateTime lastWriteTime,
+            ushort method,
+            uint crc32,
+            long compressedSize,
+            long uncompressedSize,
+            Stream compressedData)
+        {
+            var job = new Job(name, lastWriteTime, compressedData, transform: null)
+            {
+                IsRaw = true,
+                RawMethod = method,
+                RawCompressedSize = compressedSize,
+                Crc32 = crc32,
+                UncompressedSize = uncompressedSize,
+            };
+
+            job.Done.SetResult();
+            return job;
+        }
+
+        /// <summary>Copies the compressed data of a raw entry to the destination, and disposes the source.</summary>
+        public void CopyRawTo(Stream destination)
+        {
+            Stream input = _source!;
+            byte[] buffer = ArrayPool<byte>.Shared.Rent((int)Math.Clamp(RawCompressedSize, 1, 1 << 16));
+
+            try
+            {
+                long remaining = RawCompressedSize;
+
+                while (remaining > 0)
+                {
+                    int read = input.Read(buffer, 0, (int)Math.Min(remaining, buffer.Length));
+
+                    if (read == 0)
+                        throw new InvalidDataException($"Unexpected end of compressed data for '{Name}'");
+
+                    destination.Write(buffer, 0, read);
+                    remaining -= read;
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+                input.Dispose();
+                _source = null;
+            }
+        }
 
         public void Compress(CompressionLevel level)
         {
