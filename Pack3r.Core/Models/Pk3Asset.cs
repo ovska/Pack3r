@@ -26,7 +26,11 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
         {
             Stream compressed = source.OpenData(dataOffset, data.CompressedSize);
 
-            if (data.Method == DeflateMethod && transform is null)
+            // copy as is, unless the smallest size was requested: then compress again at the highest level,
+            // as decompressing doesn't get slower with the level the data was compressed with
+            if (data.Method == DeflateMethod &&
+                transform is null &&
+                writer.CompressionLevel != CompressionLevel.SmallestSize)
             {
                 // already deflated, so the writer copies the bytes as is: no decompression, compression or buffering
                 writer.AddRaw(
@@ -37,6 +41,23 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
                     data.CompressedSize,
                     data.UncompressedSize,
                     compressed);
+                return;
+            }
+
+            if (data.Method == DeflateMethod && transform is null)
+            {
+                // smallest size requested: compress at the highest level, but keep the original data if it's
+                // smaller, as it may have been compressed with something better than zlib (e.g. 7-Zip)
+                writer.Add(
+                    name,
+                    lastWriteTime,
+                    new DeflateStream(compressed, CompressionMode.Decompress, leaveOpen: false),
+                    alternative: new PrecompressedData(
+                        data.Method,
+                        data.Crc32,
+                        data.CompressedSize,
+                        data.UncompressedSize,
+                        () => source.OpenData(dataOffset, data.CompressedSize)));
                 return;
             }
 

@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Pack3r.Extensions;
 using Pack3r.IO;
@@ -45,6 +46,7 @@ public sealed class Packager(
         await using var archive = new Pk3Writer(
             destination,
             comment: $"Created with Pack3r {Global.Version}",
+            compressionLevel: options.SmallestSize ? CompressionLevel.SmallestSize : CompressionLevel.Optimal,
             cancellationToken: cancellationToken);
 
         // contains both actual and alternate files added

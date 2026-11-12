@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Text;
 using Pack3r.IO;
 using Pack3r.Models;
@@ -178,6 +178,31 @@ public sealed class ZipDirectoryTests : IDisposable
 
         byte[] transformed = ReadAll(result.GetEntry("textures/transformed.tga")!.Open());
         Assert.Equal([.. files[0].Item2, .. "appended"u8.ToArray()], transformed);
+    }
+
+    [Fact]
+    public async Task Pk3Asset_Should_Recompress_Deflated_Entries_With_SmallestSize()
+    {
+        byte[] data = Compressible(500_000, 1);
+        string path = CreateZip(("textures/fastest.tga", data, CompressionLevel.Fastest));
+        using var destination = new MemoryStream();
+
+        using (var source = new Pk3AssetSource(path, notPacked: false))
+        {
+            await using var writer = new Pk3Writer(destination, compressionLevel: CompressionLevel.SmallestSize);
+            source.Assets.Values.Distinct().Single().AddTo(writer);
+            await writer.CompleteAsync();
+        }
+
+        destination.Position = 0;
+        using var result = new ZipArchive(destination, ZipArchiveMode.Read);
+        using var original = ZipFile.OpenRead(path);
+
+        var entry = result.Entries.Single();
+        Assert.Equal(data, ReadAll(entry.Open()));
+        Assert.True(
+            entry.CompressedLength < original.Entries.Single().CompressedLength,
+            $"expected smaller than {original.Entries.Single().CompressedLength}, was {entry.CompressedLength}");
     }
 
     private string CreateZip(params (string name, byte[] data, CompressionLevel level)[] files)
