@@ -20,35 +20,33 @@ public sealed class CountingStream : Stream
     public override void Write(byte[] buffer, int offset, int count)
     {
         _written += count;
-        Null.Write(buffer, offset, count);
+        Null.Write(buffer, offset, count); // validate args
     }
 
     public override void Write(ReadOnlySpan<byte> buffer)
     {
         _written += buffer.Length;
-        Null.Write(buffer);
     }
 
     public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
     {
         _written += count;
-        return Null.WriteAsync(buffer, offset, count, cancellationToken);
+        return Null.WriteAsync(buffer, offset, count, cancellationToken); // validate args
     }
 
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         _written += buffer.Length;
-        return Null.WriteAsync(buffer, cancellationToken);
+        return default;
     }
 
     public override void WriteByte(byte value)
     {
         _written++;
-        Null.WriteByte(value);
     }
 
-    public override void Flush() => Null.Flush();
-    public override Task FlushAsync(CancellationToken cancellationToken) => Null.FlushAsync(cancellationToken);
+    public override void Flush() {}
+    public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
     public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();

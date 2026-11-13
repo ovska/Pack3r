@@ -470,8 +470,6 @@ public sealed class Packager(
         }
 
         // the conversion runs on a compression thread
-        Func<string, int, string>[] converters = [.. convertList];
-
         asset.AddTo(archive, archivePath, (input, output) =>
         {
             using var reader = new StreamReader(input, Encoding.UTF8);
@@ -484,7 +482,7 @@ public sealed class Packager(
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                foreach (var func in converters)
+                foreach (var func in convertList)
                 {
                     line = func(line, index);
                 }
