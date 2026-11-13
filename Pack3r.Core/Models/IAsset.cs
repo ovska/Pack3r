@@ -21,6 +21,11 @@ public interface IAsset
     AssetSource Source { get; }
 
     /// <summary>
+    /// Size of the data in bytes, uncompressed.
+    /// </summary>
+    long Length { get; }
+
+    /// <summary>
     /// Opens a stream to read the data.
     /// </summary>
     /// <returns></returns>

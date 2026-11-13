@@ -14,6 +14,7 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
     public string Name { get; } = entry.FullName.NormalizePath();
     public string FullPath { get; } = Path.Combine(source.ArchivePath, entry.FullName).NormalizePath();
     public AssetSource Source => source;
+    public long Length => entry.Length;
 
     public Stream OpenRead() => entry.Open();
 

@@ -17,9 +17,19 @@ public readonly struct Line : IEquatable<Line>, IResourceSource
     public ReadOnlyMemory<char> Value { get; }
 
     /// <summary>
-    /// Raw value of the line with whitespace and comments removed.
+    /// The line as it was in the file, without comments or whitespace removed.
+    /// Usually a slice of the whole file's text, so reading it doesn't allocate.
     /// </summary>
-    public string Raw { get; }
+    public ReadOnlyMemory<char> RawMemory { get; }
+
+    /// <inheritdoc cref="RawMemory"/>
+    public ReadOnlySpan<char> RawSpan => RawMemory.Span;
+
+    /// <summary>
+    /// The line as it was in the file as a string, e.g. for error messages. Allocates, use
+    /// <see cref="RawSpan"/> in parsing code.
+    /// </summary>
+    public string Raw => RawMemory.ToString();
 
     /// <summary>
     /// Path to the file where this line was read from.
@@ -34,22 +44,27 @@ public readonly struct Line : IEquatable<Line>, IResourceSource
     public char FirstChar { get; }
 
     public Line(string path, int index, string rawValue, bool keepRaw)
+        : this(path, index, (rawValue ?? "").AsMemory(), keepRaw)
+    {
+    }
+
+    public Line(string path, int index, ReadOnlyMemory<char> rawValue, bool keepRaw)
     {
         Path = path;
         Index = index;
-        Raw = rawValue ?? "";
+        RawMemory = rawValue;
 
         if (keepRaw)
         {
-            Value = Raw.AsMemory();
+            Value = rawValue;
         }
-        else if (Raw.IndexOf("//") is int commentIndex and >= 0)
+        else if (rawValue.Span.IndexOf("//", StringComparison.Ordinal) is int commentIndex and >= 0)
         {
-            Value = Raw.AsMemory(0, commentIndex).Trim();
+            Value = rawValue[..commentIndex].Trim();
         }
         else
         {
-            Value = Raw.AsMemory().Trim();
+            Value = rawValue.Trim();
         }
 
         if (!Value.IsEmpty)
@@ -66,7 +81,7 @@ public readonly struct Line : IEquatable<Line>, IResourceSource
     public bool Equals(Line other)
     {
         return Index.Equals(other.Index)
-            && Raw.Equals(other.Raw)
+            && RawSpan.SequenceEqual(other.RawSpan)
             && Path.Equals(other.Path);
     }
 
@@ -80,7 +95,7 @@ public readonly struct Line : IEquatable<Line>, IResourceSource
         return !(left == right);
     }
 
-    public override int GetHashCode() => HashCode.Combine(Index, Raw, Path);
+    public override int GetHashCode() => HashCode.Combine(Index, string.GetHashCode(RawSpan), Path);
 
     internal string DebuggerDisplay => $"{{ Line: '{Value}' in L{Index} {Path} }}";
 

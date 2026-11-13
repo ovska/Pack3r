@@ -45,7 +45,7 @@ public class MapFileParser(
         {
             lineCount = line.Index;
 
-            if (line.Raw.StartsWith("//@$&", StringComparison.Ordinal))
+            if (line.RawSpan.StartsWith("//@$&", StringComparison.Ordinal))
             {
                 // layers feature from netradiant-custom commit 1599d0a
                 continue;
@@ -90,7 +90,7 @@ public class MapFileParser(
 
             if (state == State.None)
             {
-                if (line.Raw.StartsWith("// entity ", StringComparison.Ordinal))
+                if (line.RawSpan.StartsWith("// entity ", StringComparison.Ordinal))
                 {
                     currentEntity = line.Value["// entity ".Length..];
                     state = State.Entity;
@@ -118,7 +118,7 @@ public class MapFileParser(
                 }
                 else if (line.FirstChar == 'b')
                 {
-                    if (line.Raw.Equals("brushDef"))
+                    if (line.RawSpan.SequenceEqual("brushDef"))
                     {
                         state = State.BrushDef;
                         expect = '{';
@@ -127,7 +127,7 @@ public class MapFileParser(
                 }
                 else if (line.FirstChar == 'p')
                 {
-                    if (line.Raw.Equals("patchDef2"))
+                    if (line.RawSpan.SequenceEqual("patchDef2"))
                     {
                         state = State.PatchDef;
                         expect = '{';
@@ -140,16 +140,16 @@ public class MapFileParser(
 
             if (state == State.BrushDef)
             {
-                int lastParen = line.Raw.LastIndexOf(')');
-                QPath shaderPart = line.Raw.AsMemory(lastParen + 2);
+                int lastParen = line.RawSpan.LastIndexOf(')');
+                QPath shaderPart = line.RawMemory[(lastParen + 2)..];
 
                 if (!CanSkip(shaderPart))
                 {
-                    int space = line.Raw.AsSpan(lastParen + 2).IndexOf(' ');
+                    int space = line.RawSpan[(lastParen + 2)..].IndexOf(' ');
 
                     if (space > 1)
                     {
-                        AddTexture(shaders, nonPrefixedShaders, in line, line.Raw.AsMemory(lastParen + 2, space));
+                        AddTexture(shaders, nonPrefixedShaders, in line, line.RawMemory.Slice(lastParen + 2, space));
                     }
                     else
                     {
