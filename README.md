@@ -8,6 +8,19 @@
   <h3 align="center">Create release-ready Wolfenstein: Enemy Territory pk3 archives quickly from .map-files</h3>
 </p>
 
+<p align="center">
+  <b>Download:</b>
+  <a href="https://github.com/ovska/Pack3r/releases/latest/download/pack3r-win-x64.exe">Windows</a> |
+  <a href="https://github.com/ovska/Pack3r/releases/latest/download/pack3r-linux-x64">Linux</a> |
+  <a href="https://github.com/ovska/Pack3r/releases/latest/download/pack3r-osx-arm64">macOS (Apple Silicon)</a>
+  <br />
+  <sub>Latest release. Older versions and development builds are on the <a href="https://github.com/ovska/Pack3r/releases">releases page</a>.</sub>
+</p>
+
+> [!NOTE]
+> On Linux and macOS, make the downloaded file executable before running it: `chmod +x pack3r-linux-x64` (or `pack3r-osx-arm64`).
+> macOS blocks apps from unidentified developers the first time; allow it in System Settings → Privacy & Security → "Open Anyway".
+
 ## Features
 
 - Parses the map file, shaders, mapscript, etc. and discovers files are needed to play the map. Editorimages, misc_models etc. are left out of the archive (unless wanted)

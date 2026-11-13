@@ -55,9 +55,13 @@ jobs:
         event_name="${{ github.event_name }}"
         if [[ "$event_name" == "push" && "${{ github.ref }}" == "refs/heads/master" ]]; then
           timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          short_sha="${GITHUB_SHA:0:7}"
           echo "release_tag=latest" >> "$GITHUB_OUTPUT"
-          echo "release_name=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "asset_version=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "release_name=$short_sha" >> "$GITHUB_OUTPUT"
+          echo "asset_version=$short_sha" >> "$GITHUB_OUTPUT"
+          # commit builds are pre-releases, so releases/latest (and the download links in the README)
+          # always point to the newest versioned release
+          echo "prerelease=true" >> "$GITHUB_OUTPUT"
           {
             echo "release_body<<EOF"
             echo "$timestamp"
@@ -67,6 +71,7 @@ jobs:
           echo "release_tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           echo "release_name=Release ${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           echo "asset_version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=false" >> "$GITHUB_OUTPUT"
           {
             echo "release_body<<EOF"
             echo "${{ inputs.description }}"
@@ -107,12 +112,18 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         retry_sleep_seconds=5
+        if [[ "${{ steps.release_metadata.outputs.prerelease }}" == "true" ]]; then
+          release_type=(--prerelease --latest=false)
+        else
+          release_type=(--latest)
+        fi
         for attempt in 1 2 3; do
           if gh release create "${{ steps.release_metadata.outputs.release_tag }}" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "${{ steps.release_metadata.outputs.release_name }}" \
-            --notes "${{ steps.release_metadata.outputs.release_body }}"; then
+            --notes "${{ steps.release_metadata.outputs.release_body }}" \
+            "${release_type[@]}"; then
             break
           fi
           if [[ "$attempt" -eq 3 ]]; then
@@ -132,10 +143,13 @@ jobs:
         config: 
           - os: ubuntu-latest
             rid: linux-x64
+            executable: Pack3r
           - os: windows-latest
             rid: win-x64
+            executable: Pack3r.exe
           - os: macos-latest
             rid: osx-arm64
+            executable: Pack3r
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -154,12 +168,17 @@ jobs:
         retry_sleep_seconds=5
         asset_name="pack3r-${{ needs.create_release.outputs.asset_version }}-${{ matrix.config.rid }}.zip"
         mv ./pack3r-release.zip "./$asset_name"
+        # the executable alone under a name that doesn't change between releases, for the README's direct
+        # download links (releases/latest/download/<name>)
+        executable="${{ matrix.config.executable }}"
+        direct_name="pack3r-${{ matrix.config.rid }}${executable#Pack3r}"
+        cp "./release_dir/$executable" "./$direct_name"
         for attempt in 1 2 3; do
-          if gh release upload "${{ needs.create_release.outputs.release_tag }}" "./$asset_name" --repo "${{ github.repository }}" --clobber; then
+          if gh release upload "${{ needs.create_release.outputs.release_tag }}" "./$asset_name" "./$direct_name" --repo "${{ github.repository }}" --clobber; then
             break
           fi
           if [[ "$attempt" -eq 3 ]]; then
-            echo "Failed to upload $asset_name after 3 attempts."
+            echo "Failed to upload $asset_name and $direct_name after 3 attempts."
             exit 1
           fi
           sleep $((attempt * retry_sleep_seconds))
