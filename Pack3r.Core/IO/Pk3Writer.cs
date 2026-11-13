@@ -33,6 +33,8 @@ public sealed record PrecompressedData(
 /// <para>
 /// Entries are queued with <see cref="Add"/> from a single producer thread, compressed on worker threads,
 /// and written to the destination in the order they were added, so the output is deterministic.
+/// The producer can change between threads as long as the adds don't overlap, e.g. one thread awaits a task
+/// that added entries before adding more. <see cref="DisposeAsync"/> may be called while another thread is adding.
 /// </para>
 /// <para>
 /// <see cref="ZipArchive"/> can only have one entry open at a time and has no way to accept data that is already
@@ -269,11 +271,10 @@ public sealed class Pk3Writer : IAsyncDisposable
             }
 
             // writer sees jobs in the order they were added, workers may finish them in any order.
-            // both channels are unbounded and only completed by this producer, so the writes always succeed
-            _ordered.Writer.TryWrite(job);
-
-            if (compress)
-                _work.Writer.TryWrite(job);
+            // both channels are unbounded, so writing only fails if DisposeAsync completed them on another thread
+            // while this was adding. a job that got into the ordered channel is released when it's drained there
+            if (!_ordered.Writer.TryWrite(job) || (compress && !_work.Writer.TryWrite(job)))
+                throw new ObjectDisposedException(nameof(Pk3Writer));
 
             _entriesAdded++;
             queued = true;

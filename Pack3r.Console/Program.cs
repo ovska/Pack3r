@@ -88,24 +88,33 @@ public class Program
 
             PackResult result;
 
-            // map keeps read-locks for pk3s it encounters, so keep it alive for as little time as possible
-            using (Map map = await app.AssetService.GetPackingData(cancellationToken))
+            Stream destination;
+
+            if (!options.DryRun)
             {
-                Stream destination;
+                destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
+                fileCreated = true;
+            }
+            else
+            {
+                destination = new CountingStream();
+            }
 
-                if (!options.DryRun)
-                {
-                    destination = new FileStream(options.Pk3File.FullName, FileMode.Create, FileAccess.Write, FileShare.None);
-                    fileCreated = true;
-                }
-                else
-                {
-                    destination = new CountingStream();
-                }
+            using (destination)
+            {
+                // starts compressing the bsp and lightmaps while the map is being parsed
+                PackSession session = app.Packager.Begin(destination, cancellationToken);
 
-                using (destination)
+                try
                 {
-                    result = await app.Packager.CreateZip(map, destination, cancellationToken);
+                    // map keeps read-locks for pk3s it encounters, so keep it alive for as little time as possible.
+                    // CreateZip disposes the session, which waits for the compression to stop, before the map
+                    using Map map = await app.AssetService.GetPackingData(cancellationToken);
+                    result = await app.Packager.CreateZip(map, session, cancellationToken);
+                }
+                finally
+                {
+                    await session.DisposeAsync();
                 }
             }
 

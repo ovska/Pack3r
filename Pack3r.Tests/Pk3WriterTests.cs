@@ -233,6 +233,42 @@ public class Pk3WriterTests
         Assert.Throws<ObjectDisposedException>(() => writer.Add("x", _timestamp, new MemoryStream()));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(20)]
+    public async Task Should_Release_Sources_When_Disposed_While_Adding_On_Another_Thread(int delayMs)
+    {
+        for (int iteration = 0; iteration < 20; iteration++)
+        {
+            using var destination = new MemoryStream();
+            var sources = new System.Collections.Concurrent.ConcurrentQueue<TrackingStream>();
+            var writer = new Pk3Writer(destination, maxDegreeOfParallelism: 2);
+
+            // like the map files queued while the map is parsed
+            Task producer = Task.Run(() =>
+            {
+                for (int i = 0; i < 200; i++)
+                {
+                    var source = new TrackingStream(Compressible(20_000, seed: i));
+                    sources.Enqueue(source);
+                    writer.Add($"file_{i}.tga", _timestamp, source);
+                }
+            });
+
+            await Task.Delay(delayMs);
+            await writer.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+            Exception? exception = await Record.ExceptionAsync(() => producer.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.True(
+                exception is null or ObjectDisposedException or OperationCanceledException,
+                $"Unexpected exception: {exception}");
+
+            Assert.All(sources, s => Assert.True(s.Disposed));
+        }
+    }
+
     [Fact]
     public async Task Should_Dispose_Source_If_Add_Fails()
     {
