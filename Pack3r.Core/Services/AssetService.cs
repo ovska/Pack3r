@@ -61,52 +61,35 @@ public class AssetService(
             logger.System($"Scanning directories{pk3msg} for assets: {Environment.NewLine}\t{dirMsg}");
         }
 
+        List<RenamableResource> mapFiles = GetMapFiles(options);
+
+        foreach (var resource in mapFiles)
+        {
+            map.RenamableResources.Enqueue(resource);
+        }
+
         if (!options.OnlySource)
         {
-            // add bsp
-            FileInfo bsp = new(Path.ChangeExtension(map.Path, "bsp"));
-            map.RenamableResources.Enqueue(new()
-            {
-                Name = "bsp",
-                AbsolutePath = bsp.FullName,
-                ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.bsp")
-            });
+            FileInfo bsp = new(mapFiles[0].AbsolutePath);
+            List<RenamableResource> lightmaps = [.. mapFiles.Where(r => r.Name == LightmapsName)];
 
-            var lightmapDir = new DirectoryInfo(Path.ChangeExtension(map.Path, null));
-
-            if (lightmapDir.Exists && lightmapDir.GetFiles("lm_????.tga") is { Length: > 0 } lmFiles)
+            if (lightmaps.Count > 0)
             {
                 map.HasLightmaps = true;
                 bool timestampWarned = false;
 
-                for (int i = 0; i < lmFiles.Length; i++)
+                foreach (var lightmap in lightmaps)
                 {
-                    FileInfo? file = lmFiles[i];
-                    timestampWarned = timestampWarned || logger.CheckAndLogTimestampWarning("Lightmaps", bsp, file);
-
-                    map.RenamableResources.Enqueue(new()
-                    {
-                        Name = "lightmaps",
-                        AbsolutePath = file.FullName,
-                        ArchivePath = Path.Combine("maps", options.Rename ?? map.Name, file.Name)
-                    });
+                    timestampWarned = timestampWarned ||
+                        logger.CheckAndLogTimestampWarning("Lightmaps", bsp, new FileInfo(lightmap.AbsolutePath));
                 }
             }
             else
             {
-                logger.Trace($"Lightmaps skipped, not found in '{lightmapDir.FullName}'");
+                logger.Trace($"Lightmaps skipped, not found in '{Path.ChangeExtension(map.Path, null)}'");
             }
         }
-        else
-        {
-            // add .map
-            map.RenamableResources.Enqueue(new()
-            {
-                Name = "map source",
-                AbsolutePath = map.Path,
-                ArchivePath = Path.Combine("maps", $"{options.Rename ?? map.Name}.map"),
-            });
-        }
+
         var objdata = new FileInfo(Path.ChangeExtension(map.Path, "objdata"));
 
         if (objdata.Exists)
@@ -206,6 +189,59 @@ public class AssetService(
             levelshot = new FileInfo(Path.Combine(map.GetMapRoot(), "levelshots", $"{map.Name}.jpg"));
             return levelshot.Exists;
         }
+    }
+
+    private const string LightmapsName = "lightmaps";
+
+    /// <summary>
+    /// Files found from the path of the map alone: the bsp and lightmaps, or the .map itself when packing sources.
+    /// They don't depend on parsing anything, so they can be compressed while the map is being parsed.
+    /// </summary>
+    public static List<RenamableResource> GetMapFiles(PackOptions options)
+    {
+        string mapPath = options.MapFile.FullName;
+        string name = options.Rename ?? Path.GetFileNameWithoutExtension(mapPath);
+
+        if (options.OnlySource)
+        {
+            return
+            [
+                new()
+                {
+                    Name = "map source",
+                    AbsolutePath = mapPath,
+                    ArchivePath = Path.Combine("maps", $"{name}.map"),
+                },
+            ];
+        }
+
+        List<RenamableResource> files =
+        [
+            new()
+            {
+                Name = "bsp",
+                AbsolutePath = Path.ChangeExtension(mapPath, "bsp"),
+                ArchivePath = Path.Combine("maps", $"{name}.bsp"),
+            },
+        ];
+
+        var lightmapDir = new DirectoryInfo(Path.ChangeExtension(mapPath, null));
+
+        if (lightmapDir.Exists)
+        {
+            // sorted so the order in the pk3 doesn't depend on the file system
+            foreach (var file in lightmapDir.GetFiles("lm_????.tga").OrderBy(f => f.Name, StringComparer.Ordinal))
+            {
+                files.Add(new()
+                {
+                    Name = LightmapsName,
+                    AbsolutePath = file.FullName,
+                    ArchivePath = Path.Combine("maps", name, file.Name),
+                });
+            }
+        }
+
+        return files;
     }
 
     private async Task ParseResources(Map map, CancellationToken cancellationToken)

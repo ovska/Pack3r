@@ -33,21 +33,55 @@ public sealed class Packager(
     IShaderParser shaderParser,
     IIntegrityChecker integrityChecker)
 {
-    public async Task<PackResult> CreateZip(
-        Map map,
-        Stream destination,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Creates the archive, and starts compressing the files that are found from the map's path alone (bsp and
+    /// lightmaps), so they are compressed while the map is being parsed and its assets discovered.
+    /// Pass the result to <see cref="CreateZip"/>.
+    /// </summary>
+    /// <param name="destination">Stream to write the pk3 to, not disposed</param>
+    public PackSession Begin(Stream destination, CancellationToken cancellationToken)
     {
-        int missingFiles = 0;
-
-        var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
-
-        // entries are compressed on worker threads while the assets are being resolved here
-        await using var archive = new Pk3Writer(
+        // entries are compressed on worker threads while the assets are being resolved
+        var archive = new Pk3Writer(
             destination,
             comment: $"Created with Pack3r {Global.Version}",
             compressionLevel: options.SmallestSize ? CompressionLevel.SmallestSize : CompressionLevel.Optimal,
             cancellationToken: cancellationToken);
+
+        List<RenamableResource> mapFiles = AssetService.GetMapFiles(options);
+
+        // queued on another thread, as adding blocks when too many entries are waiting to be written,
+        // and parsing shouldn't wait for that. CreateZip waits for this before adding anything else,
+        // so there is only ever one thread adding entries
+        Task queued = Task.Run(() =>
+        {
+            foreach (var resource in mapFiles)
+            {
+                CreateRenamable(archive, options, resource, cancellationToken);
+            }
+        }, cancellationToken);
+
+        return new PackSession(archive, queued, [.. mapFiles.Select(r => r.ArchivePath)]);
+    }
+
+    /// <summary>
+    /// Resolves and compresses the rest of the files, and completes the archive started with <see cref="Begin"/>.
+    /// Disposes the session.
+    /// </summary>
+    public async Task<PackResult> CreateZip(
+        Map map,
+        PackSession session,
+        CancellationToken cancellationToken)
+    {
+        await using var _ = session;
+        Pk3Writer archive = session.Archive;
+
+        int missingFiles = 0;
+
+        var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
+
+        // the map files must be queued before anything else, and from now on this thread adds the entries
+        await session.MapFilesQueued;
 
         // contains both actual and alternate files added
         HashSet<QPath> handledFiles = [];
@@ -62,7 +96,10 @@ public sealed class Packager(
             int i = 0;
             foreach (var res in renamable)
             {
-                CreateRenamable(archive, options, res, cancellationToken);
+                // bsp and lightmaps were queued in Begin
+                if (!session.MapFiles.Contains(res.ArchivePath))
+                    CreateRenamable(archive, options, res, cancellationToken);
+
                 handledFiles.Add(res.ArchivePath);
                 progress.Report(++i);
 
@@ -571,5 +608,44 @@ public sealed class Packager(
                 }
             ],
             cancellationToken);
+    }
+}
+
+/// <summary>
+/// Archive being created, see <see cref="Packager.Begin"/>.
+/// </summary>
+public sealed class PackSession : IAsyncDisposable
+{
+    internal PackSession(Pk3Writer archive, Task mapFilesQueued, HashSet<string> mapFiles)
+    {
+        Archive = archive;
+        MapFilesQueued = mapFilesQueued;
+        MapFiles = mapFiles;
+    }
+
+    internal Pk3Writer Archive { get; }
+
+    /// <summary>Completes when the map files (bsp, lightmaps) have been queued to the archive.</summary>
+    internal Task MapFilesQueued { get; }
+
+    /// <summary>Archive paths of the map files queued in <see cref="Packager.Begin"/>.</summary>
+    internal HashSet<string> MapFiles { get; }
+
+    /// <summary>
+    /// Stops compressing if the archive wasn't completed, e.g. if parsing the map failed.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        // cancels the compression, which also stops the queueing if it's still waiting for room
+        await Archive.DisposeAsync().ConfigureAwait(false);
+
+        try
+        {
+            await MapFilesQueued.ConfigureAwait(false);
+        }
+        catch
+        {
+            // observed in CreateZip, or the session is being disposed because of another exception
+        }
     }
 }
