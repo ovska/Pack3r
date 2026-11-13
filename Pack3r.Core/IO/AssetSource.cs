@@ -7,10 +7,17 @@ namespace Pack3r.IO;
 public abstract class AssetSource : IDisposable
 {
     public abstract string RootPath { get; }
-    public abstract IAsyncEnumerable<Shader> EnumerateShaders(
-        IShaderParser parser,
-        Func<string, bool> skipPredicate,
-        CancellationToken cancellationToken);
+    /// <summary>
+    /// Shader files in this source, in the order they should be parsed: when files in the same source define the
+    /// same shader, the first one wins.
+    /// </summary>
+    /// <param name="skipPredicate">Returns true for files that shouldn't be parsed</param>
+    public abstract IEnumerable<IAsset> EnumerateShaderFiles(Func<string, bool> skipPredicate);
+
+    /// <summary>
+    /// Whether different files from this source can be read on different threads at the same time.
+    /// </summary>
+    public abstract bool CanReadFilesConcurrently { get; }
 
     protected abstract IEnumerable<IAsset> EnumerateAssets();
 

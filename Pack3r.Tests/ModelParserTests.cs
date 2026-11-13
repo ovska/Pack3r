@@ -6,7 +6,7 @@ namespace Pack3r.Tests;
 public static class ModelParserTests
 {
     [Fact]
-    public static async Task Should_Parse_Ase_Models()
+    public static void Should_Parse_Ase_Models()
     {
         var reader = new StringLineReader("""
                         *3DSMAX_ASCIIEXPORT	200
@@ -378,7 +378,7 @@ public static class ModelParserTests
 
         var parser = new AseParser(NullLogger<AseParser>.Instance, reader);
 
-        var results = await parser.Parse(new MockAsset(), default);
+        var results = parser.Parse(new MockAsset(), default);
 
         Assert.NotNull(results);
         Assert.Single(results);

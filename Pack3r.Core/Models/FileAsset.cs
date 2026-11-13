@@ -14,13 +14,13 @@ public sealed class FileAsset(DirectoryAssetSource source, FileInfo file) : IAss
     public string FullPath { get; } = file.FullName.NormalizePath();
     public AssetSource Source => source;
 
-    public Stream OpenRead(bool isAsync = false) => new FileStream(
+    public Stream OpenRead() => new FileStream(
         file.FullName,
         FileMode.Open,
         FileAccess.Read,
         FileShare.Read,
         bufferSize: 4096,
-        FileOptions.SequentialScan | (isAsync ? FileOptions.Asynchronous : 0));
+        FileOptions.SequentialScan);
 
     public void AddTo(Pk3Writer writer, string? archivePath = null, Action<Stream, Stream>? transform = null)
     {
@@ -28,13 +28,15 @@ public sealed class FileAsset(DirectoryAssetSource source, FileInfo file) : IAss
         writer.Add(archivePath ?? Name, file.LastWriteTime, OpenRead(), transform);
     }
 
-    public async ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken)
+    public IMemoryOwner<byte> GetBytes(int? sizeHint, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var arrayPoolBufferWriter = new ArrayPoolBufferWriter<byte>(sizeHint ?? 4096);
 
-        await using (var stream = OpenRead(true))
+        using (var stream = OpenRead())
         {
-            await stream.CopyToAsync(arrayPoolBufferWriter.AsStream(), cancellationToken);
+            stream.CopyTo(arrayPoolBufferWriter.AsStream());
         }
 
         return arrayPoolBufferWriter;

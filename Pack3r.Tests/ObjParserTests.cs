@@ -1,4 +1,4 @@
-
+﻿
 using Pack3r.Parsers;
 
 namespace Pack3r.Tests;
@@ -6,7 +6,7 @@ namespace Pack3r.Tests;
 public static class ObjParserTests
 {
     [Fact]
-    public static async Task Should_Parse()
+    public static void Should_Parse()
     {
         var reader = new StringLineReader(Data);
         var parser = new ObjParser(reader);
@@ -14,7 +14,7 @@ public static class ObjParserTests
         Assert.True(parser.CanParse("model.obj".AsMemory()));
         Assert.False(parser.CanParse("model.md3".AsMemory()));
 
-        var result = await parser.Parse(new MockAsset(), default);
+        var result = parser.Parse(new MockAsset(), default);
 
         Assert.NotNull(result);
         Assert.Equal(

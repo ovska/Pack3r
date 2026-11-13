@@ -6,14 +6,14 @@ namespace Pack3r.Tests;
 public static class Md3ParserTests
 {
     [Fact]
-    public static async Task Should_Parse_Md3()
+    public static void Should_Parse_Md3()
     {
         var path = Path.GetFullPath("../../../TestData/etmain/models/spire_active_red.md3");
         var parser = new Md3Parser(NullLogger<Md3Parser>.Instance);
 
         Assert.True(parser.CanParse(path.AsMemory()));
 
-        var result = await parser.Parse(new FileAsset(path), default);
+        var result = parser.Parse(new FileAsset(path), default);
 
         Assert.NotNull(result);
         Assert.All(result, s => Assert.True(s.IsShader));
@@ -32,14 +32,14 @@ public static class Md3ParserTests
     }
 
     [Fact]
-    public static async Task Should_Parse_Mdm()
+    public static void Should_Parse_Mdm()
     {
         var path = Path.GetFullPath("../../../TestData/etmain/models/sidechair3.mdc");
         var parser = new Md3Parser(NullLogger<Md3Parser>.Instance);
 
         Assert.True(parser.CanParse(path.AsMemory()));
 
-        var result = await parser.Parse(new FileAsset(path), default);
+        var result = parser.Parse(new FileAsset(path), default);
 
         Assert.NotNull(result);
         Assert.All(result, s => Assert.True(s.IsShader));

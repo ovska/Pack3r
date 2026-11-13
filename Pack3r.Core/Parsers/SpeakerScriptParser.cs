@@ -1,5 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
@@ -14,11 +13,11 @@ public class SpeakerScriptParser(
 
     public bool SearchModDirectories => true;
 
-    public async IAsyncEnumerable<Resource> Parse(
+    public IEnumerable<Resource> Parse(
         string path,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
-        await foreach (var line in reader.ReadLines(path, cancellationToken).ConfigureAwait(false))
+        foreach (var line in reader.ReadLines(path, cancellationToken))
         {
             if (line.MatchKeyword("noise", out var token))
             {

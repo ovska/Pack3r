@@ -5,7 +5,7 @@ namespace Pack3r.Tests;
 public static class SkinParserTests
 {
     [Fact]
-    public static async Task Should_Parse_Skin()
+    public static void Should_Parse_Skin()
     {
         var reader = new StringLineReader("""
             head, "models/players/hud/allied_field"
@@ -19,7 +19,7 @@ public static class SkinParserTests
         Assert.True(parser.CanParse("test.skin".AsMemory()));
         Assert.False(parser.CanParse("test.md3".AsMemory()));
 
-        var result = await parser.Parse(new MockAsset(), default);
+        var result = parser.Parse(new MockAsset(), default);
 
         Assert.NotNull(result);
         Assert.Equal(
