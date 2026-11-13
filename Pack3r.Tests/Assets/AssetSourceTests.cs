@@ -42,7 +42,7 @@ public static class AssetSourceTests
             QPath expected)
         {
             Assert.Contains(key, source.Assets);
-            Assert.Equal(expected, source.Assets[key].Name);
+            Assert.Equal(expected.ToString(), source.Assets[key].Name);
         }
     }
 }
