@@ -115,10 +115,18 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         for (int i = 0; i < _workers.Length; i++)
         {
-            _workers[i] = CompressLoop();
+            _workers[i] = Task.Factory.StartNew(
+                CompressLoop,
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
         }
 
-        _writer = WriteLoop();
+        _writer = Task.Factory.StartNew(
+            WriteLoop,
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
     }
 
     /// <summary>Compression level of the entries compressed by this writer.</summary>
@@ -365,54 +373,72 @@ public sealed class Pk3Writer : IAsyncDisposable
         }
     }
 
-    private async Task CompressLoop()
+    private void CompressLoop()
     {
+        CancellationToken token = _cts.Token;
+        ChannelReader<Job> reader = _work.Reader;
+
         try
         {
-            await foreach (Job job in _work.Reader.ReadAllAsync(_cts.Token).ConfigureAwait(false))
+            while (WaitToRead(reader, token))
             {
-                try
+                while (reader.TryRead(out Job? job))
                 {
-                    await job.CompressAsync(_compressionLevel, _cts.Token).ConfigureAwait(false);
-                    job.Done.TrySetResult();
-                }
-                catch (Exception e)
-                {
-                    Fail(e);
-                    job.Done.TrySetException(e);
+                    try
+                    {
+                        token.ThrowIfCancellationRequested();
+                        job.Compress(_compressionLevel);
+                        job.Done.TrySetResult();
+                    }
+                    catch (Exception e)
+                    {
+                        Fail(e);
+                        job.Done.TrySetException(e);
+                    }
                 }
             }
         }
-        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
         }
     }
 
-    private async Task WriteLoop()
+    private void WriteLoop()
     {
+        CancellationToken token = _cts.Token;
+        ChannelReader<Job> reader = _ordered.Reader;
+
         try
         {
-            // the ordered channel, so entries are written in the order they were added. workers read the other one
-            await foreach (Job job in _ordered.Reader.ReadAllAsync(_cts.Token).ConfigureAwait(false))
+            while (WaitToRead(reader, token))
             {
-                _writing = job;
+                while (reader.TryRead(out Job? job))
+                {
+                    _writing = job;
 
-                // throws the worker's exception if compressing failed. the token is needed: after a failure or
-                // cancellation, jobs still in the work channel are never completed by a worker
-                await job.Done.Task.WaitAsync(_cts.Token).ConfigureAwait(false);
+                    // throws the worker's exception if compressing failed. the token is needed: after a failure or
+                    // cancellation, jobs still in the work channel are never completed by a worker
+                    job.Done.Task.WaitAsync(token).GetAwaiter().GetResult();
 
-                WriteEntry(job);
-                _writing = null;
-                job.Release();
+                    WriteEntry(job);
+                    _writing = null;
+                    job.Release();
 
-                Interlocked.Increment(ref _entriesWritten);
-                _inFlight.Release();
+                    Interlocked.Increment(ref _entriesWritten);
+                    _inFlight.Release();
+                }
             }
         }
         catch (Exception e)
         {
             Fail(e);
         }
+    }
+
+    private static bool WaitToRead(ChannelReader<Job> reader, CancellationToken token)
+    {
+        ValueTask<bool> task = reader.WaitToReadAsync(token);
+        return task.IsCompletedSuccessfully ? task.Result : task.AsTask().GetAwaiter().GetResult();
     }
 
     private void WriteEntry(Job job)
@@ -671,7 +697,7 @@ public sealed class Pk3Writer : IAsyncDisposable
             }
         }
 
-        public async Task CompressAsync(CompressionLevel level, CancellationToken cancellationToken)
+        public void Compress(CompressionLevel level)
         {
             Stream input = _source!;
 
@@ -691,19 +717,20 @@ public sealed class Pk3Writer : IAsyncDisposable
 
                 if (transform is null)
                 {
-                    await input.CopyToAsync(sink, cancellationToken).ConfigureAwait(false);
+                    input.CopyTo(sink);
                 }
                 else
                 {
                     transform(input, sink);
                 }
 
+                sink.Finish();
                 Crc32 = sink.Crc32;
                 UncompressedSize = sink.BytesWritten;
             }
             finally
             {
-                await input.DisposeAsync().ConfigureAwait(false);
+                input.Dispose();
                 _source = null;
             }
         }
@@ -764,20 +791,6 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         public override void WriteByte(byte value) => Write([value]);
 
-        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            ValidateBufferArguments(buffer, offset, count);
-            return WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
-        }
-
-        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
-        {
-            ObjectDisposedException.ThrowIf(_finished, this);
-            _crc.Append(buffer.Span);
-            BytesWritten += buffer.Length;
-            return _deflate.WriteAsync(buffer, cancellationToken);
-        }
-
         /// <summary>No-op, flushing deflate in the middle of an entry only makes the output larger.</summary>
         public override void Flush()
         {
@@ -792,17 +805,6 @@ public sealed class Pk3Writer : IAsyncDisposable
                 _deflate.Dispose();
             }
         }
-        
-        public ValueTask FinishAsync()
-        {
-            if (!_finished)
-            {
-                _finished = true;
-                return _deflate.DisposeAsync();
-            }
-
-            return default;
-        }
 
         protected override void Dispose(bool disposing)
         {
@@ -811,12 +813,6 @@ public sealed class Pk3Writer : IAsyncDisposable
 
             base.Dispose(disposing);
         }
-
-        public override ValueTask DisposeAsync()
-        {
-            return FinishAsync();
-        }
-
 
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
