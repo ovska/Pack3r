@@ -2,6 +2,7 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
 using System.IO.Hashing;
+using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Channels;
@@ -67,7 +68,7 @@ public sealed class Pk3Writer : IAsyncDisposable
     private readonly CancellationTokenSource _cts;
     private readonly Task[] _workers;
     private readonly Task _writer;
-    private readonly List<CentralDirectoryRecord> _records = [];
+    private readonly List<CentralDirectoryRecord> _records = new(capacity: 256);
 
     private ExceptionDispatchInfo? _failure;
     private Job? _writing;
@@ -114,18 +115,10 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         for (int i = 0; i < _workers.Length; i++)
         {
-            _workers[i] = Task.Factory.StartNew(
-                CompressLoop,
-                CancellationToken.None,
-                TaskCreationOptions.LongRunning,
-                TaskScheduler.Default);
+            _workers[i] = CompressLoop();
         }
 
-        _writer = Task.Factory.StartNew(
-            WriteLoop,
-            CancellationToken.None,
-            TaskCreationOptions.LongRunning,
-            TaskScheduler.Default);
+        _writer = WriteLoop();
     }
 
     /// <summary>Compression level of the entries compressed by this writer.</summary>
@@ -372,59 +365,46 @@ public sealed class Pk3Writer : IAsyncDisposable
         }
     }
 
-    private void CompressLoop()
+    private async Task CompressLoop()
     {
-        CancellationToken token = _cts.Token;
-        ChannelReader<Job> reader = _work.Reader;
-
         try
         {
-            while (WaitToRead(reader, token))
+            await foreach (Job job in _work.Reader.ReadAllAsync(_cts.Token))
             {
-                while (reader.TryRead(out Job? job))
+                try
                 {
-                    try
-                    {
-                        token.ThrowIfCancellationRequested();
-                        job.Compress(_compressionLevel);
-                        job.Done.TrySetResult();
-                    }
-                    catch (Exception e)
-                    {
-                        Fail(e);
-                        job.Done.TrySetException(e);
-                    }
+                    await job.CompressAsync(_compressionLevel, _cts.Token);
+                    job.Done.TrySetResult();
+                }
+                catch (Exception e)
+                {
+                    Fail(e);
+                    job.Done.TrySetException(e);
                 }
             }
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
         {
         }
     }
 
-    private void WriteLoop()
+    private async Task WriteLoop()
     {
-        CancellationToken token = _cts.Token;
-        ChannelReader<Job> reader = _ordered.Reader;
-
         try
         {
-            while (WaitToRead(reader, token))
+            await foreach (Job job in _work.Reader.ReadAllAsync(_cts.Token))
             {
-                while (reader.TryRead(out Job? job))
-                {
-                    _writing = job;
+                _writing = job;
 
-                    // throws the worker's exception if compressing failed
-                    job.Done.Task.WaitAsync(token).GetAwaiter().GetResult();
+                // throws the worker's exception if compressing failed
+                await job.Done.Task;
 
-                    WriteEntry(job);
-                    _writing = null;
-                    job.Release();
+                WriteEntry(job);
+                _writing = null;
+                job.Release();
 
-                    Interlocked.Increment(ref _entriesWritten);
-                    _inFlight.Release();
-                }
+                Interlocked.Increment(ref _entriesWritten);
+                _inFlight.Release();
             }
         }
         catch (Exception e)
@@ -433,18 +413,12 @@ public sealed class Pk3Writer : IAsyncDisposable
         }
     }
 
-    private static bool WaitToRead(ChannelReader<Job> reader, CancellationToken token)
-    {
-        ValueTask<bool> task = reader.WaitToReadAsync(token);
-        return task.IsCompletedSuccessfully ? task.Result : task.AsTask().GetAwaiter().GetResult();
-    }
-
     private void WriteEntry(Job job)
     {
         if (_records.Count >= ushort.MaxValue)
             throw new IOException($"Too many entries in archive, maximum is {ushort.MaxValue - 1}");
 
-        byte[] name = EncodeName(job.Name, out bool utf8);
+        byte[] name = Encoding.UTF8.GetBytes(job.Name);
 
         if (name.Length > ushort.MaxValue)
             throw new IOException($"Entry name is too long: '{job.Name}'");
@@ -478,7 +452,7 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         var record = new CentralDirectoryRecord(
             Name: name,
-            Flags: utf8 ? FlagUtf8 : (ushort)0,
+            Flags: Ascii.IsValid(name) ? (ushort)0 : FlagUtf8,
             Method: method,
             Version: method == MethodStored ? VersionStored : VersionDeflate,
             DosTime: ToDosTime(job.LastWriteTime),
@@ -488,16 +462,16 @@ public sealed class Pk3Writer : IAsyncDisposable
             Offset: (uint)_position);
 
         Span<byte> header = stackalloc byte[LocalFileHeaderSize];
-        BinaryPrimitives.WriteUInt32LittleEndian(header, LocalFileHeaderSignature);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[4..], record.Version);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[6..], record.Flags);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[8..], record.Method);
-        BinaryPrimitives.WriteUInt32LittleEndian(header[10..], record.DosTime);
-        BinaryPrimitives.WriteUInt32LittleEndian(header[14..], record.Crc32);
-        BinaryPrimitives.WriteUInt32LittleEndian(header[18..], record.CompressedSize);
-        BinaryPrimitives.WriteUInt32LittleEndian(header[22..], record.UncompressedSize);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[26..], (ushort)name.Length);
-        BinaryPrimitives.WriteUInt16LittleEndian(header[28..], 0); // extra field length
+        WriteUInt32(header, LocalFileHeaderSignature);
+        WriteUInt16(header[4..], record.Version);
+        WriteUInt16(header[6..], record.Flags);
+        WriteUInt16(header[8..], record.Method);
+        WriteUInt32(header[10..], record.DosTime);
+        WriteUInt32(header[14..], record.Crc32);
+        WriteUInt32(header[18..], record.CompressedSize);
+        WriteUInt32(header[22..], record.UncompressedSize);
+        WriteUInt16(header[26..], (ushort)name.Length);
+        WriteUInt16(header[28..], 0); // extra field length
 
         _destination.Write(header);
         _destination.Write(name);
@@ -524,18 +498,18 @@ public sealed class Pk3Writer : IAsyncDisposable
         foreach (var record in _records)
         {
             header.Clear();
-            BinaryPrimitives.WriteUInt32LittleEndian(header, CentralDirectorySignature);
-            BinaryPrimitives.WriteUInt16LittleEndian(header[4..], record.Version); // made by (MS-DOS)
-            BinaryPrimitives.WriteUInt16LittleEndian(header[6..], record.Version); // needed to extract
-            BinaryPrimitives.WriteUInt16LittleEndian(header[8..], record.Flags);
-            BinaryPrimitives.WriteUInt16LittleEndian(header[10..], record.Method);
-            BinaryPrimitives.WriteUInt32LittleEndian(header[12..], record.DosTime);
-            BinaryPrimitives.WriteUInt32LittleEndian(header[16..], record.Crc32);
-            BinaryPrimitives.WriteUInt32LittleEndian(header[20..], record.CompressedSize);
-            BinaryPrimitives.WriteUInt32LittleEndian(header[24..], record.UncompressedSize);
-            BinaryPrimitives.WriteUInt16LittleEndian(header[28..], (ushort)record.Name.Length);
+            WriteUInt32(header, CentralDirectorySignature);
+            WriteUInt16(header[4..], record.Version); // made by (MS-DOS)
+            WriteUInt16(header[6..], record.Version); // needed to extract
+            WriteUInt16(header[8..], record.Flags);
+            WriteUInt16(header[10..], record.Method);
+            WriteUInt32(header[12..], record.DosTime);
+            WriteUInt32(header[16..], record.Crc32);
+            WriteUInt32(header[20..], record.CompressedSize);
+            WriteUInt32(header[24..], record.UncompressedSize);
+            WriteUInt16(header[28..], (ushort)record.Name.Length);
             // extra field length, comment length, disk number, internal and external attributes are all zero
-            BinaryPrimitives.WriteUInt32LittleEndian(header[42..], record.Offset);
+            WriteUInt32(header[42..], record.Offset);
 
             _destination.Write(header);
             _destination.Write(record.Name);
@@ -548,35 +522,18 @@ public sealed class Pk3Writer : IAsyncDisposable
             throw new IOException("Archive is too large, zip64 is not supported");
 
         Span<byte> end = stackalloc byte[EndOfCentralDirectorySize];
-        BinaryPrimitives.WriteUInt32LittleEndian(end, EndOfCentralDirectorySignature);
-        BinaryPrimitives.WriteUInt16LittleEndian(end[4..], 0); // number of this disk
-        BinaryPrimitives.WriteUInt16LittleEndian(end[6..], 0); // disk where central directory starts
-        BinaryPrimitives.WriteUInt16LittleEndian(end[8..], (ushort)_records.Count);
-        BinaryPrimitives.WriteUInt16LittleEndian(end[10..], (ushort)_records.Count);
-        BinaryPrimitives.WriteUInt32LittleEndian(end[12..], (uint)size);
-        BinaryPrimitives.WriteUInt32LittleEndian(end[16..], (uint)start);
-        BinaryPrimitives.WriteUInt16LittleEndian(end[20..], (ushort)_comment.Length);
+        WriteUInt32(end, EndOfCentralDirectorySignature);
+        WriteUInt16(end[4..], 0); // number of this disk
+        WriteUInt16(end[6..], 0); // disk where central directory starts
+        WriteUInt16(end[8..], (ushort)_records.Count);
+        WriteUInt16(end[10..], (ushort)_records.Count);
+        WriteUInt32(end[12..], (uint)size);
+        WriteUInt32(end[16..], (uint)start);
+        WriteUInt16(end[20..], (ushort)_comment.Length);
 
         _destination.Write(end);
         _destination.Write(_comment);
         _position += end.Length + _comment.Length;
-    }
-
-    private static byte[] EncodeName(string name, out bool utf8)
-    {
-        // same rule as ZipArchive: anything outside printable ASCII is written as UTF-8 and flagged as such
-        utf8 = false;
-
-        foreach (char c in name)
-        {
-            if (c is < (char)32 or > (char)126)
-            {
-                utf8 = true;
-                break;
-            }
-        }
-
-        return utf8 ? Encoding.UTF8.GetBytes(name) : Encoding.ASCII.GetBytes(name);
     }
 
     /// <summary>
@@ -591,6 +548,18 @@ public sealed class Pk3Writer : IAsyncDisposable
         int date = ((value.Year - 1980) << 9) | (value.Month << 5) | value.Day;
         int time = (value.Hour << 11) | (value.Minute << 5) | (value.Second / 2);
         return (uint)((date << 16) | time);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void WriteUInt16(Span<byte> destination, ushort value)
+    {
+        BinaryPrimitives.WriteUInt16LittleEndian(destination, value);
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void WriteUInt32(Span<byte> destination, uint value)
+    {
+        BinaryPrimitives.WriteUInt32LittleEndian(destination, value);
     }
 
     private readonly record struct CentralDirectoryRecord(
@@ -700,7 +669,7 @@ public sealed class Pk3Writer : IAsyncDisposable
             }
         }
 
-        public void Compress(CompressionLevel level)
+        public async Task CompressAsync(CompressionLevel level, CancellationToken cancellationToken)
         {
             Stream input = _source!;
 
@@ -720,20 +689,19 @@ public sealed class Pk3Writer : IAsyncDisposable
 
                 if (transform is null)
                 {
-                    input.CopyTo(sink);
+                    await input.CopyToAsync(sink, cancellationToken);
                 }
                 else
                 {
                     transform(input, sink);
                 }
 
-                sink.Finish();
                 Crc32 = sink.Crc32;
                 UncompressedSize = sink.BytesWritten;
             }
             finally
             {
-                input.Dispose();
+                await input.DisposeAsync();
                 _source = null;
             }
         }
@@ -794,6 +762,22 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         public override void WriteByte(byte value) => Write([value]);
 
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            ObjectDisposedException.ThrowIf(_finished, this);
+            _crc.Append(buffer);
+            BytesWritten += buffer.Length;
+            return _deflate.WriteAsync(buffer, offset, count, cancellationToken);
+        }
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            ObjectDisposedException.ThrowIf(_finished, this);
+            _crc.Append(buffer);
+            BytesWritten += buffer.Length;
+            return _deflate.WriteAsync(buffer, cancellationToken);
+        }
+
         /// <summary>No-op, flushing deflate in the middle of an entry only makes the output larger.</summary>
         public override void Flush()
         {
@@ -808,6 +792,17 @@ public sealed class Pk3Writer : IAsyncDisposable
                 _deflate.Dispose();
             }
         }
+        
+        public ValueTask FinishAsync()
+        {
+            if (!_finished)
+            {
+                _finished = true;
+                return _deflate.DisposeAsync();
+            }
+
+            return default;
+        }
 
         protected override void Dispose(bool disposing)
         {
@@ -816,6 +811,12 @@ public sealed class Pk3Writer : IAsyncDisposable
 
             base.Dispose(disposing);
         }
+
+        public override ValueTask DisposeAsync()
+        {
+            return FinishAsync();
+        }
+
 
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
