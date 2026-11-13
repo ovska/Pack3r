@@ -10,6 +10,7 @@ internal class FileAsset(string path) : IAsset
     public string Name => path;
     public string FullPath => Path.GetFullPath(path);
     public AssetSource Source { get; }
+    public long Length => new FileInfo(path).Length;
 
     public void AddTo(Pk3Writer writer, string archivePath = null, Action<Stream, Stream> transform = null)
     {
@@ -37,6 +38,7 @@ internal class MockAsset : IAsset
     public string Name { get; }
     public string FullPath { get; }
     public AssetSource Source { get; }
+    public long Length => 0;
 
     public void AddTo(Pk3Writer writer, string archivePath = null, Action<Stream, Stream> transform = null)
     {

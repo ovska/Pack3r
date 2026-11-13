@@ -536,7 +536,7 @@ public class ShaderParser(
     {
         if (line.Value.Length > 1)
         {
-            line = new Line(line.Path, line.Index, line.Value[1..].ToString(), false);
+            line = new Line(line.Path, line.Index, line.Value[1..], false);
             return true;
         }
 

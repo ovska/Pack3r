@@ -13,6 +13,7 @@ public sealed class FileAsset(DirectoryAssetSource source, FileInfo file) : IAss
     public string Name { get; } = Path.GetRelativePath(source.RootPath, file.FullName).NormalizePath();
     public string FullPath { get; } = file.FullName.NormalizePath();
     public AssetSource Source => source;
+    public long Length => file.Length;
 
     public Stream OpenRead() => new FileStream(
         file.FullName,
