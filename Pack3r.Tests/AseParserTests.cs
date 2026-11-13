@@ -1,4 +1,4 @@
-
+﻿
 using Pack3r.Logging;
 using Pack3r.Parsers;
 
@@ -7,7 +7,7 @@ namespace Pack3r.Tests;
 public static class AseParserTests
 {
     [Fact]
-    public static async Task Should_Parse()
+    public static void Should_Parse()
     {
         var reader = new StringLineReader(Data);
         var parser = new AseParser(NullLogger<AseParser>.Instance, reader);
@@ -15,7 +15,7 @@ public static class AseParserTests
         Assert.True(parser.CanParse("model.ase".AsMemory()));
         Assert.False(parser.CanParse("model.obj".AsMemory()));
 
-        var result = await parser.Parse(new MockAsset(), default);
+        var result = parser.Parse(new MockAsset(), default);
 
         Assert.NotNull(result);
         Assert.Equal(

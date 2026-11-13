@@ -6,7 +6,7 @@ namespace Pack3r.Parsers;
 
 public interface IResourceRefParser
 {
-    Task ParseReferences(
+    void ParseReferences(
         Map map,
         CancellationToken cancellationToken);
 }
@@ -18,7 +18,7 @@ public class ResourceRefParser(
     IProgressManager progressManager)
     : IResourceRefParser
 {
-    public async Task ParseReferences(
+    public void ParseReferences(
         Map map,
         CancellationToken cancellationToken)
     {
@@ -37,7 +37,7 @@ public class ResourceRefParser(
             if (!handled.Add(resource))
                 continue;
 
-            ResourceList? result = await TryParse(map, resource, cancellationToken);
+            ResourceList? result = TryParse(map, resource, cancellationToken);
 
             // if the misc_model is still present, this resource is ONLY a misc_model
             // and we can try to trim the values
@@ -98,7 +98,7 @@ public class ResourceRefParser(
         }
     }
 
-    private async Task<ResourceList?> TryParse(
+    private ResourceList? TryParse(
         Map map,
         Resource resource,
         CancellationToken cancellationToken)
@@ -136,7 +136,7 @@ public class ResourceRefParser(
                 }
                 else
                 {
-                    return await parser.Parse(asset, cancellationToken);
+                    return parser.Parse(asset, cancellationToken);
                 }
             }
         }

@@ -11,11 +11,11 @@ namespace Pack3r.Parsers;
 
 public interface IShaderParser
 {
-    Task<Dictionary<QPath, Shader>> GetReferencedShaders(
+    Dictionary<QPath, Shader> GetReferencedShaders(
         Map map,
         CancellationToken cancellationToken);
 
-    IAsyncEnumerable<Shader> Parse(
+    IEnumerable<Shader> Parse(
         IAsset asset,
         CancellationToken cancellationToken);
 }
@@ -27,105 +27,115 @@ public class ShaderParser(
     IProgressManager progressManager)
     : IShaderParser
 {
-    public async Task<Dictionary<QPath, Shader>> GetReferencedShaders(
+    public Dictionary<QPath, Shader> GetReferencedShaders(
         Map map,
         CancellationToken cancellationToken)
     {
         ConcurrentDictionary<QPath, Shader> allShaders = [];
         ConcurrentDictionary<QPath, List<Shader>> duplicateShaders = [];
 
-        int shaderFileCount = 0;
+        // list the files first, in the order they are searched in each source. a group is parsed on one thread:
+        // each file on disk is its own group, but a pk3's files are read one at a time through its archive
+        List<IAsset[]> groups = [];
 
-        using (var progress = progressManager.Create("Parsing shader files", max: null))
+        foreach (var source in map.AssetSources)
         {
-            await Parallel.ForEachAsync(map.AssetSources, Global.ParallelOptions(cancellationToken), async (source, ct) =>
+            IAsset[] files = [.. source.EnumerateShaderFiles(name => SkipShaderFile(source, name))];
+
+            if (source.CanReadFilesConcurrently)
             {
-                bool skipPredicate(string name)
+                foreach (var file in files)
+                    groups.Add([file]);
+            }
+            else if (files.Length > 0)
+            {
+                groups.Add(files);
+            }
+        }
+
+        var parsed = new List<Shader>[groups.Count];
+        int parsedCount = 0;
+
+        using (var progress = progressManager.Create("Parsing shader files", groups.Sum(g => g.Length)))
+        {
+            Global.ParallelFor(groups.Count, cancellationToken, i =>
+            {
+                List<Shader> shaders = [];
+
+                foreach (var file in groups[i])
                 {
-                    progress.Report(Interlocked.Increment(ref shaderFileCount));
-
-                    string fileName = Path.GetFileNameWithoutExtension(name);
-
-                    if (fileName.EqualsF("q3shadersCopyForRadiant"))
-                    {
-                        if (options.ShaderDebug)
-                            logger.Info($"Skipped parsing Radiant specific shaderfile {getName()}");
-                        return true;
-                    }
-
-                    if (fileName.StartsWithF("q3map_") || fileName.StartsWithF("q3map2_"))
-                    {
-                        if (options.ShaderDebug)
-                            logger.Info($"Skipped shaderfile parsing from compiler generated file '{getName()}'");
-                        return true;
-                    }
-
-                    return false;
-
-                    string getName() => Path.Combine(source.RootPath, "scripts", name).NormalizePath();
+                    shaders.AddRange(Parse(file, cancellationToken));
+                    progress.Report(Interlocked.Increment(ref parsedCount));
                 }
 
-                await foreach (var shader in source.EnumerateShaders(this, skipPredicate, ct))
-                {
-                    allShaders.AddOrUpdate(
-                        key: shader.Name,
-                        addValueFactory: static (_, tuple) => tuple.shader,
-                        updateValueFactory: static (_, a, tuple) =>
+                parsed[i] = shaders;
+            });
+        }
+
+        // merged in the order the files were listed, not the order they finished parsing, so shaders defined
+        // in more than one file resolve the same way every time
+        foreach (var shaders in parsed)
+        {
+            foreach (var shader in shaders)
+            {
+                allShaders.AddOrUpdate(
+                    key: shader.Name,
+                    addValueFactory: static (_, tuple) => tuple.shader,
+                    updateValueFactory: static (_, a, tuple) =>
+                    {
+                        var (b, logger, map, duplicate, options) = tuple;
+
+                        int cmp = map.AssetSources.IndexOf(a.Source).CompareTo(map.AssetSources.IndexOf(b.Source));
+
+                        if (cmp != 0)
                         {
-                            var (b, logger, map, duplicate, options) = tuple;
+                            var toReturn = cmp > 0 ? a : b;
+                            var other = cmp > 0 ? b : a;
 
-                            int cmp = map.AssetSources.IndexOf(a.Source).CompareTo(map.AssetSources.IndexOf(b.Source));
-
-                            if (cmp != 0)
+                            if (options.ShaderDebug)
                             {
-                                var toReturn = cmp > 0 ? a : b;
-                                var other = cmp > 0 ? b : a;
-
-                                if (options.ShaderDebug)
-                                {
-                                    logger.Info($"Shader {a.Name} resolved from '{toReturn.Source}' instead of '{other.Source}'");
-                                }
-
-                                return toReturn;
+                                logger.Info($"Shader {a.Name} resolved from '{toReturn.Source}' instead of '{other.Source}'");
                             }
 
-                            // cases such as common shaders, if they are compile only we don't care
-                            if (!options.OnlySource && (!a.NeededInPk3 || !b.NeededInPk3))
+                            return toReturn;
+                        }
+
+                        // cases such as common shaders, if they are compile only we don't care
+                        if (!options.OnlySource && (!a.NeededInPk3 || !b.NeededInPk3))
+                        {
+                            return a.NeededInPk3 ? b : a;
+                        }
+
+                        if (ReferenceEquals(a.Asset, b.Asset))
+                        {
+                            // not packed, don't care
+                            if (a.Source.NotPacked) return a;
+
+                            // ET uses the first shader in the file in case of duplicates
+                            var first = a.Line < b.Line ? a : b;
+
+                            if (options.ShaderDebug)
                             {
-                                return a.NeededInPk3 ? b : a;
+                                logger.Info(
+                                    $"Shader {first} found multiple times in {first.Asset.FullPath}, " +
+                                    $"using the first from line {first.Line}");
                             }
 
-                            if (ReferenceEquals(a.Asset, b.Asset))
-                            {
-                                // not packed, don't care
-                                if (a.Source.NotPacked) return a;
+                            return first;
+                        }
 
-                                // ET uses the first shader in the file in case of duplicates
-                                var first = a.Line < b.Line ? a : b;
-
-                                if (options.ShaderDebug)
-                                {
-                                    logger.Info(
-                                        $"Shader {first} found multiple times in {first.Asset.FullPath}, " +
-                                        $"using the first from line {first.Line}");
-                                }
-
-                                return first;
-                            }
-
-                            if (!a.Source.NotPacked || !b.Source.NotPacked)
-                            {
-                                duplicate.AddOrUpdate(
-                                    key: a.Name,
-                                    addValueFactory: static (_, arg) => [arg.a, arg.b],
-                                    updateValueFactory: static (_, existing, arg) => [arg.a, arg.b, .. existing],
-                                    (a, b));
-                            }
-                            return a;
-                        },
-                        factoryArgument: (shader, logger, map, duplicateShaders, options));
-                }
-            }).ConfigureAwait(false);
+                        if (!a.Source.NotPacked || !b.Source.NotPacked)
+                        {
+                            duplicate.AddOrUpdate(
+                                key: a.Name,
+                                addValueFactory: static (_, arg) => [arg.a, arg.b],
+                                updateValueFactory: static (_, existing, arg) => [arg.a, arg.b, .. existing],
+                                (a, b));
+                        }
+                        return a;
+                    },
+                    factoryArgument: (shader, logger, map, duplicateShaders, options));
+            }
         }
 
         logger.Debug($"Parsed total of {allShaders.Count} shaders");
@@ -238,9 +248,32 @@ public class ShaderParser(
         }
     }
 
-    public async IAsyncEnumerable<Shader> Parse(
+    private bool SkipShaderFile(AssetSource source, string name)
+    {
+        string fileName = Path.GetFileNameWithoutExtension(name);
+
+        if (fileName.EqualsF("q3shadersCopyForRadiant"))
+        {
+            if (options.ShaderDebug)
+                logger.Info($"Skipped parsing Radiant specific shaderfile {getName()}");
+            return true;
+        }
+
+        if (fileName.StartsWithF("q3map_") || fileName.StartsWithF("q3map2_"))
+        {
+            if (options.ShaderDebug)
+                logger.Info($"Skipped shaderfile parsing from compiler generated file '{getName()}'");
+            return true;
+        }
+
+        return false;
+
+        string getName() => Path.Combine(source.RootPath, "scripts", name).NormalizePath();
+    }
+
+    public IEnumerable<Shader> Parse(
         IAsset asset,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
         State state = State.None;
 
@@ -248,7 +281,7 @@ public class ShaderParser(
         ReadOnlyMemory<char> token;
         bool inComment = false;
 
-        await foreach (var _line in reader.ReadLines(asset, cancellationToken).ConfigureAwait(false))
+        foreach (var _line in reader.ReadLines(asset, cancellationToken))
         {
             Line line = _line;
 
