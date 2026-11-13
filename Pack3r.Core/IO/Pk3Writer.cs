@@ -369,11 +369,11 @@ public sealed class Pk3Writer : IAsyncDisposable
     {
         try
         {
-            await foreach (Job job in _work.Reader.ReadAllAsync(_cts.Token))
+            await foreach (Job job in _work.Reader.ReadAllAsync(_cts.Token).ConfigureAwait(false))
             {
                 try
                 {
-                    await job.CompressAsync(_compressionLevel, _cts.Token);
+                    await job.CompressAsync(_compressionLevel, _cts.Token).ConfigureAwait(false);
                     job.Done.TrySetResult();
                 }
                 catch (Exception e)
@@ -392,12 +392,14 @@ public sealed class Pk3Writer : IAsyncDisposable
     {
         try
         {
-            await foreach (Job job in _work.Reader.ReadAllAsync(_cts.Token))
+            // the ordered channel, so entries are written in the order they were added. workers read the other one
+            await foreach (Job job in _ordered.Reader.ReadAllAsync(_cts.Token).ConfigureAwait(false))
             {
                 _writing = job;
 
-                // throws the worker's exception if compressing failed
-                await job.Done.Task;
+                // throws the worker's exception if compressing failed. the token is needed: after a failure or
+                // cancellation, jobs still in the work channel are never completed by a worker
+                await job.Done.Task.WaitAsync(_cts.Token).ConfigureAwait(false);
 
                 WriteEntry(job);
                 _writing = null;
@@ -689,7 +691,7 @@ public sealed class Pk3Writer : IAsyncDisposable
 
                 if (transform is null)
                 {
-                    await input.CopyToAsync(sink, cancellationToken);
+                    await input.CopyToAsync(sink, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -701,7 +703,7 @@ public sealed class Pk3Writer : IAsyncDisposable
             }
             finally
             {
-                await input.DisposeAsync();
+                await input.DisposeAsync().ConfigureAwait(false);
                 _source = null;
             }
         }
@@ -764,16 +766,14 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            ObjectDisposedException.ThrowIf(_finished, this);
-            _crc.Append(buffer);
-            BytesWritten += buffer.Length;
-            return _deflate.WriteAsync(buffer, offset, count, cancellationToken);
+            ValidateBufferArguments(buffer, offset, count);
+            return WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
         }
 
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             ObjectDisposedException.ThrowIf(_finished, this);
-            _crc.Append(buffer);
+            _crc.Append(buffer.Span);
             BytesWritten += buffer.Length;
             return _deflate.WriteAsync(buffer, cancellationToken);
         }

@@ -139,6 +139,35 @@ public class Pk3WriterTests
     }
 
     [Fact]
+    public async Task Should_Compute_Crc_Of_Partial_Writes()
+    {
+        byte[] buffer = "xxhelloxx"u8.ToArray();
+        using var destination = new MemoryStream();
+
+        await using (var writer = new Pk3Writer(destination))
+        {
+            // every write overload with an offset into a larger buffer
+            writer.Add("entry.txt", _timestamp, new MemoryStream(), (_, output) =>
+            {
+                output.Write(buffer, 2, 2);
+                output.Write(buffer.AsSpan(4, 1));
+                output.WriteAsync(buffer, 5, 1).GetAwaiter().GetResult();
+                output.WriteAsync(buffer.AsMemory(6, 1)).AsTask().GetAwaiter().GetResult();
+            });
+
+            await writer.CompleteAsync();
+        }
+
+        destination.Position = 0;
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Read);
+        var entry = archive.Entries.Single();
+
+        Assert.Equal("hello"u8.ToArray(), ReadAll(entry));
+        Assert.Equal(Crc32.HashToUInt32("hello"u8), entry.Crc32);
+        Assert.Equal(5, entry.Length);
+    }
+
+    [Fact]
     public async Task Should_Write_To_NonSeekable_Stream()
     {
         using var destination = new CountingStream();
