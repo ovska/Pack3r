@@ -59,9 +59,6 @@ jobs:
           echo "release_tag=latest" >> "$GITHUB_OUTPUT"
           echo "release_name=$short_sha" >> "$GITHUB_OUTPUT"
           echo "asset_version=$short_sha" >> "$GITHUB_OUTPUT"
-          # commit builds are pre-releases, so releases/latest (and the download links in the README)
-          # always point to the newest versioned release
-          echo "prerelease=true" >> "$GITHUB_OUTPUT"
           {
             echo "release_body<<EOF"
             echo "$timestamp"
@@ -71,7 +68,6 @@ jobs:
           echo "release_tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           echo "release_name=Release ${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           echo "asset_version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=false" >> "$GITHUB_OUTPUT"
           {
             echo "release_body<<EOF"
             echo "${{ inputs.description }}"
@@ -112,18 +108,13 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         retry_sleep_seconds=5
-        if [[ "${{ steps.release_metadata.outputs.prerelease }}" == "true" ]]; then
-          release_type=(--prerelease --latest=false)
-        else
-          release_type=(--latest)
-        fi
         for attempt in 1 2 3; do
           if gh release create "${{ steps.release_metadata.outputs.release_tag }}" \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "${{ steps.release_metadata.outputs.release_name }}" \
             --notes "${{ steps.release_metadata.outputs.release_body }}" \
-            "${release_type[@]}"; then
+            --latest; then
             break
           fi
           if [[ "$attempt" -eq 3 ]]; then

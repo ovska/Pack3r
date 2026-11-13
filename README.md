@@ -14,7 +14,7 @@
   <a href="https://github.com/ovska/Pack3r/releases/latest/download/pack3r-linux-x64">Linux</a> |
   <a href="https://github.com/ovska/Pack3r/releases/latest/download/pack3r-osx-arm64">macOS (Apple Silicon)</a>
   <br />
-  <sub>Latest release. Older versions and development builds are on the <a href="https://github.com/ovska/Pack3r/releases">releases page</a>.</sub>
+  <sub>Latest build. Versioned releases are on the <a href="https://github.com/ovska/Pack3r/releases">releases page</a>.</sub>
 </p>
 
 > [!NOTE]
