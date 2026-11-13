@@ -16,12 +16,12 @@ internal class FileAsset(string path) : IAsset
         throw new NotImplementedException();
     }
 
-    public async ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken)
+    public IMemoryOwner<byte> GetBytes(int? sizeHint, CancellationToken cancellationToken)
     {
-        return new NoopMemoryOwner(await File.ReadAllBytesAsync(path, cancellationToken));
+        return new NoopMemoryOwner(File.ReadAllBytes(path));
     }
 
-    public Stream OpenRead(bool isAsync = false) => File.OpenRead(FullPath);
+    public Stream OpenRead() => File.OpenRead(FullPath);
 
     private sealed class NoopMemoryOwner(Memory<byte> data) : IMemoryOwner<byte>
     {
@@ -43,12 +43,12 @@ internal class MockAsset : IAsset
         throw new NotImplementedException();
     }
 
-    public ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken)
+    public IMemoryOwner<byte> GetBytes(int? sizeHint, CancellationToken cancellationToken)
     {
         throw new NotImplementedException();
     }
 
-    public Stream OpenRead(bool isAsync = false)
+    public Stream OpenRead()
     {
         throw new NotImplementedException();
     }

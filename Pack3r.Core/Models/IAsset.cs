@@ -24,12 +24,12 @@ public interface IAsset
     /// Opens a stream to read the data.
     /// </summary>
     /// <returns></returns>
-    Stream OpenRead(bool isAsync = false);
+    Stream OpenRead();
 
     /// <summary>
     /// Reads the contents as bytes.
     /// </summary>
-    ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken);
+    IMemoryOwner<byte> GetBytes(int? sizeHint, CancellationToken cancellationToken);
 
     /// <summary>
     /// Queues the asset to be compressed into the destination archive. Called on the packaging thread; the data

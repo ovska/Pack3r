@@ -1,4 +1,4 @@
-using Pack3r.Logging;
+﻿using Pack3r.Logging;
 using Pack3r.Models;
 using Pack3r.Parsers;
 
@@ -6,10 +6,10 @@ namespace Pack3r.Tests;
 
 public class ShaderParserTests
 {
-    private static async Task<Shader> ParseSingle(string data, bool includeDevFiles = false)
+    private static Shader ParseSingle(string data, bool includeDevFiles = false)
     {
         var parser = GetParser(data, includeDevFiles);
-        var results = await parser.Parse(new MockAsset(), default).ToList();
+        var results = parser.Parse(new MockAsset(), default).ToList();
 
         Assert.Single(results);
         return results[0];
@@ -28,7 +28,7 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Parse_Multiple_Shaders()
+    public void Should_Parse_Multiple_Shaders()
     {
         var parser = GetParser("""
             textures/pgm/bar1
@@ -44,7 +44,7 @@ public class ShaderParserTests
             }
             """);
 
-        var results = await parser.Parse(new MockAsset(), default).ToList();
+        var results = parser.Parse(new MockAsset(), default).ToList();
 
         Assert.Equal(2, results.Count);
 
@@ -62,9 +62,9 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Parse_Implicit_Shader()
+    public void Should_Parse_Implicit_Shader()
     {
-        var shader = await ParseSingle("""
+        var shader = ParseSingle("""
             textures/pgm/light_rec_blu_5000
             {
             	qer_editorimage textures/pgm/abal2.tga
@@ -84,9 +84,9 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Parse_Shader()
+    public void Should_Parse_Shader()
     {
-        var shader = await ParseSingle("""
+        var shader = ParseSingle("""
             // this is a comment
             textures/common/clipweap_glass
             {
@@ -106,9 +106,9 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Parse_Sky()
+    public void Should_Parse_Sky()
     {
-        var shader = await ParseSingle("""
+        var shader = ParseSingle("""
             textures/pgm/sky
             {
             	// skpk/qer/env/cs/desert194.tga
@@ -143,18 +143,18 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Parse_With_Tabs()
+    public void Should_Parse_With_Tabs()
     {
-        var shader = await ParseSingle("textures/mymap/shader\n{\n\t\timplicitMap\t-\n}");
+        var shader = ParseSingle("textures/mymap/shader\n{\n\t\timplicitMap\t-\n}");
         Assert.Empty(shader.Resources);
         Assert.Empty(shader.Shaders);
         Assert.Equal("textures/mymap/shader", shader.ImplicitMapping?.ToString());
     }
 
     [Fact]
-    public async Task Should_Parse_AnimMap()
+    public void Should_Parse_AnimMap()
     {
-        var shader = await ParseSingle("""
+        var shader = ParseSingle("""
             textures/sfx/wilsflame1
             {
             	qer_editorimage textures/sfx/flame1.tga
@@ -199,9 +199,9 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Parse_Complex_Shader()
+    public void Should_Parse_Complex_Shader()
     {
-        var shader = await ParseSingle("""
+        var shader = ParseSingle("""
             textures/pgm/ice_floor1
             {
             	qer_editorimage textures/pgm/ice_floor1.jpg
@@ -250,9 +250,9 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Handle_Dangling_Brace()
+    public void Should_Handle_Dangling_Brace()
     {
-        var shader = await ParseSingle("""
+        var shader = ParseSingle("""
                 models/powerups/holdable/binoc {
 
                 {
@@ -283,9 +283,9 @@ public class ShaderParserTests
     }
 
     [Fact]
-    public async Task Should_Handle_Keyword_With_Opening_Brace()
+    public void Should_Handle_Keyword_With_Opening_Brace()
     {
-        var shader = await ParseSingle("""
+        var shader = ParseSingle("""
             textures/skies/sd_goldrush
             {
                 {	map textures/skies_sd/goldrush_clouds.tga

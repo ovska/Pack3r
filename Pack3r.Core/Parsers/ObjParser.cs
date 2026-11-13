@@ -1,4 +1,4 @@
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Models;
 
@@ -11,11 +11,11 @@ public partial class ObjParser(
 
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".obj");
 
-    public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)
+    public ResourceList? Parse(IAsset asset, CancellationToken cancellationToken)
     {
         ResourceList resources = [];
 
-        await foreach (var line in reader.ReadLines(asset, cancellationToken))
+        foreach (var line in reader.ReadLines(asset, cancellationToken))
         {
             const string UseMaterial = "usemtl ";
 

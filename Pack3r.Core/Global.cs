@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 
 namespace Pack3r;
 
@@ -42,5 +43,22 @@ public static class Global
             MaxDegreeOfParallelism = Debugger.IsAttached ? 1 : -1,
             CancellationToken = cancellationToken,
         };
+    }
+
+    /// <summary>
+    /// <see cref="Parallel.For(int, int, System.Threading.Tasks.ParallelOptions, Action{int})"/> over
+    /// <c>0..count</c>, that throws the first exception thrown by the body as is, instead of wrapped in an
+    /// <see cref="AggregateException"/>.
+    /// </summary>
+    public static void ParallelFor(int count, CancellationToken cancellationToken, Action<int> body)
+    {
+        try
+        {
+            Parallel.For(0, count, ParallelOptions(cancellationToken), body);
+        }
+        catch (AggregateException e) when (e.InnerExceptions.Count > 0)
+        {
+            ExceptionDispatchInfo.Throw(e.InnerExceptions[0]);
+        }
     }
 }

@@ -109,7 +109,7 @@ public class Program
                 {
                     // map keeps read-locks for pk3s it encounters, so keep it alive for as little time as possible.
                     // CreateZip disposes the session, which waits for the compression to stop, before the map
-                    using Map map = await app.AssetService.GetPackingData(cancellationToken);
+                    using Map map = app.AssetService.GetPackingData(cancellationToken);
                     result = await app.Packager.CreateZip(map, session, cancellationToken);
                 }
                 finally

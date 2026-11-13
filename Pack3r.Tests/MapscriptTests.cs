@@ -6,7 +6,7 @@ namespace Pack3r.Tests;
 public static class MapscriptTests
 {
     [Fact]
-    public static async Task Should_Parse_Mapscript()
+    public static void Should_Parse_Mapscript()
     {
         var reader = new StringLineReader("""
             game_manager
@@ -24,7 +24,7 @@ public static class MapscriptTests
 
         var parser = new MapscriptParser(reader, NullLogger<MapscriptParser>.Instance);
 
-        var results = await parser.Parse("a.script", default).ToList();
+        var results = parser.Parse("a.script", default).ToList();
 
         Assert.Equal(4, results.Count);
 

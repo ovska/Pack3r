@@ -8,7 +8,7 @@ namespace Pack3r.Services;
 
 public interface IAssetService
 {
-    Task<Map> GetPackingData(CancellationToken cancellationToken);
+    Map GetPackingData(CancellationToken cancellationToken);
 }
 
 public class AssetService(
@@ -19,7 +19,7 @@ public class AssetService(
     IResourceRefParser referenceParser)
     : IAssetService
 {
-    public async Task<Map> GetPackingData(CancellationToken cancellationToken)
+    public Map GetPackingData(CancellationToken cancellationToken)
     {
         if (options.MapFile.Directory is not { Name: "maps", Parent: DirectoryInfo mapsParent })
         {
@@ -173,7 +173,7 @@ public class AssetService(
             }
         }
 
-        await ParseResources(map, cancellationToken);
+        ParseResources(map, cancellationToken);
 
         return map;
 
@@ -244,13 +244,17 @@ public class AssetService(
         return files;
     }
 
-    private async Task ParseResources(Map map, CancellationToken cancellationToken)
+    private void ParseResources(Map map, CancellationToken cancellationToken)
     {
         // Parse resources referenced by map/mapscript/soundscript/speakerscript in parallel
-        ConcurrentDictionary<Resource, object?> referencedResources = [];
+        var renamable = new RenamableResource?[resourceParsers.Length];
+        var resources = new List<Resource>[resourceParsers.Length];
 
-        await Parallel.ForEachAsync(resourceParsers, Global.ParallelOptions(cancellationToken), async (parser, ct) =>
+        Global.ParallelFor(resourceParsers.Length, cancellationToken, i =>
         {
+            IResourceParser parser = resourceParsers[i];
+            resources[i] = [];
+
             string relativePath = parser.GetRelativePath(map.Name);
             FileInfo? file = parser.SearchModDirectories
                 ? FindFileFromMods(map, relativePath)
@@ -264,30 +268,41 @@ public class AssetService(
                 return;
             }
 
-            map.RenamableResources.Enqueue(new()
+            renamable[i] = new()
             {
                 Name = parser.Description,
                 AbsolutePath = file.FullName,
                 ArchivePath = parser.GetRelativePath(options.Rename ?? map.Name),
-            });
+            };
 
-            await foreach (var resource in parser.Parse(file.FullName, ct).ConfigureAwait(false))
-            {
-                referencedResources.TryAdd(resource, null);
-            }
-        }).ConfigureAwait(false);
+            resources[i].AddRange(parser.Parse(file.FullName, cancellationToken));
+        });
 
-        foreach (var (resource, _) in referencedResources)
+        // merged in parser order, not in the order they finished, so the pk3 is the same every time
+        HashSet<Resource> referencedResources = [];
+
+        for (int i = 0; i < resourceParsers.Length; i++)
         {
-            if (resource.CanReferenceResources)
+            if (renamable[i] is { } resource)
             {
-                map.ReferenceResources.Add(resource);
+                map.RenamableResources.Enqueue(resource);
             }
 
-            (resource.IsShader ? map.Shaders : map.Resources).Add(resource);
+            foreach (var item in resources[i])
+            {
+                if (!referencedResources.Add(item))
+                    continue;
+
+                if (item.CanReferenceResources)
+                {
+                    map.ReferenceResources.Add(item);
+                }
+
+                (item.IsShader ? map.Shaders : map.Resources).Add(item);
+            }
         }
 
-        await referenceParser.ParseReferences(map, cancellationToken);
+        referenceParser.ParseReferences(map, cancellationToken);
     }
 
     private FileInfo? FindFileFromMods(Map map, string relativePath)

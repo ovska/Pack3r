@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using Pack3r.Models;
 using Pack3r.Parsers;
 
@@ -14,10 +13,9 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, bool notPacked
     public override string ToString() => $"{{ Dir: {Directory.FullName} }}";
     internal string DebuggerDisplay => $"{{ Dir src: '{Directory.Name}' (Excluded: {NotPacked}) }}";
 
-    public override async IAsyncEnumerable<Shader> EnumerateShaders(
-        IShaderParser parser,
-        Func<string, bool> skipPredicate,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    public override bool CanReadFilesConcurrently => true;
+
+    public override IEnumerable<IAsset> EnumerateShaderFiles(Func<string, bool> skipPredicate)
     {
         foreach (var scriptsDir in Directory.EnumerateDirectories("scripts", SearchOption.TopDirectoryOnly))
         {
@@ -26,10 +24,7 @@ public sealed class DirectoryAssetSource(DirectoryInfo directory, bool notPacked
                 if (skipPredicate(shaderFile.FullName))
                     continue;
 
-                await foreach (var shader in parser.Parse(new FileAsset(this, shaderFile), cancellationToken))
-                {
-                    yield return shader;
-                }
+                yield return new FileAsset(this, shaderFile);
             }
         }
     }

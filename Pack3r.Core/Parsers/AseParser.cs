@@ -14,11 +14,11 @@ public partial class AseParser(
 
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".ase");
 
-    public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)
+    public ResourceList? Parse(IAsset asset, CancellationToken cancellationToken)
     {
         ResourceList resources = [];
 
-        await foreach (var line in reader.ReadLines(asset, cancellationToken))
+        foreach (var line in reader.ReadLines(asset, cancellationToken))
         {
             ReadOnlySpan<char> span = line.Value.Span;
 

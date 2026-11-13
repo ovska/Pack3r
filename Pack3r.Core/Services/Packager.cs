@@ -78,7 +78,7 @@ public sealed class Packager(
 
         int missingFiles = 0;
 
-        var shadersByName = await shaderParser.GetReferencedShaders(map, cancellationToken);
+        var shadersByName = shaderParser.GetReferencedShaders(map, cancellationToken);
 
         // the map files must be queued before anything else, and from now on this thread adds the entries
         await session.MapFilesQueued;

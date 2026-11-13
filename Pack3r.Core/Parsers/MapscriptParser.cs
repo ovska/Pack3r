@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -16,13 +15,13 @@ public class MapscriptParser(
 
     public bool SearchModDirectories => false;
 
-    public async IAsyncEnumerable<Resource> Parse(
+    public IEnumerable<Resource> Parse(
         string path,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
         HashSet<QString> unsupported = [];
 
-        await foreach (var line in reader.ReadLines(path, cancellationToken).ConfigureAwait(false))
+        foreach (var line in reader.ReadLines(path, cancellationToken))
         {
             // skip everything except: playsound, remapshader, set, create, changeskin
             if ((line.FirstChar | 0x20) is not ('p' or 'r' or 's' or 'c'))

@@ -6,7 +6,7 @@ namespace Pack3r.Tests;
 public static class SpeakerScriptTests
 {
     [Fact]
-    public static async Task Should_Parse_SpeakerScript()
+    public static void Should_Parse_SpeakerScript()
     {
         var reader = new StringLineReader("""
             speakerScript
@@ -33,7 +33,7 @@ public static class SpeakerScriptTests
 
         var parser = new SpeakerScriptParser(reader, NullLogger<SpeakerScriptParser>.Instance);
 
-        var results = await parser.Parse("a.sps", default).ToList();
+        var results = parser.Parse("a.sps", default).ToList();
 
         Assert.Equal(2, results.Count);
         Assert.Equal("sound/world/war.wav", results[0].Value.ToString());

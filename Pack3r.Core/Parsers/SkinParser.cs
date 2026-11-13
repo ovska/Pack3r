@@ -10,11 +10,11 @@ public class SkinParser(ILineReader reader) : IReferenceParser
 
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".skin");
 
-    public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)
+    public ResourceList? Parse(IAsset asset, CancellationToken cancellationToken)
     {
         ResourceList result = [];
 
-        await foreach (var line in reader.ReadLines(asset, cancellationToken))
+        foreach (var line in reader.ReadLines(asset, cancellationToken))
         {
             int comma = line.Value.Span.IndexOf(',');
 

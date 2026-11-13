@@ -6,7 +6,7 @@ public interface IResourceParser
 {
     public string Description { get; }
 
-    IAsyncEnumerable<Resource> Parse(string path, CancellationToken cancellationToken);
+    IEnumerable<Resource> Parse(string path, CancellationToken cancellationToken);
 
     /// <summary>
     /// Whether the file can be found in any directory, instead of just the same root dir where .map file is.
