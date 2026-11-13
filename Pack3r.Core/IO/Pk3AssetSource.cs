@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.IO.Compression;
-using System.Runtime.CompilerServices;
 using Microsoft.Win32.SafeHandles;
 using Pack3r.Extensions;
 using Pack3r.Models;
@@ -88,10 +87,10 @@ public sealed class Pk3AssetSource(string path, bool notPacked) : AssetSource(no
     public override string ToString() => $"{{ Pk3: {ArchivePath} }}";
     internal string DebuggerDisplay => $"{{ Pk3 src: '{Path.GetFileName(ArchivePath)}' (Excluded: {NotPacked}) }}";
 
-    public override async IAsyncEnumerable<Shader> EnumerateShaders(
-        IShaderParser parser,
-        Func<string, bool> skipPredicate,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
+    // entries of a ZipArchive are read through one shared file stream
+    public override bool CanReadFilesConcurrently => false;
+
+    public override IEnumerable<IAsset> EnumerateShaderFiles(Func<string, bool> skipPredicate)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -103,10 +102,7 @@ public sealed class Pk3AssetSource(string path, bool notPacked) : AssetSource(no
             if (entry.FullName.Length > Global.MAX_QPATH)
                 continue;
 
-            await foreach (var shader in parser.Parse(new Pk3Asset(this, entry), cancellationToken))
-            {
-                yield return shader;
-            }
+            yield return new Pk3Asset(this, entry);
         }
     }
 

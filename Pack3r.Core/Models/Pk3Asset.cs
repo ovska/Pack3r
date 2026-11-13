@@ -14,8 +14,9 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
     public string Name { get; } = entry.FullName.NormalizePath();
     public string FullPath { get; } = Path.Combine(source.ArchivePath, entry.FullName).NormalizePath();
     public AssetSource Source => source;
+    public long Length => entry.Length;
 
-    public Stream OpenRead(bool isAsync = false) => entry.Open();
+    public Stream OpenRead() => entry.Open();
 
     public void AddTo(Pk3Writer writer, string? archivePath = null, Action<Stream, Stream>? transform = null)
     {
@@ -92,12 +93,9 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
     private const ushort StoredMethod = 0;
     private const ushort DeflateMethod = 8;
 
-    public ValueTask<IMemoryOwner<byte>> GetBytes(int? sizeHint, CancellationToken cancellationToken)
+    public IMemoryOwner<byte> GetBytes(int? sizeHint, CancellationToken cancellationToken)
     {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return ValueTask.FromCanceled<IMemoryOwner<byte>>(cancellationToken);
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
         var arrayPoolBufferWriter = new ArrayPoolBufferWriter<byte>(sizeHint ?? 1024);
 
@@ -106,7 +104,7 @@ public sealed class Pk3Asset(Pk3AssetSource source, ZipArchiveEntry entry) : IAs
             stream.CopyTo(arrayPoolBufferWriter.AsStream());
         }
 
-        return new ValueTask<IMemoryOwner<byte>>(arrayPoolBufferWriter);
+        return arrayPoolBufferWriter;
     }
 
     internal string DebuggerDisplay => $"{{ Pk3Asset: '{Name}' from {Source.Name} }}";

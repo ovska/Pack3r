@@ -14,9 +14,9 @@ public partial class Md3Parser(ILogger<Md3Parser> logger) : IReferenceParser
 
     public bool CanParse(ReadOnlyMemory<char> resource) => resource.EndsWithF(".md3") || resource.EndsWithF(".mdc");
 
-    public async Task<ResourceList?> Parse(IAsset asset, CancellationToken cancellationToken)
+    public ResourceList? Parse(IAsset asset, CancellationToken cancellationToken)
     {
-        using var data = await asset.GetBytes(1024 * 64, cancellationToken);
+        using var data = asset.GetBytes(1024 * 64, cancellationToken);
 
         if (Impl(asset.FullPath, data.Memory.Span, cancellationToken, out var resources, out var error))
         {

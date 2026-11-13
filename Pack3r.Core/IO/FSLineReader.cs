@@ -1,4 +1,4 @@
-﻿using System.Collections;
+﻿using System.Buffers;
 using System.Text;
 using Pack3r.Models;
 
@@ -6,125 +6,166 @@ namespace Pack3r.IO;
 
 public class FSLineReader() : ILineReader
 {
-    public IAsyncEnumerable<Line> ReadLines(
-        string path,
-        CancellationToken cancellationToken)
-    {
-        return new AsyncEnumerator(path, cancellationToken);
-    }
+    public const long DefaultWholeFileThreshold = 10 * 1024 * 1024;
 
-    public IAsyncEnumerable<Line> ReadLines(IAsset asset, CancellationToken cancellationToken)
-    {
-        return new AsyncEnumerator(asset, cancellationToken);
-    }
+    /// <summary>
+    /// Files up to this size are read into memory at once, and their lines are slices of one string instead of a
+    /// string each. Larger files are streamed line by line.
+    /// </summary>
+    public long WholeFileThreshold { get; init; } = DefaultWholeFileThreshold;
+
+    // read in larger chunks than the default, the files are read start to end
+    private const int BufferSize = 16 * 1024;
 
     public IEnumerable<Line> ReadRawLines(string path)
     {
-        return new Enumerator(path);
+        return Read(OpenFile(path), GetLength(path), path, keepRaw: true, CancellationToken.None);
     }
 
-    private sealed class Enumerator(string path) : IEnumerable<Line>, IEnumerator<Line>
+    public IEnumerable<Line> ReadLines(string path, CancellationToken cancellationToken)
     {
-        private readonly StreamReader _reader = new(
-            new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, FileOptions.SequentialScan),
+        return Read(OpenFile(path), GetLength(path), path, keepRaw: false, cancellationToken);
+    }
+
+    public IEnumerable<Line> ReadLines(IAsset asset, CancellationToken cancellationToken)
+    {
+        return Read(asset.OpenRead, asset.Length, asset.FullPath, keepRaw: false, cancellationToken);
+    }
+
+    private static long GetLength(string path) => new FileInfo(path).Length;
+
+    private static Func<Stream> OpenFile(string path) => () => new FileStream(
+        path,
+        FileMode.Open,
+        FileAccess.Read,
+        FileShare.Read,
+        bufferSize: 0, // the reader does the buffering
+        FileOptions.SequentialScan);
+
+    private IEnumerable<Line> Read(
+        Func<Stream> open,
+        long length,
+        string path,
+        bool keepRaw,
+        CancellationToken cancellationToken)
+    {
+        return length <= WholeFileThreshold
+            ? ReadWhole(open, length, path, keepRaw, cancellationToken)
+            : ReadStreaming(open, path, keepRaw, cancellationToken);
+    }
+
+    private static IEnumerable<Line> ReadWhole(
+        Func<Stream> open,
+        long length,
+        string path,
+        bool keepRaw,
+        CancellationToken cancellationToken)
+    {
+        string text = ReadAllText(open, length);
+
+        int position = 0;
+        int index = 0;
+
+        // same line breaks as StreamReader.ReadLine: \n, \r\n and \r
+        while (position < text.Length)
+        {
+            int lineLength = text.AsSpan(position).IndexOfAny('\r', '\n');
+            int next;
+
+            if (lineLength < 0)
+            {
+                lineLength = text.Length - position;
+                next = text.Length;
+            }
+            else
+            {
+                int lineEnd = position + lineLength;
+                next = lineEnd + (text[lineEnd] == '\r' && lineEnd + 1 < text.Length && text[lineEnd + 1] == '\n' ? 2 : 1);
+            }
+
+            index++;
+
+            if (lineLength > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                Line line = new(path, index, text.AsMemory(position, lineLength), keepRaw);
+
+                if (line.HasValue)
+                    yield return line;
+            }
+
+            position = next;
+        }
+    }
+
+    /// <summary>
+    /// Reads the whole stream as ASCII. Bytes outside ASCII become '?', same as with a <see cref="StreamReader"/>.
+    /// </summary>
+    private static string ReadAllText(Func<Stream> open, long lengthHint)
+    {
+        // +1 so a file that is exactly the hinted length is read to the end without growing the buffer
+        byte[] buffer = ArrayPool<byte>.Shared.Rent((int)Math.Clamp(lengthHint + 1, 1, Array.MaxLength));
+        int total = 0;
+
+        try
+        {
+            using (var stream = open())
+            {
+                // read to the end instead of trusting the length, the file may have changed since it was listed
+                int read;
+
+                while ((read = stream.Read(buffer, total, buffer.Length - total)) > 0)
+                {
+                    total += read;
+
+                    if (total == buffer.Length)
+                    {
+                        byte[] larger = ArrayPool<byte>.Shared.Rent(buffer.Length * 2);
+                        buffer.AsSpan(0, total).CopyTo(larger);
+                        ArrayPool<byte>.Shared.Return(buffer);
+                        buffer = larger;
+                    }
+                }
+            }
+
+            return Encoding.ASCII.GetString(buffer, 0, total);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    private static IEnumerable<Line> ReadStreaming(
+        Func<Stream> open,
+        string path,
+        bool keepRaw,
+        CancellationToken cancellationToken)
+    {
+        using var reader = new StreamReader(
+            open(),
             Encoding.ASCII,
             detectEncodingFromByteOrderMarks: false,
-            bufferSize: 4096,
+            bufferSize: BufferSize,
             leaveOpen: false);
 
-        public Line Current { get; private set; }
-        object IEnumerator.Current => Current;
+        string? value;
+        int index = 0;
 
-        public void Dispose() => _reader.Dispose();
-
-        private int index;
-
-        public bool MoveNext()
+        while ((value = reader.ReadLine()) is not null)
         {
-            string? line;
+            index++;
 
-            while ((line = _reader.ReadLine()) is not null)
-            {
-                index++;
+            if (value.Length == 0)
+                continue;
 
-                if (line.Length == 0)
-                    continue;
+            cancellationToken.ThrowIfCancellationRequested();
 
-                Current = new Line(path, index, line, keepRaw: true);
+            Line line = new(path, index, value, keepRaw);
 
-                if (Current.HasValue)
-                    return true;
-            }
-
-            return false;
+            if (line.HasValue)
+                yield return line;
         }
-
-        public void Reset() => throw new NotSupportedException();
-
-        IEnumerator<Line> IEnumerable<Line>.GetEnumerator() => this;
-        IEnumerator IEnumerable.GetEnumerator() => this;
-    }
-
-    private sealed class AsyncEnumerator : IAsyncEnumerable<Line>, IAsyncEnumerator<Line>
-    {
-        private readonly StreamReader _reader;
-        private readonly string _path;
-        private readonly CancellationToken _cancellationToken;
-
-        public AsyncEnumerator(string path, CancellationToken cancellationToken)
-        {
-            _path = path;
-            _reader = new StreamReader(
-                new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, FileOptions.SequentialScan),
-                Encoding.ASCII,
-                detectEncodingFromByteOrderMarks: false,
-                bufferSize: 4096,
-                leaveOpen: false);
-            _cancellationToken = cancellationToken;
-        }
-
-        public AsyncEnumerator(IAsset asset, CancellationToken cancellationToken)
-        {
-            _path = asset.FullPath;
-            _reader = new StreamReader(
-                asset.OpenRead(isAsync: true),
-                Encoding.ASCII,
-                detectEncodingFromByteOrderMarks: false,
-                bufferSize: 4096,
-                leaveOpen: false);
-            _cancellationToken = cancellationToken;
-        }
-
-        public Line Current { get; private set; }
-
-        private int index;
-
-        public async ValueTask<bool> MoveNextAsync()
-        {
-            string? line;
-
-            while ((line = await _reader.ReadLineAsync(_cancellationToken)) is not null)
-            {
-                index++;
-
-                if (line.Length == 0)
-                    continue;
-
-                Current = new Line(_path, index, line, keepRaw: false);
-
-                if (Current.HasValue)
-                    return true;
-            }
-
-            return false;
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            _reader.Dispose();
-            return default;
-        }
-
-        IAsyncEnumerator<Line> IAsyncEnumerable<Line>.GetAsyncEnumerator(CancellationToken cancellationToken) => this;
     }
 }
