@@ -43,6 +43,38 @@ public static class MapParserTests
     }
 
     [Fact]
+    public static void Should_Treat_Texture_Casing_As_Same_Shader()
+    {
+        // consecutive faces with the same texture skip the case-insensitive set with an ordinal comparison,
+        // so different casings must still end up as one shader
+        var reader = new StringLineReader("""
+            // entity 0
+            {
+            "classname" "worldspawn"
+            // brush 0
+            {
+            brushDef
+            {
+            ( 24 72 64 ) ( 24 -24 64 ) ( -16 72 64 ) ( ( 0.015625 0 0.5 ) ( 0 0.015625 0.5 ) ) pgm_props/crate_01 0 0 0
+            ( 24 32 64 ) ( -16 32 64 ) ( 24 32 32 ) ( ( 0.015625 0 0.5 ) ( 0 0.015625 0 ) ) pgm_props/Crate_01 0 0 0
+            ( 32 72 64 ) ( 32 72 32 ) ( 32 -24 64 ) ( ( 0.015625 0 0.5 ) ( 0 0.015625 0 ) ) pgm_props/crate_01 0 0 0
+            ( -16 -16 0 ) ( 24 -16 0 ) ( -16 80 0 ) ( ( 0.015625 0 0.5 ) ( 0 0.015625 0.5 ) ) pgm_props/CRATE_01 0 0 0
+            ( -16 -32 32 ) ( -16 -32 64 ) ( 24 -32 32 ) ( ( 0.015625 0 0.5 ) ( 0 0.015625 0 ) ) pgm_props/other 0 0 0
+            ( -32 -24 32 ) ( -32 72 32 ) ( -32 -24 64 ) ( ( 0.015625 0 0.5 ) ( 0 0.015625 0 ) ) pgm_props/crate_01 0 0 0
+            }
+            }
+            }
+
+            """);
+
+        var map = CreateParser(reader).ParseMapAssets("C:/ET/etmain/maps/test.map", default);
+
+        Assert.Equal(
+            ["textures/pgm_props/crate_01", "textures/pgm_props/other"],
+            map.Shaders.Select(s => s.Value.ToString()));
+    }
+
+    [Fact]
     public static void Should_Parse_Simple_Map()
     {
         var reader = new StringLineReader("""
