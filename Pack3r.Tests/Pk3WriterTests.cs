@@ -319,6 +319,122 @@ public class Pk3WriterTests
         Assert.Equal(2, writer.EntriesWritten);
     }
 
+    [Theory]
+    [InlineData(Pk3Writer.ChunkedMinimumSize)] // exactly two chunks
+    [InlineData(Pk3Writer.ChunkedMinimumSize + 1)] // a 1 byte last chunk
+    [InlineData(9 * 1024 * 1024 + 12345)]
+    [InlineData(20 * 1024 * 1024)]
+    public async Task Should_Compress_Large_Files_In_Chunks(int length)
+    {
+        byte[] data = Compressible(length, seed: length);
+        string path = WriteTempFile(data);
+
+        try
+        {
+            byte[] archive = await WriteArchive(path, threads: 4);
+            var entry = ReadSingle(archive, out byte[] content);
+
+            Assert.Equal(data, content);
+            Assert.Equal(Crc32.HashToUInt32(data), entry.Crc32);
+            Assert.Equal(length, entry.Length);
+
+            // each chunk starts without the previous one as history, which costs a little
+            long single = Deflate(data, CompressionLevel.Optimal).Length;
+            Assert.InRange(entry.CompressedLength, single, single * 101 / 100);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Should_Not_Chunk_Files_Below_The_Threshold()
+    {
+        byte[] data = Compressible((int)Pk3Writer.ChunkedMinimumSize - 1, seed: 1);
+        string path = WriteTempFile(data);
+
+        try
+        {
+            var entry = ReadSingle(await WriteArchive(path, threads: 4), out _);
+            Assert.Equal(Deflate(data, CompressionLevel.Optimal).Length, entry.CompressedLength);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Should_Write_Same_Chunked_Output_With_Any_Number_Of_Threads()
+    {
+        string path = WriteTempFile(Compressible(11 * 1024 * 1024, seed: 9));
+
+        try
+        {
+            Assert.Equal(await WriteArchive(path, threads: 1), await WriteArchive(path, threads: 4));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Should_Fail_If_Chunked_File_Gets_Smaller()
+    {
+        string path = WriteTempFile(Compressible(9 * 1024 * 1024, seed: 2));
+        using var release = new ManualResetEventSlim();
+
+        try
+        {
+            using var destination = new MemoryStream();
+            await using var writer = new Pk3Writer(destination, maxDegreeOfParallelism: 1);
+
+            // keep the only worker busy until the file has been truncated
+            writer.Add("head.bin", _timestamp, new GatedStream(new byte[1000], release));
+            writer.Add("large.bin", _timestamp, File.OpenRead(path));
+
+            using (var truncate = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+                truncate.SetLength(1024 * 1024);
+
+            release.Set();
+            await Assert.ThrowsAsync<IOException>(writer.CompleteAsync);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static string WriteTempFile(byte[] data)
+    {
+        string path = Path.GetTempFileName();
+        File.WriteAllBytes(path, data);
+        return path;
+    }
+
+    private static async Task<byte[]> WriteArchive(string path, int threads)
+    {
+        using var destination = new MemoryStream();
+
+        await using (var writer = new Pk3Writer(destination, maxDegreeOfParallelism: threads))
+        {
+            writer.Add("maps/test.bsp", _timestamp, File.OpenRead(path));
+            await writer.CompleteAsync();
+        }
+
+        return destination.ToArray();
+    }
+
+    private static ZipArchiveEntry ReadSingle(byte[] archive, out byte[] content)
+    {
+        var zip = new ZipArchive(new MemoryStream(archive), ZipArchiveMode.Read);
+        var entry = Assert.Single(zip.Entries);
+        content = ReadAll(entry);
+        return entry;
+    }
+
     [Fact]
     public async Task Should_Dispose_Source_If_Add_Fails()
     {
