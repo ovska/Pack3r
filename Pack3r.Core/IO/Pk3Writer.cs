@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Channels;
+using Microsoft.Win32.SafeHandles;
 using CommunityToolkit.HighPerformance;
 using CommunityToolkit.HighPerformance.Buffers;
 
@@ -60,7 +61,8 @@ public sealed class Pk3Writer : IAsyncDisposable
     private readonly byte[] _comment;
     private readonly CompressionLevel _compressionLevel;
 
-    private readonly Channel<Job> _work = Channel.CreateUnbounded<Job>(
+    // a job, or one chunk of a chunked job
+    private readonly Channel<WorkItem> _work = Channel.CreateUnbounded<WorkItem>(
         new UnboundedChannelOptions { SingleWriter = true, SingleReader = false });
 
     private readonly Channel<Job> _ordered = Channel.CreateUnbounded<Job>(
@@ -74,6 +76,16 @@ public sealed class Pk3Writer : IAsyncDisposable
 
     // size assumed for a source that can't report its length
     private const long UnknownSourceSize = 1024 * 1024;
+
+    /// <summary>
+    /// Files at least this large are compressed in chunks on several threads, so one large file (the bsp) doesn't
+    /// keep a single thread busy after the rest are done. Depends only on the size, so the output is the same on
+    /// any number of cores.
+    /// </summary>
+    public const long ChunkedMinimumSize = 2 * ChunkSize;
+
+    /// <summary>Size of the chunks a large file is compressed in, costs ~0.1% in size.</summary>
+    public const int ChunkSize = 2 * 1024 * 1024;
 
     private readonly InFlightLimit _inFlight;
     private readonly CancellationTokenSource _cts;
@@ -204,7 +216,13 @@ public sealed class Pk3Writer : IAsyncDisposable
                 ValidateRaw(alternative.Method, alternative.CompressedSize, alternative.UncompressedSize);
             }
 
-            return new Job(name, lastWriteTime, source, transform) { Alternative = alternative, InFlightSize = size };
+            var job = new Job(name, lastWriteTime, source, transform) { Alternative = alternative, InFlightSize = size };
+
+            // a file is read with positional reads by each chunk, a transform needs the whole input in one pass
+            if (transform is null && source is FileStream { CanSeek: true } file && size >= ChunkedMinimumSize)
+                job.SplitIntoChunks(file.SafeFileHandle, size);
+
+            return job;
         }, compress: true);
     }
 
@@ -297,7 +315,7 @@ public sealed class Pk3Writer : IAsyncDisposable
             // writer sees jobs in the order they were added, workers may finish them in any order.
             // both channels are unbounded, so writing only fails if DisposeAsync completed them on another thread
             // while this was adding. a job that got into the ordered channel is released when it's drained there
-            if (!_ordered.Writer.TryWrite(job) || (compress && !_work.Writer.TryWrite(job)))
+            if (!_ordered.Writer.TryWrite(job) || (compress && !TryQueueWork(job)))
                 throw new ObjectDisposedException(nameof(Pk3Writer));
 
             _entriesAdded++;
@@ -308,6 +326,20 @@ public sealed class Pk3Writer : IAsyncDisposable
             if (!queued)
                 source.Dispose();
         }
+    }
+
+    private bool TryQueueWork(Job job)
+    {
+        if (job.ChunkCount == 0)
+            return _work.Writer.TryWrite(new WorkItem(job, Chunk: -1));
+
+        for (int i = 0; i < job.ChunkCount; i++)
+        {
+            if (!_work.Writer.TryWrite(new WorkItem(job, i)))
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -400,19 +432,30 @@ public sealed class Pk3Writer : IAsyncDisposable
     private void CompressLoop()
     {
         CancellationToken token = _cts.Token;
-        ChannelReader<Job> reader = _work.Reader;
+        ChannelReader<WorkItem> reader = _work.Reader;
 
         try
         {
             while (WaitToRead(reader, token))
             {
-                while (reader.TryRead(out Job? job))
+                while (reader.TryRead(out WorkItem item))
                 {
+                    Job job = item.Job;
+
                     try
                     {
                         token.ThrowIfCancellationRequested();
-                        job.Compress(_compressionLevel);
-                        job.Done.TrySetResult();
+
+                        if (item.Chunk < 0)
+                        {
+                            job.Compress(_compressionLevel);
+                            job.Done.TrySetResult();
+                        }
+                        else if (job.CompressChunk(item.Chunk, _compressionLevel))
+                        {
+                            // the last chunk to finish completes the job
+                            job.Done.TrySetResult();
+                        }
                     }
                     catch (Exception e)
                     {
@@ -459,7 +502,7 @@ public sealed class Pk3Writer : IAsyncDisposable
         }
     }
 
-    private static bool WaitToRead(ChannelReader<Job> reader, CancellationToken token)
+    private static bool WaitToRead<T>(ChannelReader<T> reader, CancellationToken token)
     {
         ValueTask<bool> task = reader.WaitToReadAsync(token);
         return task.IsCompletedSuccessfully ? task.Result : task.AsTask().GetAwaiter().GetResult();
@@ -477,7 +520,6 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         ushort method;
         long compressedSize;
-        ReadOnlySpan<byte> data = default;
 
         job.UseAlternativeIfSmaller();
 
@@ -495,8 +537,7 @@ public sealed class Pk3Writer : IAsyncDisposable
         else
         {
             method = MethodDeflate;
-            data = job.Compressed!.WrittenSpan;
-            compressedSize = data.Length;
+            compressedSize = job.CompressedLength;
         }
 
         if (job.UncompressedSize >= uint.MaxValue || compressedSize >= uint.MaxValue || _position >= uint.MaxValue)
@@ -535,7 +576,7 @@ public sealed class Pk3Writer : IAsyncDisposable
         }
         else
         {
-            _destination.Write(data);
+            job.WriteCompressedTo(_destination);
         }
 
         _records.Add(record);
@@ -648,6 +689,142 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         public PrecompressedData? Alternative { get; init; }
 
+        // chunked compression of a large file, see SplitIntoChunks
+        private SafeFileHandle? _file;
+        private long _fileLength;
+        private Chunk[]? _chunks;
+        private int _pendingChunks;
+
+        /// <summary>Number of chunks the job is compressed in, 0 if it's compressed in one go.</summary>
+        public int ChunkCount => _chunks?.Length ?? 0;
+
+        /// <summary>Length of the compressed data, once compressed.</summary>
+        public long CompressedLength
+        {
+            get
+            {
+                if (_chunks is null)
+                    return Compressed!.WrittenCount;
+
+                long length = 0;
+
+                foreach (var chunk in _chunks)
+                    length += chunk.Length;
+
+                return length;
+            }
+        }
+
+        /// <summary>
+        /// Compresses the file in chunks of <see cref="ChunkSize"/>, each read with positional reads, so different
+        /// threads can compress them at the same time.
+        /// </summary>
+        public void SplitIntoChunks(SafeFileHandle file, long length)
+        {
+            _file = file;
+            _fileLength = length;
+            _chunks = new Chunk[(int)((length + ChunkSize - 1) / ChunkSize)];
+            _pendingChunks = _chunks.Length;
+        }
+
+        /// <summary>
+        /// Compresses one chunk. Every chunk but the last ends with a sync flush, which ends the deflate data on
+        /// a byte boundary without ending the stream, so the chunks written one after another are a single valid
+        /// deflate stream. Each chunk starts without the previous chunk's data as history, which costs a little
+        /// in size. Returns true for the last chunk to finish, which completes the job.
+        /// </summary>
+        public bool CompressChunk(int index, CompressionLevel level)
+        {
+            long offset = (long)index * ChunkSize;
+            int length = (int)Math.Min(ChunkSize, _fileLength - offset);
+            bool last = index == _chunks!.Length - 1;
+
+            var output = new ArrayPoolBufferWriter<byte>(Math.Max(length / 2, 4096));
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+            var crc = new System.IO.Hashing.Crc32();
+
+            try
+            {
+                long usable;
+
+                using (var deflate = new DeflateStream(output.AsStream(), level, leaveOpen: true))
+                {
+                    int done = 0;
+
+                    while (done < length)
+                    {
+                        int read = RandomAccess.Read(_file!, buffer.AsSpan(0, Math.Min(buffer.Length, length - done)), offset + done);
+
+                        if (read == 0)
+                            throw new IOException($"File '{Name}' got smaller while it was being compressed");
+
+                        crc.Append(buffer.AsSpan(0, read));
+                        deflate.Write(buffer, 0, read);
+                        done += read;
+                    }
+
+                    if (!last)
+                    {
+                        deflate.Flush();
+                        usable = output.WrittenCount;
+                    }
+                    else
+                    {
+                        usable = -1;
+                    }
+                }
+
+                // disposing a non-final chunk wrote an empty final block after the flush, which is left out
+                _chunks[index] = new Chunk(output, usable < 0 ? output.WrittenCount : usable, crc.GetCurrentHashAsUInt32(), length);
+                output = null;
+            }
+            finally
+            {
+                output?.Dispose();
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+
+            if (Interlocked.Decrement(ref _pendingChunks) != 0)
+                return false;
+
+            uint combined = _chunks[0].Crc32;
+
+            for (int i = 1; i < _chunks.Length; i++)
+                combined = Crc32Combine.Combine(combined, _chunks[i].Crc32, _chunks[i].UncompressedLength);
+
+            Crc32 = combined;
+            UncompressedSize = _fileLength;
+
+            _source?.Dispose();
+            _source = null;
+            return true;
+        }
+
+        /// <summary>Writes the compressed data, from one buffer or one chunk at a time.</summary>
+        public void WriteCompressedTo(Stream destination)
+        {
+            if (_chunks is null)
+            {
+                destination.Write(Compressed!.WrittenSpan);
+                return;
+            }
+
+            foreach (var chunk in _chunks)
+                destination.Write(chunk.Output.WrittenSpan[..(int)chunk.Length]);
+        }
+
+        private void ReleaseChunks()
+        {
+            if (_chunks is null)
+                return;
+
+            for (int i = 0; i < _chunks.Length; i++)
+            {
+                _chunks[i].Output?.Dispose();
+                _chunks[i] = default;
+            }
+        }
+
         /// <summary>
         /// Called by the writer after compressing: switches to the precompressed alternative if it's not larger.
         /// The CRC of the alternative must match the data that was just compressed, so a mismatching source
@@ -660,14 +837,17 @@ public sealed class Pk3Writer : IAsyncDisposable
                 UncompressedSize == 0 ||
                 alternative.Crc32 != Crc32 ||
                 alternative.UncompressedSize != UncompressedSize ||
-                alternative.CompressedSize > Compressed!.WrittenCount)
+                alternative.CompressedSize > CompressedLength)
             {
                 return;
             }
 
+            _source?.Dispose();
             _source = alternative.Open();
-            Compressed.Dispose();
+            Compressed?.Dispose();
             Compressed = null;
+            ReleaseChunks();
+            _chunks = null;
             IsRaw = true;
             RawMethod = alternative.Method;
             RawCompressedSize = alternative.CompressedSize;
@@ -775,8 +955,13 @@ public sealed class Pk3Writer : IAsyncDisposable
             _source = null;
             Compressed?.Dispose();
             Compressed = null;
+            ReleaseChunks();
         }
     }
+
+    private readonly record struct WorkItem(Job Job, int Chunk);
+
+    private readonly record struct Chunk(ArrayPoolBufferWriter<byte> Output, long Length, uint Crc32, int UncompressedLength);
 
     /// <summary>
     /// Limits the number and total size of entries waiting to be written.
