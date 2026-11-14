@@ -41,6 +41,9 @@ public class MapFileParser(
         int lineCount = 0;
         var timer = Stopwatch.StartNew();
 
+        // last texture added, see AddTexture
+        QPath previousTexture = default;
+
         foreach (var line in reader.ReadRawLines(path))
         {
             lineCount = line.Index;
@@ -173,12 +176,18 @@ public class MapFileParser(
                 AddTexture(shaders, nonPrefixedShaders, in line, line.Value);
             }
 
-            static void AddTexture(
+            void AddTexture(
                 ResourceList shaders,
                 HashSet<QString> nonPrefixedShaders,
                 ref readonly Line line,
                 QPath value)
             {
+                // most faces have the same texture as the one before (85% on a real map), so skip hashing those
+                if (value.Span.Equals(previousTexture.Span, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                previousTexture = value;
+
                 if (nonPrefixedShaders.Add(value))
                 {
                     shaders.Add(Resource.Shader($"textures/{value}", in line));
