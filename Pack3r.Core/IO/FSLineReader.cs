@@ -61,15 +61,15 @@ public class FSLineReader() : ILineReader
         bool keepRaw,
         CancellationToken cancellationToken)
     {
-        string text = ReadAllText(open, length);
-
+        ReadOnlyMemory<char> memory = ReadAllText(open, length);
         int position = 0;
         int index = 0;
 
         // same line breaks as StreamReader.ReadLine: \n, \r\n and \r
-        while (position < text.Length)
+        while (position < memory.Length)
         {
-            int lineLength = text.AsSpan(position).IndexOfAny('\r', '\n');
+            ReadOnlySpan<char> text = memory.Span;
+            int lineLength = text[position..].IndexOfAny('\r', '\n');
             int next;
 
             if (lineLength < 0)
@@ -89,7 +89,7 @@ public class FSLineReader() : ILineReader
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                Line line = new(path, index, text.AsMemory(position, lineLength), keepRaw);
+                Line line = new(path, index, memory.Slice(position, lineLength), keepRaw);
 
                 if (line.HasValue)
                     yield return line;
@@ -102,7 +102,11 @@ public class FSLineReader() : ILineReader
     /// <summary>
     /// Reads the whole stream as ASCII. Bytes outside ASCII become '?', same as with a <see cref="StreamReader"/>.
     /// </summary>
-    private static string ReadAllText(Func<Stream> open, long lengthHint)
+    /// <remarks>
+    /// Decoded into an uninitialized array rather than a string, as the runtime zeroes a new string's memory
+    /// before it is written. The lines are slices of the array, so it can't be returned to a pool.
+    /// </remarks>
+    private static ReadOnlyMemory<char> ReadAllText(Func<Stream> open, long lengthHint)
     {
         // +1 so a file that is exactly the hinted length is read to the end without growing the buffer
         byte[] buffer = ArrayPool<byte>.Shared.Rent((int)Math.Clamp(lengthHint + 1, 1, Array.MaxLength));
@@ -129,7 +133,9 @@ public class FSLineReader() : ILineReader
                 }
             }
 
-            return Encoding.ASCII.GetString(buffer, 0, total);
+            char[] chars = GC.AllocateUninitializedArray<char>(total);
+            int decoded = Encoding.ASCII.GetChars(buffer, 0, total, chars, 0);
+            return chars.AsMemory(0, decoded);
         }
         finally
         {
