@@ -66,7 +66,16 @@ public sealed class Pk3Writer : IAsyncDisposable
     private readonly Channel<Job> _ordered = Channel.CreateUnbounded<Job>(
         new UnboundedChannelOptions { SingleWriter = true, SingleReader = true });
 
-    private readonly SemaphoreSlim _inFlight;
+    /// <summary>Default for the maximum number of entries waiting to be written.</summary>
+    public const int DefaultMaxEntriesInFlight = 256;
+
+    /// <summary>Default for the maximum total input size of entries waiting to be written.</summary>
+    public const long DefaultMaxBytesInFlight = 128 * 1024 * 1024;
+
+    // size assumed for a source that can't report its length
+    private const long UnknownSourceSize = 1024 * 1024;
+
+    private readonly InFlightLimit _inFlight;
     private readonly CancellationTokenSource _cts;
     private readonly Task[] _workers;
     private readonly Task _writer;
@@ -84,16 +93,27 @@ public sealed class Pk3Writer : IAsyncDisposable
     /// <param name="comment">Archive comment</param>
     /// <param name="compressionLevel">Deflate compression level for all entries</param>
     /// <param name="maxDegreeOfParallelism">Number of compression threads, defaults to processor count - 1</param>
+    /// <param name="maxEntriesInFlight">
+    /// Maximum number of entries waiting to be written. Each holds its source open, e.g. a file handle.
+    /// </param>
+    /// <param name="maxBytesInFlight">
+    /// Maximum total input size of entries waiting to be written, as each holds its compressed data in memory
+    /// until then. An entry larger than this is still accepted when nothing else is waiting.
+    /// </param>
     /// <param name="cancellationToken">Token to cancel the compression</param>
     public Pk3Writer(
         Stream destination,
         string? comment = null,
         CompressionLevel compressionLevel = CompressionLevel.Optimal,
         int? maxDegreeOfParallelism = null,
+        int maxEntriesInFlight = DefaultMaxEntriesInFlight,
+        long maxBytesInFlight = DefaultMaxBytesInFlight,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(destination);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxDegreeOfParallelism ?? 1, 1, nameof(maxDegreeOfParallelism));
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxEntriesInFlight, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxBytesInFlight, 1);
 
         if (!destination.CanWrite)
             throw new ArgumentException("Destination stream must be writable", nameof(destination));
@@ -107,9 +127,10 @@ public sealed class Pk3Writer : IAsyncDisposable
 
         int workerCount = maxDegreeOfParallelism ?? Math.Max(1, Environment.ProcessorCount - 1);
 
-        // bounds memory use: an entry holds its compressed data until it has been written. a bit of headroom lets
-        // workers keep going while the writer waits for a large entry (e.g. a lightmap) at the head of the queue
-        _inFlight = new SemaphoreSlim(workerCount * 2 + 2);
+        // entries are written in the order they were added, so while a large entry at the head of the queue (e.g.
+        // the bsp) is being compressed, the rest wait for it after they're done. a generous limit keeps the other
+        // workers busy meanwhile; it's by size, as an entry holds its compressed data until it has been written
+        _inFlight = new InFlightLimit(maxEntriesInFlight, maxBytesInFlight);
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         // dedicated threads, as the producer blocks while waiting for room in the queue
@@ -171,7 +192,9 @@ public sealed class Pk3Writer : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        Enqueue(source, () =>
+        long size = source.CanSeek ? source.Length : alternative?.UncompressedSize ?? UnknownSourceSize;
+
+        Enqueue(source, size, () =>
         {
             if (alternative is not null)
             {
@@ -181,7 +204,7 @@ public sealed class Pk3Writer : IAsyncDisposable
                 ValidateRaw(alternative.Method, alternative.CompressedSize, alternative.UncompressedSize);
             }
 
-            return new Job(name, lastWriteTime, source, transform) { Alternative = alternative };
+            return new Job(name, lastWriteTime, source, transform) { Alternative = alternative, InFlightSize = size };
         }, compress: true);
     }
 
@@ -227,7 +250,8 @@ public sealed class Pk3Writer : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(compressedData);
 
-        Enqueue(compressedData, () =>
+        // streamed to the destination by the writer, so it holds a source open but no data in memory
+        Enqueue(compressedData, size: 0, () =>
         {
             ValidateRaw(method, compressedSize, uncompressedSize);
 
@@ -235,7 +259,7 @@ public sealed class Pk3Writer : IAsyncDisposable
         }, compress: false);
     }
 
-    private void Enqueue(Stream source, Func<Job> createJob, bool compress)
+    private void Enqueue(Stream source, long size, Func<Job> createJob, bool compress)
     {
         bool queued = false;
 
@@ -250,7 +274,7 @@ public sealed class Pk3Writer : IAsyncDisposable
 
             try
             {
-                _inFlight.Wait(_cts.Token);
+                _inFlight.Acquire(size, _cts.Token);
             }
             catch (OperationCanceledException) when (_failure is not null)
             {
@@ -266,7 +290,7 @@ public sealed class Pk3Writer : IAsyncDisposable
             }
             catch
             {
-                _inFlight.Release();
+                _inFlight.Release(size);
                 throw;
             }
 
@@ -357,7 +381,6 @@ public sealed class Pk3Writer : IAsyncDisposable
         }
 
         _cts.Dispose();
-        _inFlight.Dispose();
     }
 
     private void Fail(Exception exception)
@@ -426,7 +449,7 @@ public sealed class Pk3Writer : IAsyncDisposable
                     job.Release();
 
                     Interlocked.Increment(ref _entriesWritten);
-                    _inFlight.Release();
+                    _inFlight.Release(job.InFlightSize);
                 }
             }
         }
@@ -615,6 +638,9 @@ public sealed class Pk3Writer : IAsyncDisposable
         public uint Crc32 { get; private set; }
         public long UncompressedSize { get; private set; }
 
+        /// <summary>Size counted against <see cref="InFlightLimit"/> until the entry is written.</summary>
+        public long InFlightSize { get; init; }
+
         /// <summary>Data is already compressed, and is copied from the source by the writer.</summary>
         public bool IsRaw { get; private set; }
         public ushort RawMethod { get; private set; }
@@ -750,6 +776,68 @@ public sealed class Pk3Writer : IAsyncDisposable
             Compressed?.Dispose();
             Compressed = null;
         }
+    }
+
+    /// <summary>
+    /// Limits the number and total size of entries waiting to be written.
+    /// </summary>
+    private sealed class InFlightLimit(int maxEntries, long maxBytes)
+    {
+        private readonly object _lock = new();
+        private int _entries;
+        private long _bytes;
+
+        /// <summary>
+        /// Waits until there is room for an entry of the given size. An entry larger than the limit is let
+        /// through when nothing else is in flight, so it can't wait forever.
+        /// </summary>
+        public void Acquire(long size, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            lock (_lock)
+            {
+                if (HasRoom(size))
+                {
+                    _entries++;
+                    _bytes += size;
+                    return;
+                }
+            }
+
+            using var registration = cancellationToken.Register(
+                static state =>
+                {
+                    var limit = (InFlightLimit)state!;
+                    lock (limit._lock) Monitor.PulseAll(limit._lock);
+                },
+                this);
+
+            lock (_lock)
+            {
+                while (!HasRoom(size))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Monitor.Wait(_lock);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                _entries++;
+                _bytes += size;
+            }
+        }
+
+        public void Release(long size)
+        {
+            lock (_lock)
+            {
+                _entries--;
+                _bytes -= size;
+                Monitor.PulseAll(_lock);
+            }
+        }
+
+        private bool HasRoom(long size) => _entries < maxEntries && (_entries == 0 || _bytes + size <= maxBytes);
     }
 
     /// <summary>
