@@ -269,6 +269,56 @@ public class Pk3WriterTests
         }
     }
 
+    [Theory]
+    [InlineData(256, 100_000)] // limited by size: 50 + 40 KB fit, another 40 KB doesn't
+    [InlineData(2, 1_000_000_000)] // limited by count
+    public async Task Should_Block_Until_Entries_Are_Written(int maxEntries, long maxBytes)
+    {
+        using var destination = new MemoryStream();
+        using var release = new ManualResetEventSlim();
+
+        await using var writer = new Pk3Writer(
+            destination,
+            maxDegreeOfParallelism: 1,
+            maxEntriesInFlight: maxEntries,
+            maxBytesInFlight: maxBytes);
+
+        // the first entry can't finish until released, so nothing can be written meanwhile
+        writer.Add("head.bin", _timestamp, new GatedStream(Compressible(50_000, seed: 1), release));
+        writer.Add("second.bin", _timestamp, new MemoryStream(Compressible(40_000, seed: 2)));
+
+        Task third = Task.Run(() => writer.Add("third.bin", _timestamp, new MemoryStream(Compressible(40_000, seed: 3))));
+
+        await Task.Delay(300);
+        Assert.False(third.IsCompleted, "third entry should wait until there is room");
+
+        release.Set();
+        await third.WaitAsync(TimeSpan.FromSeconds(10));
+        await writer.CompleteAsync();
+
+        destination.Position = 0;
+        using var archive = new ZipArchive(destination, ZipArchiveMode.Read);
+        Assert.Equal(["head.bin", "second.bin", "third.bin"], archive.Entries.Select(e => e.FullName));
+        Assert.Equal(Compressible(50_000, seed: 1), ReadAll(archive.Entries[0]));
+    }
+
+    [Fact]
+    public async Task Should_Accept_Entry_Larger_Than_Limit_When_Nothing_Is_Waiting()
+    {
+        using var destination = new MemoryStream();
+        await using var writer = new Pk3Writer(destination, maxBytesInFlight: 10);
+
+        Task add = Task.Run(() =>
+        {
+            writer.Add("large.bin", _timestamp, new MemoryStream(Compressible(100_000, seed: 1)));
+            writer.Add("large2.bin", _timestamp, new MemoryStream(Compressible(100_000, seed: 2)));
+        });
+
+        await add.WaitAsync(TimeSpan.FromSeconds(10));
+        await writer.CompleteAsync();
+        Assert.Equal(2, writer.EntriesWritten);
+    }
+
     [Fact]
     public async Task Should_Dispose_Source_If_Add_Fails()
     {
@@ -469,6 +519,34 @@ public class Pk3WriterTests
         var data = new byte[length];
         new Random(seed).NextBytes(data);
         return data;
+    }
+
+    /// <summary>Seekable read-only stream whose reads wait until the event is set.</summary>
+    private sealed class GatedStream(byte[] data, ManualResetEventSlim gate) : Stream
+    {
+        private int _position;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => true;
+        public override bool CanWrite => false;
+        public override long Length => data.Length;
+        public override long Position { get => _position; set => _position = (int)value; }
+
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            gate.Wait();
+            int count = Math.Min(buffer.Length, data.Length - _position);
+            data.AsSpan(_position, count).CopyTo(buffer);
+            _position += count;
+            return count;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Flush() { }
     }
 
     private sealed class TrackingStream(byte[] data) : MemoryStream(data)
