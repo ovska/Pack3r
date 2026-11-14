@@ -182,8 +182,10 @@ public class MapFileParser(
                 ref readonly Line line,
                 QPath value)
             {
-                // most faces have the same texture as the one before (85% on a real map), so skip hashing those
-                if (value.Span.Equals(previousTexture.Span, StringComparison.OrdinalIgnoreCase))
+                // most faces have the same texture as the one before (85% on a real map), so skip hashing those.
+                // ordinal, as a map writes the same name the same way; a different casing just goes to the
+                // case-insensitive set below
+                if (value.Span.SequenceEqual(previousTexture.Span))
                     return;
 
                 previousTexture = value;
