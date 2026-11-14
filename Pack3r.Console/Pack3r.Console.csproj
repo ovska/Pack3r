@@ -34,7 +34,6 @@
     <UseSystemResourceKeys>true</UseSystemResourceKeys>
     <IlcDisableUnhandledExceptionExperience>true</IlcDisableUnhandledExceptionExperience>
     <IlcInvariantGlobalization>true</IlcInvariantGlobalization>
-    <IlcOptimizationPreference>Size</IlcOptimizationPreference>
     <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
     <IlcGenerateMapFile>true</IlcGenerateMapFile>
     <IlcGenerateMetadataLog>true</IlcGenerateMetadataLog>
