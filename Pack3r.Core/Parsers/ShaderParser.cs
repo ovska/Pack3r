@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Pack3r.Extensions;
@@ -367,40 +368,11 @@ public class ShaderParser(
                 if (CanSkipShaderDirective(line.Value.Span))
                     continue;
 
-                bool found = false;
+                // look up the first word, instead of trying each keyword in turn
+                ReadOnlySpan<char> keyword = SplitKeyword(line.Value, out token, out bool hasArguments);
 
-                foreach (var prefix in _simpleShaderRefPrefixes)
-                {
-                    if (line.MatchKeyword(prefix, out token))
-                    {
-                        if (!token.Span.StartsWith("$", StringComparison.Ordinal))
-                            shader.Shaders.Add(token);
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found && options.OnlySource)
-                {
-                    foreach (var prefix in _devTexturePrefixes)
-                    {
-                        if (line.MatchKeyword(prefix, out token))
-                        {
-                            if (!token.Span.StartsWith("$", StringComparison.Ordinal))
-                            {
-                                shader.DevResources.Add(token.Trim('"')); // netradiant allows using doublequotes here
-                            }
-
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (found)
-                    continue;
-
-                if (line.Value.StartsWithF("implicit"))
+                // implicitMap, implicitMask, implicitBlend
+                if (keyword.StartsWithF("implicit"))
                 {
                     if (line.Value.TryReadPastWhitespace(out token))
                     {
@@ -417,43 +389,74 @@ public class ShaderParser(
                     {
                         logger.Warn($"Missing implicit mapping path on line {line.Index} in shader '{shader.Name}' in file '{asset.FullPath}'");
                     }
-                }
-                else if (line.MatchKeyword("skyparms", out token))
-                {
-                    if (!token.TryReadUpToWhitespace(out token))
-                    {
-                        logger.UnparsableKeyword(asset.FullPath, line.Index, "skyparms", line.Raw);
-                        continue;
-                    }
 
-                    // '-' farbox means no envbox is loaded, see ParseSkyParms in tr_shader.c
-                    if (!(token.Span.Length == 1 && token.Span.Equals("-", StringComparison.Ordinal)))
-                    {
-                        foreach (var suffix in _skySuffixes)
+                    continue;
+                }
+
+                if (!_shaderKeywords.TryGetValue(keyword, out ShaderKeyword kind))
+                    continue;
+
+                if (kind == ShaderKeyword.ForceInclude)
+                {
+                    // fog, portals etc. need the shader in the pk3 even without any textures
+                    shader.ForcePk3Include = true;
+                    continue;
+                }
+
+                // the rest need a value after the keyword
+                if (!hasArguments)
+                    continue;
+
+                switch (kind)
+                {
+                    case ShaderKeyword.ShaderReference:
+                        if (!token.Span.StartsWith("$", StringComparison.Ordinal))
+                            shader.Shaders.Add(token);
+                        break;
+
+                    case ShaderKeyword.DevTexture when options.OnlySource:
+                        if (!token.Span.StartsWith("$", StringComparison.Ordinal))
+                            shader.DevResources.Add(token.Trim('"')); // netradiant allows using doublequotes here
+                        break;
+
+                    case ShaderKeyword.SkyParms:
+                        if (!token.TryReadUpToWhitespace(out token))
                         {
-                            shader.Resources.Add($"{token}{suffix}".AsMemory());
+                            logger.UnparsableKeyword(asset.FullPath, line.Index, "skyparms", line.Raw);
+                            break;
                         }
-                    }
+
+                        // '-' farbox means no envbox is loaded, see ParseSkyParms in tr_shader.c
+                        if (!(token.Span.Length == 1 && token.Span.Equals("-", StringComparison.Ordinal)))
+                        {
+                            foreach (var suffix in _skySuffixes)
+                            {
+                                shader.Resources.Add($"{token}{suffix}".AsMemory());
+                            }
+                        }
+                        break;
+
+                    case ShaderKeyword.SunShader:
+                        shader.Shaders.Add(token);
+                        break;
+
+                    case ShaderKeyword.SurfaceModel:
+                        if (token.TryReadUpToWhitespace(out token))
+                        {
+                            shader.Resources.Add(token);
+                        }
+                        else
+                        {
+                            logger.UnparsableKeyword(asset.FullPath, line.Index, "q3map_surfaceModel", line.Raw);
+                        }
+                        break;
+
+                    case ShaderKeyword.LightStyle:
+                        shader.HasLightStyles = true;
+                        break;
                 }
-                else if (line.MatchKeyword("sunshader", out token))
-                {
-                    shader.Shaders.Add(token);
-                }
-                else if (line.MatchKeyword("q3map_surfaceModel", out token))
-                {
-                    if (token.TryReadUpToWhitespace(out token))
-                    {
-                        shader.Resources.Add(token);
-                    }
-                    else
-                    {
-                        logger.UnparsableKeyword(asset.FullPath, line.Index, "q3map_surfaceModel", line.Raw);
-                    }
-                }
-                else if (!shader.HasLightStyles && line.MatchKeyword("q3map_lightstyle", out _))
-                {
-                    shader.HasLightStyles = true;
-                }
+
+                continue;
             }
 
             ReadStage:
@@ -471,8 +474,12 @@ public class ShaderParser(
                     continue;
                 }
 
-                if (line.MatchKeyword("map", out token) ||
-                    line.MatchKeyword("clampMap", out token))
+                ReadOnlySpan<char> stageKeyword = SplitKeyword(line.Value, out token, out bool stageHasArguments);
+
+                if (!stageHasArguments)
+                    continue;
+
+                if (stageKeyword.EqualsF("map") || stageKeyword.EqualsF("clampMap"))
                 {
                     // $lightmap, $whiteimage etc
                     if (token.Span[0] != '$')
@@ -484,7 +491,7 @@ public class ShaderParser(
                         shader.ForcePk3Include = true;
                     }
                 }
-                else if (line.MatchKeyword("animMap", out token))
+                else if (stageKeyword.EqualsF("animMap"))
                 {
                     // read past the frames-agument
                     if (token.TryReadPastWhitespace(out token))
@@ -509,13 +516,9 @@ public class ShaderParser(
                         logger.UnparsableKeyword(asset.FullPath, line.Index, "animMap", line.Raw);
                     }
                 }
-                else if (line.MatchKeyword("videomap", out token))
+                else if (stageKeyword.EqualsF("videomap"))
                 {
                     shader.Resources.Add(token);
-                }
-                else if (!shader.ForcePk3Include && _forceIncludeKeywords.Contains(token))
-                {
-                    shader.ForcePk3Include = true;
                 }
 
                 continue;
@@ -545,20 +548,65 @@ public class ShaderParser(
 
     private static readonly string[] _skySuffixes = ["_bk", "_dn", "_ft", "_up", "_rt", "_lf"];
 
-    private static readonly string[] _simpleShaderRefPrefixes =
-    [
-        "q3map_backShader",
-        "q3map_baseShader",
-        "q3map_cloneShader",
-        "q3map_remapShader",
-    ];
+    /// <summary>
+    /// Splits a trimmed line into its first word and the rest, trimmed. Same as
+    /// <see cref="StringExtensions.MatchKeyword"/>: the keyword must be followed by a space or a tab.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ReadOnlySpan<char> SplitKeyword(
+        ReadOnlyMemory<char> value,
+        out ReadOnlyMemory<char> arguments,
+        out bool hasArguments)
+    {
+        int separator = value.Span.IndexOfAny(' ', '\t');
 
-    private static readonly string[] _devTexturePrefixes =
-    [
-        "q3map_lightImage",
-        "qer_editorImage",
-        "q3map_normalImage",
-    ];
+        if (separator < 0)
+        {
+            arguments = default;
+            hasArguments = false;
+            return value.Span;
+        }
+
+        arguments = value[(separator + 1)..].Trim();
+        hasArguments = true;
+        return value.Span[..separator];
+    }
+
+    private enum ShaderKeyword : byte
+    {
+        ShaderReference,
+        DevTexture,
+        SkyParms,
+        SunShader,
+        SurfaceModel,
+        LightStyle,
+        ForceInclude,
+    }
+
+    private static readonly FrozenDictionary<string, ShaderKeyword>.AlternateLookup<ReadOnlySpan<char>> _shaderKeywords =
+        new Dictionary<string, ShaderKeyword>
+        {
+            ["q3map_backShader"] = ShaderKeyword.ShaderReference,
+            ["q3map_baseShader"] = ShaderKeyword.ShaderReference,
+            ["q3map_cloneShader"] = ShaderKeyword.ShaderReference,
+            ["q3map_remapShader"] = ShaderKeyword.ShaderReference,
+            ["q3map_lightImage"] = ShaderKeyword.DevTexture,
+            ["qer_editorImage"] = ShaderKeyword.DevTexture,
+            ["q3map_normalImage"] = ShaderKeyword.DevTexture,
+            ["skyparms"] = ShaderKeyword.SkyParms,
+            ["sunshader"] = ShaderKeyword.SunShader,
+            ["q3map_surfaceModel"] = ShaderKeyword.SurfaceModel,
+            ["q3map_lightstyle"] = ShaderKeyword.LightStyle,
+            ["portal"] = ShaderKeyword.ForceInclude,
+            ["fogvars"] = ShaderKeyword.ForceInclude,
+            ["fogparms"] = ShaderKeyword.ForceInclude,
+            ["skyfogvars"] = ShaderKeyword.ForceInclude,
+            ["waterfogvars"] = ShaderKeyword.ForceInclude,
+            ["lightgridmulamb"] = ShaderKeyword.ForceInclude,
+            ["lightgridmuldir"] = ShaderKeyword.ForceInclude,
+        }
+        .ToFrozenDictionary(StringComparer.OrdinalIgnoreCase)
+        .GetAlternateLookup<ReadOnlySpan<char>>();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool CanSkipShaderDirective(ReadOnlySpan<char> line)
@@ -588,15 +636,4 @@ public class ShaderParser(
         /// <summary>In a stage e.g. map $lightmap</summary>
         Stage = 3,
     }
-
-    private static readonly HashSet<QString> _forceIncludeKeywords = new(QString.Comparer)
-    {
-        "portal",
-        "fogvars",
-        "fogparms",
-        "skyfogvars",
-        "waterfogvars",
-        "lightgridmulamb",
-        "lightgridmuldir",
-    };
 }

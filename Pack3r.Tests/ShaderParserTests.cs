@@ -27,6 +27,48 @@ public class ShaderParserTests
             new NoOpProgressManager());
     }
 
+    [Theory]
+    [InlineData("fogparms ( 0.5 0.5 0.5 ) 1024")]
+    [InlineData("FogParms ( 0.5 0.5 0.5 ) 1024")]
+    [InlineData("portal")]
+    [InlineData("fogvars ( 0.1 0.1 0.1 ) 2048")]
+    [InlineData("skyfogvars ( 0.1 0.1 0.1 ) 0.5")]
+    [InlineData("waterfogvars ( 0.1 0.1 0.1 ) 512")]
+    [InlineData("lightgridmulamb 2")]
+    [InlineData("lightgridmuldir 2")]
+    public void Should_Force_Include_Shaders_With_Global_Keywords(string keyword)
+    {
+        // e.g. a fog volume shader has no textures, but must still be in the pk3
+        var shader = ParseSingle($$"""
+            textures/fog/mapfog
+            {
+            	qer_editorimage textures/common/fog.tga
+            	surfaceparm fog
+            	surfaceparm nodraw
+            	{{keyword}}
+            }
+            """);
+
+        Assert.True(shader.ForcePk3Include);
+        Assert.True(shader.NeededInPk3);
+    }
+
+    [Fact]
+    public void Should_Not_Force_Include_Plain_Shader()
+    {
+        var shader = ParseSingle("""
+            textures/common/clip
+            {
+            	qer_editorimage textures/common/clip.tga
+            	surfaceparm nodraw
+            	surfaceparm playerclip
+            }
+            """);
+
+        Assert.False(shader.ForcePk3Include);
+        Assert.False(shader.NeededInPk3);
+    }
+
     [Fact]
     public void Should_Parse_Multiple_Shaders()
     {
