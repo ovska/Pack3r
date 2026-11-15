@@ -1,5 +1,4 @@
 using System.Text;
-using Pack3r.Extensions;
 
 namespace Pack3r.Tests;
 
@@ -36,16 +35,32 @@ public class AsciiIgnoreCaseComparerTests
     }
 
     [Fact]
-    public void Should_Match_Non_Ascii_Bytes_To_Their_Decoded_String()
+    public void Should_Fold_Only_Letters_At_Every_Position()
     {
-        byte[] alternate = [(byte)'T', 0xE4, (byte)'x', 0xFF];
-        QString decoded = ((ReadOnlySpan<byte>)alternate).ToQString();
+        // every ASCII character, at the start and end of values long enough to cover whole and partial words
+        for (int length = 1; length <= 17; length++)
+        {
+            for (int c = 0; c < 128; c++)
+            {
+                foreach (int position in (int[])[0, length - 1])
+                {
+                    char[] chars = new string('x', length).ToCharArray();
+                    chars[position] = (char)c;
+                    string value = new(chars);
+                    byte[] bytes = Encoding.ASCII.GetBytes(value);
 
-        Assert.Equal("T?x?", decoded.ToString());
-        Assert.True(Comparer.Equals(alternate, decoded));
-        Assert.True(Comparer.Equals(alternate, new QString("t?X?")));
-        Assert.False(Comparer.Equals(alternate, new QString("t?X!")));
-        Assert.Equal(Comparer.GetHashCode(decoded), Comparer.GetHashCode(alternate));
+                    Assert.Equal(Comparer.GetHashCode(new QString(value.ToLowerInvariant())), Comparer.GetHashCode(bytes));
+                    Assert.Equal(Comparer.GetHashCode(new QString(value.ToUpperInvariant())), Comparer.GetHashCode(bytes));
+                    Assert.True(Comparer.Equals(bytes, new QString(value.ToUpperInvariant())));
+
+                    // flipping the case bit of anything but a letter gives a different value
+                    chars[position] = (char)(c ^ 0x20);
+
+                    if (!char.IsAsciiLetter((char)c) && chars[position] < 128)
+                        Assert.False(Comparer.Equals(bytes, new QString(new string(chars))));
+                }
+            }
+        }
     }
 
     [Fact]
