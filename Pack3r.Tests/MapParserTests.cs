@@ -43,6 +43,23 @@ public static class MapParserTests
     }
 
     [Fact]
+    public static void Should_Stop_When_Canceled()
+    {
+        // no line here reaches a check in the parser itself, so the reader must notice
+        var reader = new StringLineReader("""
+            // entity 0
+            {
+            }
+            """);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            () => CreateParser(reader).ParseMapAssets("C:/ET/etmain/maps/test.map", cts.Token));
+    }
+
+    [Fact]
     public static void Should_Treat_Texture_Casing_As_Same_Shader()
     {
         // consecutive faces with the same texture skip the case-insensitive set with an ordinal comparison,
