@@ -276,26 +276,27 @@ public class ShaderParser(
         IAsset asset,
         CancellationToken cancellationToken)
     {
+        List<Shader> shaders = [];
         State state = State.None;
 
         Shader? shader = null;
-        ReadOnlyMemory<char> token;
+        ReadOnlySpan<byte> token;
         bool inComment = false;
 
         foreach (var _line in reader.ReadLines(asset, cancellationToken))
         {
-            Line line = _line;
+            LineRef line = _line;
 
             if (inComment)
             {
-                if (line.FirstChar == '*' && line.Value.Length == 2 && line.Value.Span[1] == '/')
+                if (line.FirstChar == '*' && line.Value.Length == 2 && line.Value[1] == '/')
                 {
                     inComment = false;
                 }
                 continue;
             }
 
-            if (line.FirstChar == '/' && line.Value.Length == 2 && line.Value.Span[1] == '*')
+            if (line.FirstChar == '/' && line.Value.Length == 2 && line.Value[1] == '*')
             {
                 inComment = true;
                 continue;
@@ -319,25 +320,26 @@ public class ShaderParser(
 
             if (state == State.None)
             {
-                ReadOnlyMemory<char> shaderName = line.Value;
+                ReadOnlySpan<byte> shaderName = line.Value;
 
                 State next = State.AfterShaderName;
 
                 // handle opening brace left on the previous line, e.g:
                 // textures/mymap/ice {
-                if (shaderName.Span[^1] == '{')
+                if (shaderName[^1] == '{')
                 {
-                    shaderName = shaderName[..^1].TrimEnd();
+                    shaderName = shaderName[..^1].TrimWhitespace();
                     next = State.Shader;
                 }
 
-                if (shaderName.Span.ContainsAny(Tokens.Braces))
+                if (shaderName.IndexOfAny((byte)'{', (byte)'}') >= 0)
                 {
                     throw new InvalidDataException(
                         $"Expected shader name on line {line.Index} in file '{asset.FullPath}', got: '{line.Raw}'");
                 }
 
-                shader = new Shader(shaderName, asset, line.Index);
+                // every shader is kept in the table of all shaders, so its name is always a string
+                shader = new Shader(shaderName.ToQPath(), asset, line.Index);
                 state = next;
                 continue;
             }
@@ -359,30 +361,30 @@ public class ShaderParser(
                 if (line.IsClosingBrace)
                 {
                     Debug.Assert(shader != null);
-                    yield return shader;
+                    shaders.Add(shader);
                     state = State.None;
                     continue;
                 }
 
                 // early exit for known irrelevant keywords
-                if (CanSkipShaderDirective(line.Value.Span))
+                if (CanSkipShaderDirective(line.Value))
                     continue;
 
                 // look up the first word, instead of trying each keyword in turn
-                ReadOnlySpan<char> keyword = SplitKeyword(line.Value, out token, out bool hasArguments);
+                ReadOnlySpan<byte> keyword = SplitKeyword(line.Value, out token, out bool hasArguments);
 
                 // implicitMap, implicitMask, implicitBlend
-                if (keyword.StartsWithF("implicit"))
+                if (keyword.StartsWithIgnoreCase("implicit"u8))
                 {
                     if (line.Value.TryReadPastWhitespace(out token))
                     {
-                        if (token.Length == 1 && token.Span.Equals("-", StringComparison.Ordinal))
+                        if (token.Length == 1 && token[0] == '-')
                         {
                             shader.ImplicitMapping = shader.Name;
                         }
                         else
                         {
-                            shader.ImplicitMapping = token;
+                            shader.ImplicitMapping = token.ToQPath();
                         }
                     }
                     else
@@ -393,7 +395,7 @@ public class ShaderParser(
                     continue;
                 }
 
-                if (!_shaderKeywords.TryGetValue(keyword, out ShaderKeyword kind))
+                if (!TryGetKeyword(keyword, out ShaderKeyword kind))
                     continue;
 
                 if (kind == ShaderKeyword.ForceInclude)
@@ -410,13 +412,13 @@ public class ShaderParser(
                 switch (kind)
                 {
                     case ShaderKeyword.ShaderReference:
-                        if (!token.Span.StartsWith("$", StringComparison.Ordinal))
-                            shader.Shaders.Add(token);
+                        if (token[0] != '$')
+                            shader.Shaders.Add(token.ToQPath());
                         break;
 
                     case ShaderKeyword.DevTexture when options.OnlySource:
-                        if (!token.Span.StartsWith("$", StringComparison.Ordinal))
-                            shader.DevResources.Add(token.Trim('"')); // netradiant allows using doublequotes here
+                        if (token[0] != '$')
+                            shader.DevResources.Add(token.Trim((byte)'"').ToQPath()); // netradiant allows using doublequotes here
                         break;
 
                     case ShaderKeyword.SkyParms:
@@ -427,23 +429,25 @@ public class ShaderParser(
                         }
 
                         // '-' farbox means no envbox is loaded, see ParseSkyParms in tr_shader.c
-                        if (!(token.Span.Length == 1 && token.Span.Equals("-", StringComparison.Ordinal)))
+                        if (!(token.Length == 1 && token[0] == '-'))
                         {
+                            string farbox = token.ToAsciiString();
+
                             foreach (var suffix in _skySuffixes)
                             {
-                                shader.Resources.Add($"{token}{suffix}".AsMemory());
+                                shader.Resources.Add(farbox + suffix);
                             }
                         }
                         break;
 
                     case ShaderKeyword.SunShader:
-                        shader.Shaders.Add(token);
+                        shader.Shaders.Add(token.ToQPath());
                         break;
 
                     case ShaderKeyword.SurfaceModel:
                         if (token.TryReadUpToWhitespace(out token))
                         {
-                            shader.Resources.Add(token);
+                            shader.Resources.Add(token.ToQPath());
                         }
                         else
                         {
@@ -474,40 +478,35 @@ public class ShaderParser(
                     continue;
                 }
 
-                ReadOnlySpan<char> stageKeyword = SplitKeyword(line.Value, out token, out bool stageHasArguments);
+                ReadOnlySpan<byte> stageKeyword = SplitKeyword(line.Value, out token, out bool stageHasArguments);
 
                 if (!stageHasArguments)
                     continue;
 
-                if (stageKeyword.EqualsF("map") || stageKeyword.EqualsF("clampMap"))
+                if (stageKeyword.EqualsIgnoreCase("map"u8) || stageKeyword.EqualsIgnoreCase("clampMap"u8))
                 {
                     // $lightmap, $whiteimage etc
-                    if (token.Span[0] != '$')
+                    if (token[0] != '$')
                     {
-                        shader.Resources.Add(token);
+                        shader.Resources.Add(token.ToQPath());
                     }
                     else
                     {
                         shader.ForcePk3Include = true;
                     }
                 }
-                else if (stageKeyword.EqualsF("animMap"))
+                else if (stageKeyword.EqualsIgnoreCase("animMap"u8))
                 {
                     // read past the frames-agument
                     if (token.TryReadPastWhitespace(out token))
                     {
-                        AddFrames(shader.Resources, token);
-
-                        static void AddFrames(List<QPath> list, ReadOnlyMemory<char> source)
+                        foreach (var frame in token.EnumerateTokens())
                         {
-                            foreach (var match in Tokens.WhitespaceSeparatedTokens().EnumerateMatches(source.Span))
-                            {
-                                ReadOnlyMemory<char> value = source.Slice(match).TrimQuotes().Trim();
+                            ReadOnlySpan<byte> value = frame.TrimQuotes().TrimWhitespace();
 
-                                if (!value.IsEmpty)
-                                {
-                                    list.Add(value);
-                                }
+                            if (!value.IsEmpty)
+                            {
+                                shader.Resources.Add(value.ToQPath());
                             }
                         }
                     }
@@ -516,9 +515,9 @@ public class ShaderParser(
                         logger.UnparsableKeyword(asset.FullPath, line.Index, "animMap", line.Raw);
                     }
                 }
-                else if (stageKeyword.EqualsF("videomap"))
+                else if (stageKeyword.EqualsIgnoreCase("videomap"u8))
                 {
-                    shader.Resources.Add(token);
+                    shader.Resources.Add(token.ToQPath());
                 }
 
                 continue;
@@ -529,17 +528,19 @@ public class ShaderParser(
         {
             throw new InvalidDataException($"Shader '{asset.FullPath}' ended in an invalid state: {state}");
         }
+
+        return shaders;
     }
 
     /// <summary>
     /// Returns whether the line is not empty (just a single opening brace)
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsContinuationBrace(ref Line line)
+    private static bool IsContinuationBrace(ref LineRef line)
     {
         if (line.Value.Length > 1)
         {
-            line = new Line(line.Path, line.Index, line.Value[1..], false);
+            line = line.WithValue(line.Value[1..].TrimWhitespace());
             return true;
         }
 
@@ -550,26 +551,44 @@ public class ShaderParser(
 
     /// <summary>
     /// Splits a trimmed line into its first word and the rest, trimmed. Same as
-    /// <see cref="StringExtensions.MatchKeyword"/>: the keyword must be followed by a space or a tab.
+    /// <see cref="AsciiExtensions.MatchKeyword"/>: the keyword must be followed by a space or a tab.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ReadOnlySpan<char> SplitKeyword(
-        ReadOnlyMemory<char> value,
-        out ReadOnlyMemory<char> arguments,
+    private static ReadOnlySpan<byte> SplitKeyword(
+        ReadOnlySpan<byte> value,
+        out ReadOnlySpan<byte> arguments,
         out bool hasArguments)
     {
-        int separator = value.Span.IndexOfAny(' ', '\t');
+        int separator = value.IndexOfAny((byte)' ', (byte)'\t');
 
         if (separator < 0)
         {
             arguments = default;
             hasArguments = false;
-            return value.Span;
+            return value;
         }
 
-        arguments = value[(separator + 1)..].Trim();
+        arguments = value[(separator + 1)..].TrimWhitespace();
         hasArguments = true;
-        return value.Span[..separator];
+        return value[..separator];
+    }
+
+    /// <summary>
+    /// Looks up a keyword without creating a string: it's decoded on the stack, and anything longer than the
+    /// longest keyword isn't one.
+    /// </summary>
+    private static bool TryGetKeyword(ReadOnlySpan<byte> keyword, out ShaderKeyword kind)
+    {
+        const int MaxKeywordLength = 32;
+
+        if (keyword.Length > MaxKeywordLength)
+        {
+            kind = default;
+            return false;
+        }
+
+        Span<char> chars = stackalloc char[MaxKeywordLength];
+        return _shaderKeywords.TryGetValue(keyword.ToChars(chars), out kind);
     }
 
     private enum ShaderKeyword : byte
@@ -609,15 +628,15 @@ public class ShaderParser(
         .GetAlternateLookup<ReadOnlySpan<char>>();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool CanSkipShaderDirective(ReadOnlySpan<char> line)
+    private bool CanSkipShaderDirective(ReadOnlySpan<byte> line)
     {
         return (line[0] | 0x20) switch
         {
-            'q' => !options.OnlySource && line.StartsWithF("qer_"),
-            's' => line.StartsWithF("surfaceparm") || line.StartsWithF("sort"),
-            'c' => line.StartsWithF("cull"),
-            'n' => line.StartsWithF("nopicmip") || line.StartsWithF("nomipmaps"),
-            't' => line.StartsWithF("tesssize"),
+            'q' => !options.OnlySource && line.StartsWithIgnoreCase("qer_"u8),
+            's' => line.StartsWithIgnoreCase("surfaceparm"u8) || line.StartsWithIgnoreCase("sort"u8),
+            'c' => line.StartsWithIgnoreCase("cull"u8),
+            'n' => line.StartsWithIgnoreCase("nopicmip"u8) || line.StartsWithIgnoreCase("nomipmaps"u8),
+            't' => line.StartsWithIgnoreCase("tesssize"u8),
             _ => false,
         };
     }

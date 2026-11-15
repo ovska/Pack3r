@@ -1,103 +1,82 @@
 ﻿using System.Diagnostics;
+using System.Text;
+using Pack3r.Extensions;
 using Pack3r.Models;
 
 namespace Pack3r.IO;
 
+/// <summary>
+/// A line kept after parsing, e.g. as the source of a resource for log messages. A copy of the line's ASCII
+/// bytes; created from a <see cref="LineRef"/> with <see cref="LineRef.ToLine"/> only when it's needed.
+/// </summary>
 [DebuggerDisplay("{DebuggerDisplay,nq}")]
 public readonly struct Line : IEquatable<Line>, IResourceSource
 {
-    /// <summary>
-    /// 1-based line index.
-    /// </summary>
-    public int Index { get; }
+    private readonly byte[]? _raw;
+    private readonly int _valueStart;
+    private readonly int _valueLength;
 
-    /// <summary>
-    /// Value of the line, with possibly comments and whitespace trimmed.
-    /// </summary>
-    public ReadOnlyMemory<char> Value { get; }
-
-    /// <summary>
-    /// The line as it was in the file, without comments or whitespace removed.
-    /// Usually a slice of the whole file's text, so reading it doesn't allocate.
-    /// </summary>
-    public ReadOnlyMemory<char> RawMemory { get; }
-
-    /// <inheritdoc cref="RawMemory"/>
-    public ReadOnlySpan<char> RawSpan => RawMemory.Span;
-
-    /// <summary>
-    /// The line as it was in the file as a string, e.g. for error messages. Allocates, use
-    /// <see cref="RawSpan"/> in parsing code.
-    /// </summary>
-    public string Raw => RawMemory.ToString();
-
-    /// <summary>
-    /// Path to the file where this line was read from.
-    /// </summary>
-    public string Path { get; }
-
-    public bool HasValue => !Value.IsEmpty;
-
-    /// <summary>
-    /// First characters
-    /// </summary>
-    public char FirstChar { get; }
-
-    public Line(string path, int index, string rawValue, bool keepRaw)
-        : this(path, index, (rawValue ?? "").AsMemory(), keepRaw)
-    {
-    }
-
-    public Line(string path, int index, ReadOnlyMemory<char> rawValue, bool keepRaw)
+    internal Line(string path, int index, byte[] raw, int valueStart, int valueLength)
     {
         Path = path;
         Index = index;
-        RawMemory = rawValue;
-
-        if (keepRaw)
-        {
-            Value = rawValue;
-        }
-        else if (rawValue.Span.IndexOf("//", StringComparison.Ordinal) is int commentIndex and >= 0)
-        {
-            Value = rawValue[..commentIndex].Trim();
-        }
-        else
-        {
-            Value = rawValue.Trim();
-        }
-
-        if (!Value.IsEmpty)
-        {
-            FirstChar = Value.Span[0];
-        }
+        _raw = raw;
+        _valueStart = valueStart;
+        _valueLength = valueLength;
     }
 
-    public bool IsOpeningBrace => FirstChar == '{';
-    public bool IsClosingBrace => FirstChar == '}';
+    /// <summary>
+    /// Creates a line from text, e.g. for a resource that doesn't come from a parsed file.
+    /// </summary>
+    public Line(string path, int index, string rawValue, bool keepRaw)
+    {
+        byte[] raw = Encoding.ASCII.GetBytes(rawValue ?? "");
+        var line = new LineRef(path, index, raw, keepRaw);
+        this = line.ToLine();
+    }
+
+    /// <summary>1-based line number.</summary>
+    public int Index { get; }
+
+    /// <summary>Path to the file the line was read from.</summary>
+    public string Path { get; }
+
+    /// <summary>The line as it was in the file.</summary>
+    public ReadOnlySpan<byte> RawSpan => _raw;
+
+    /// <summary>The line with comments and whitespace removed, unless read as raw.</summary>
+    public ReadOnlySpan<byte> Value => _raw.AsSpan(_valueStart, _valueLength);
+
+    public bool HasValue => _valueLength > 0;
+
+    /// <summary>First byte of <see cref="Value"/>, or 0 if it's empty.</summary>
+    public byte FirstChar => HasValue ? _raw![_valueStart] : (byte)0;
+
+    /// <summary>The raw line as a string, for log and error messages. Allocates.</summary>
+    public string Raw => RawSpan.ToAsciiString();
 
     public override bool Equals(object? obj) => obj is Line other && Equals(other);
 
     public bool Equals(Line other)
     {
-        return Index.Equals(other.Index)
+        return Index == other.Index
             && RawSpan.SequenceEqual(other.RawSpan)
-            && Path.Equals(other.Path);
+            && string.Equals(Path, other.Path, StringComparison.Ordinal);
     }
 
-    public static bool operator ==(Line left, Line right)
+    public static bool operator ==(Line left, Line right) => left.Equals(right);
+    public static bool operator !=(Line left, Line right) => !(left == right);
+
+    public override int GetHashCode()
     {
-        return left.Equals(right);
+        var hash = new HashCode();
+        hash.Add(Index);
+        hash.AddBytes(RawSpan);
+        hash.Add(Path, StringComparer.Ordinal);
+        return hash.ToHashCode();
     }
 
-    public static bool operator !=(Line left, Line right)
-    {
-        return !(left == right);
-    }
-
-    public override int GetHashCode() => HashCode.Combine(Index, string.GetHashCode(RawSpan), Path);
-
-    internal string DebuggerDisplay => $"{{ Line: '{Value}' in L{Index} {Path} }}";
+    internal string DebuggerDisplay => $"{{ Line: '{Value.ToAsciiString()}' in L{Index} {Path} }}";
 
     int IResourceSource.Position => Index;
     PositionType IResourceSource.Type => Index > 0 ? PositionType.Line : PositionType.Unknown;

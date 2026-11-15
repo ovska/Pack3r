@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.Text.RegularExpressions;
-using Pack3r.IO;
+﻿using System.Text.RegularExpressions;
 
 namespace Pack3r.Extensions;
 
@@ -55,24 +53,6 @@ public static class StringExtensions
         return true;
     }
 
-    public static bool MatchKeyword(in this Line line, string prefix, out ReadOnlyMemory<char> remainder)
-    {
-        Debug.Assert(line.Value.Span.Trim().SequenceEqual(line.Value.Span), "Line should be trimmed");
-
-        var value = line.Value.Span;
-
-        if (value.Length > prefix.Length &&
-            value.StartsWithF(prefix) &&
-            (value[prefix.Length] is ' ' or '\t'))
-        {
-            remainder = line.Value[(prefix.Length + 1)..].Trim();
-            return true;
-        }
-
-        remainder = default;
-        return false;
-    }
-
     public static ReadOnlyMemory<char> TrimQuotes(this ReadOnlyMemory<char> token)
     {
         _ = TryTrimQuotes(token, out token);
@@ -124,22 +104,8 @@ public static class StringExtensions
         return false;
     }
 
-    public static (ReadOnlyMemory<char> key, ReadOnlyMemory<char> value) ReadKeyValue(in this Line line)
-    {
-        if (TryReadKeyValue(line.Value, out var kvp))
-            return kvp;
-
-        ThrowForInvalidKVP(in line);
-        return default;
-    }
-
     public static ReadOnlyMemory<char> Slice(this ReadOnlyMemory<char> token, ValueMatch match)
     {
         return token.Slice(match.Index, match.Length);
-    }
-
-    private static void ThrowForInvalidKVP(in Line line)
-    {
-        throw new InvalidDataException($"Invalid key/value pair in {line.Path} on line {line.Index}: {line.Raw}");
     }
 }

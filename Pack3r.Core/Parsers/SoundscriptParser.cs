@@ -1,4 +1,4 @@
-﻿using Pack3r.Extensions;
+using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Models;
 
@@ -15,13 +15,17 @@ public class SoundscriptParser(
         string path,
         CancellationToken cancellationToken)
     {
+        List<Resource> resources = [];
+
         foreach (var line in reader.ReadLines(path, cancellationToken))
         {
-            if (line.MatchKeyword("sound", out var token))
+            if (line.MatchKeyword("sound"u8, out var token))
             {
-                yield return new(token, false, in line);
+                resources.Add(new Resource(token.ToQString(), isShader: false, line.ToLine()));
             }
         }
+
+        return resources;
     }
 
     public string GetRelativePath(string mapName)
