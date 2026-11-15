@@ -1,4 +1,4 @@
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Models;
 
@@ -17,11 +17,11 @@ public partial class ObjParser(
 
         foreach (var line in reader.ReadLines(asset, cancellationToken))
         {
-            ReadOnlySpan<byte> useMaterial = "usemtl "u8;
+            const string UseMaterial = "usemtl ";
 
-            if (line.HasValue && line.Value.StartsWithIgnoreCase(useMaterial))
+            if (line.HasValue && line.Value.StartsWith(UseMaterial, StringComparison.OrdinalIgnoreCase))
             {
-                QString materialName = line.Value[useMaterial.Length..].TrimWhitespace().ToQString().TrimTextureExtension();
+                QString materialName = line.Value[UseMaterial.Length..].Trim().ToQString().TrimTextureExtension();
 
                 if (!materialName.IsEmpty)
                 {

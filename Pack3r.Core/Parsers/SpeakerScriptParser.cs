@@ -1,4 +1,4 @@
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
@@ -21,9 +21,9 @@ public class SpeakerScriptParser(
 
         foreach (var line in reader.ReadLines(path, cancellationToken))
         {
-            if (line.MatchKeyword("noise"u8, out var token))
+            if (line.MatchKeyword("noise", out var token))
             {
-                QString noise = token.Trim((byte)'"').TrimWhitespace().ToQString();
+                QString noise = token.Trim('"').Trim().ToQString();
 
                 if (noise.Span.GetExtension().IsEmpty)
                 {

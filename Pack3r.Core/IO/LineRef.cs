@@ -2,38 +2,38 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Pack3r.Extensions;
+using System.Text;
 using Pack3r.Models;
 
 namespace Pack3r.IO;
 
 /// <summary>
-/// A line as ASCII bytes, pointing into the reader's buffer: valid only until the next line is read.
+/// A line of text, pointing into the reader's buffer: valid only until the next line is read.
 /// Parsers inspect it, and call <see cref="ToLine"/> only when something from the line is kept.
 /// </summary>
 public readonly ref struct LineRef
 {
     private readonly int _valueStart;
 
-    public LineRef(string path, int index, ReadOnlySpan<byte> raw, bool keepRaw)
+    public LineRef(string path, int index, ReadOnlySpan<char> raw, bool keepRaw)
     {
         Path = path;
         Index = index;
         RawSpan = raw;
 
-        ReadOnlySpan<byte> value = raw;
+        ReadOnlySpan<char> value = raw;
 
         if (!keepRaw)
         {
-            int comment = raw.IndexOf("//"u8);
-            value = (comment >= 0 ? raw[..comment] : raw).TrimWhitespace();
+            int comment = raw.IndexOf("//", StringComparison.Ordinal);
+            value = (comment >= 0 ? raw[..comment] : raw).Trim();
         }
 
         Value = value;
         _valueStart = OffsetIn(raw, value);
     }
 
-    private LineRef(string path, int index, ReadOnlySpan<byte> raw, ReadOnlySpan<byte> value)
+    private LineRef(string path, int index, ReadOnlySpan<char> raw, ReadOnlySpan<char> value)
     {
         Path = path;
         Index = index;
@@ -49,34 +49,37 @@ public readonly ref struct LineRef
     public int Index { get; }
 
     /// <summary>The line as it was in the file.</summary>
-    public ReadOnlySpan<byte> RawSpan { get; }
+    public ReadOnlySpan<char> RawSpan { get; }
 
     /// <summary>The line with comments and whitespace removed, unless read as raw.</summary>
-    public ReadOnlySpan<byte> Value { get; }
+    public ReadOnlySpan<char> Value { get; }
 
     public bool HasValue => !Value.IsEmpty;
 
-    /// <summary>First byte of <see cref="Value"/>, or 0 if it's empty.</summary>
-    public byte FirstChar => Value.IsEmpty ? (byte)0 : Value[0];
+    /// <summary>Position of <see cref="Value"/> in <see cref="RawSpan"/>.</summary>
+    internal int ValueStart => _valueStart;
+
+    /// <summary>First character of <see cref="Value"/>, or 0 if it's empty.</summary>
+    public char FirstChar => Value.IsEmpty ? '\0' : Value[0];
 
     public bool IsOpeningBrace => FirstChar == '{';
     public bool IsClosingBrace => FirstChar == '}';
 
     /// <summary>The raw line as a string, for log and error messages. Allocates.</summary>
-    public string Raw => RawSpan.ToAsciiString();
+    public string Raw => RawSpan.ToString();
 
     /// <summary>Same line with a different value, which must be a slice of <see cref="RawSpan"/>.</summary>
-    public LineRef WithValue(ReadOnlySpan<byte> value) => new(Path, Index, RawSpan, value);
+    public LineRef WithValue(ReadOnlySpan<char> value) => new(Path, Index, RawSpan, value);
 
-    /// <summary>Copies the line into an array, to keep it after the next line has been read.</summary>
-    public Line ToLine() => new(Path, Index, RawSpan.ToArray(), _valueStart, Value.Length);
+    /// <summary>Copies the line into a string, to keep it after the next line has been read.</summary>
+    public Line ToLine() => new(Path, Index, RawSpan.ToString(), _valueStart, Value.Length);
 
-    private static int OffsetIn(ReadOnlySpan<byte> raw, ReadOnlySpan<byte> value)
+    private static int OffsetIn(ReadOnlySpan<char> raw, ReadOnlySpan<char> value)
     {
         if (value.IsEmpty)
             return 0;
 
-        nint offset = Unsafe.ByteOffset(ref MemoryMarshal.GetReference(raw), ref MemoryMarshal.GetReference(value));
+        nint offset = Unsafe.ByteOffset(ref MemoryMarshal.GetReference(raw), ref MemoryMarshal.GetReference(value)) / sizeof(char);
         Debug.Assert(offset >= 0 && offset + value.Length <= raw.Length, "Value must be a slice of the raw line");
         return (int)offset;
     }
@@ -137,16 +140,18 @@ public readonly ref struct LineEnumerable
 }
 
 /// <summary>
-/// Reads lines from a stream into a buffer rented from the shared pool. Line breaks are the same as
-/// <see cref="StreamReader.ReadLine"/>: \n, \r\n and \r. Empty lines, and lines left empty without comments,
-/// are skipped, but counted in the line numbers.
+/// Reads lines from a stream into buffers rented from the shared pool: the bytes are widened from ASCII to
+/// UTF-16 as they're read, bytes outside ASCII become '?' (same as an ASCII <see cref="StreamReader"/>). Line breaks
+/// are the same as <see cref="StreamReader.ReadLine"/>: \n, \r\n and \r. Empty lines, and lines left empty
+/// without comments, are skipped, but counted in the line numbers.
 /// </summary>
 public ref struct LineEnumerator
 {
     public const int DefaultBufferSize = 64 * 1024;
 
     private Stream? _stream;
-    private byte[]? _buffer;
+    private byte[]? _bytes;
+    private char[]? _buffer;
     private int _start;
     private int _end;
     private bool _endOfStream;
@@ -163,7 +168,8 @@ public ref struct LineEnumerator
         ArgumentOutOfRangeException.ThrowIfLessThan(bufferSize, 1);
 
         _stream = stream;
-        _buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+        _bytes = ArrayPool<byte>.Shared.Rent(bufferSize);
+        _buffer = ArrayPool<char>.Shared.Rent(bufferSize);
         _path = path;
         _keepRaw = keepRaw;
         _cancellationToken = cancellationToken;
@@ -192,9 +198,9 @@ public ref struct LineEnumerator
                 _skipLineFeed = false;
             }
 
-            ReadOnlySpan<byte> available = _buffer.AsSpan(_start, _end - _start);
-            int lineEnd = available.IndexOfAny((byte)'\r', (byte)'\n');
-            ReadOnlySpan<byte> raw;
+            ReadOnlySpan<char> available = _buffer.AsSpan(_start, _end - _start);
+            int lineEnd = available.IndexOfAny('\r', '\n');
+            ReadOnlySpan<char> raw;
 
             if (lineEnd >= 0)
             {
@@ -236,10 +242,10 @@ public ref struct LineEnumerator
         }
     }
 
-    // moves the unread bytes to the start of the buffer, grows it if a line doesn't fit, and reads more
+    // moves the unread characters to the start of the buffer, grows it if a line doesn't fit, and reads more
     private void Fill()
     {
-        byte[] buffer = _buffer!;
+        char[] buffer = _buffer!;
         int unread = _end - _start;
 
         if (_start > 0)
@@ -251,18 +257,19 @@ public ref struct LineEnumerator
 
         if (_end == buffer.Length)
         {
-            byte[] larger = ArrayPool<byte>.Shared.Rent(buffer.Length * 2);
+            char[] larger = ArrayPool<char>.Shared.Rent(buffer.Length * 2);
             buffer.AsSpan(0, _end).CopyTo(larger);
-            ArrayPool<byte>.Shared.Return(buffer);
+            ArrayPool<char>.Shared.Return(buffer);
             _buffer = buffer = larger;
         }
 
-        int read = _stream!.Read(buffer, _end, buffer.Length - _end);
+        byte[] bytes = _bytes!;
+        int read = _stream!.Read(bytes, 0, Math.Min(bytes.Length, buffer.Length - _end));
 
         if (read == 0)
             _endOfStream = true;
         else
-            _end += read;
+            _end += Encoding.ASCII.GetChars(bytes, 0, read, buffer, _end);
     }
 
     public void Dispose()
@@ -271,8 +278,10 @@ public ref struct LineEnumerator
 
         if (_buffer is not null)
         {
-            ArrayPool<byte>.Shared.Return(_buffer);
+            ArrayPool<char>.Shared.Return(_buffer);
+            ArrayPool<byte>.Shared.Return(_bytes!);
             _buffer = null;
+            _bytes = null;
         }
 
         _stream?.Dispose();

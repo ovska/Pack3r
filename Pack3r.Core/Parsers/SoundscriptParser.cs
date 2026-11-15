@@ -1,4 +1,4 @@
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Models;
 
@@ -19,7 +19,7 @@ public class SoundscriptParser(
 
         foreach (var line in reader.ReadLines(path, cancellationToken))
         {
-            if (line.MatchKeyword("sound"u8, out var token))
+            if (line.MatchKeyword("sound", out var token))
             {
                 resources.Add(new Resource(token.ToQString(), isShader: false, line.ToLine()));
             }

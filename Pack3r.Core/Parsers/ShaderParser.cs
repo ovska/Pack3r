@@ -280,7 +280,7 @@ public class ShaderParser(
         State state = State.None;
 
         Shader? shader = null;
-        ReadOnlySpan<byte> token;
+        ReadOnlySpan<char> token;
         bool inComment = false;
 
         foreach (var _line in reader.ReadLines(asset, cancellationToken))
@@ -320,7 +320,7 @@ public class ShaderParser(
 
             if (state == State.None)
             {
-                ReadOnlySpan<byte> shaderName = line.Value;
+                ReadOnlySpan<char> shaderName = line.Value;
 
                 State next = State.AfterShaderName;
 
@@ -328,11 +328,11 @@ public class ShaderParser(
                 // textures/mymap/ice {
                 if (shaderName[^1] == '{')
                 {
-                    shaderName = shaderName[..^1].TrimWhitespace();
+                    shaderName = shaderName[..^1].Trim();
                     next = State.Shader;
                 }
 
-                if (shaderName.IndexOfAny((byte)'{', (byte)'}') >= 0)
+                if (shaderName.IndexOfAny('{', '}') >= 0)
                 {
                     throw new InvalidDataException(
                         $"Expected shader name on line {line.Index} in file '{asset.FullPath}', got: '{line.Raw}'");
@@ -371,10 +371,10 @@ public class ShaderParser(
                     continue;
 
                 // look up the first word, instead of trying each keyword in turn
-                ReadOnlySpan<byte> keyword = SplitKeyword(line.Value, out token, out bool hasArguments);
+                ReadOnlySpan<char> keyword = SplitKeyword(line.Value, out token, out bool hasArguments);
 
                 // implicitMap, implicitMask, implicitBlend
-                if (keyword.StartsWithIgnoreCase("implicit"u8))
+                if (keyword.StartsWith("implicit", StringComparison.OrdinalIgnoreCase))
                 {
                     if (line.Value.TryReadPastWhitespace(out token))
                     {
@@ -418,7 +418,7 @@ public class ShaderParser(
 
                     case ShaderKeyword.DevTexture when options.OnlySource:
                         if (token[0] != '$')
-                            shader.DevResources.Add(token.Trim((byte)'"').ToQPath()); // netradiant allows using doublequotes here
+                            shader.DevResources.Add(token.Trim('"').ToQPath()); // netradiant allows using doublequotes here
                         break;
 
                     case ShaderKeyword.SkyParms:
@@ -431,7 +431,7 @@ public class ShaderParser(
                         // '-' farbox means no envbox is loaded, see ParseSkyParms in tr_shader.c
                         if (!(token.Length == 1 && token[0] == '-'))
                         {
-                            string farbox = token.ToAsciiString();
+                            string farbox = token.ToString();
 
                             foreach (var suffix in _skySuffixes)
                             {
@@ -478,12 +478,12 @@ public class ShaderParser(
                     continue;
                 }
 
-                ReadOnlySpan<byte> stageKeyword = SplitKeyword(line.Value, out token, out bool stageHasArguments);
+                ReadOnlySpan<char> stageKeyword = SplitKeyword(line.Value, out token, out bool stageHasArguments);
 
                 if (!stageHasArguments)
                     continue;
 
-                if (stageKeyword.EqualsIgnoreCase("map"u8) || stageKeyword.EqualsIgnoreCase("clampMap"u8))
+                if (stageKeyword.Equals("map", StringComparison.OrdinalIgnoreCase) || stageKeyword.Equals("clampMap", StringComparison.OrdinalIgnoreCase))
                 {
                     // $lightmap, $whiteimage etc
                     if (token[0] != '$')
@@ -495,14 +495,14 @@ public class ShaderParser(
                         shader.ForcePk3Include = true;
                     }
                 }
-                else if (stageKeyword.EqualsIgnoreCase("animMap"u8))
+                else if (stageKeyword.Equals("animMap", StringComparison.OrdinalIgnoreCase))
                 {
                     // read past the frames-agument
                     if (token.TryReadPastWhitespace(out token))
                     {
                         foreach (var frame in token.EnumerateTokens())
                         {
-                            ReadOnlySpan<byte> value = frame.TrimQuotes().TrimWhitespace();
+                            ReadOnlySpan<char> value = frame.TrimQuotes().Trim();
 
                             if (!value.IsEmpty)
                             {
@@ -515,7 +515,7 @@ public class ShaderParser(
                         logger.UnparsableKeyword(asset.FullPath, line.Index, "animMap", line.Raw);
                     }
                 }
-                else if (stageKeyword.EqualsIgnoreCase("videomap"u8))
+                else if (stageKeyword.Equals("videomap", StringComparison.OrdinalIgnoreCase))
                 {
                     shader.Resources.Add(token.ToQPath());
                 }
@@ -540,7 +540,7 @@ public class ShaderParser(
     {
         if (line.Value.Length > 1)
         {
-            line = line.WithValue(line.Value[1..].TrimWhitespace());
+            line = line.WithValue(line.Value[1..].Trim());
             return true;
         }
 
@@ -551,15 +551,15 @@ public class ShaderParser(
 
     /// <summary>
     /// Splits a trimmed line into its first word and the rest, trimmed. Same as
-    /// <see cref="AsciiExtensions.MatchKeyword"/>: the keyword must be followed by a space or a tab.
+    /// <see cref="LineExtensions.MatchKeyword"/>: the keyword must be followed by a space or a tab.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ReadOnlySpan<byte> SplitKeyword(
-        ReadOnlySpan<byte> value,
-        out ReadOnlySpan<byte> arguments,
+    private static ReadOnlySpan<char> SplitKeyword(
+        ReadOnlySpan<char> value,
+        out ReadOnlySpan<char> arguments,
         out bool hasArguments)
     {
-        int separator = value.IndexOfAny((byte)' ', (byte)'\t');
+        int separator = value.IndexOfAny(' ', '\t');
 
         if (separator < 0)
         {
@@ -568,28 +568,13 @@ public class ShaderParser(
             return value;
         }
 
-        arguments = value[(separator + 1)..].TrimWhitespace();
+        arguments = value[(separator + 1)..].Trim();
         hasArguments = true;
         return value[..separator];
     }
 
-    /// <summary>
-    /// Looks up a keyword without creating a string: it's decoded on the stack, and anything longer than the
-    /// longest keyword isn't one.
-    /// </summary>
-    private static bool TryGetKeyword(ReadOnlySpan<byte> keyword, out ShaderKeyword kind)
-    {
-        const int MaxKeywordLength = 32;
-
-        if (keyword.Length > MaxKeywordLength)
-        {
-            kind = default;
-            return false;
-        }
-
-        Span<char> chars = stackalloc char[MaxKeywordLength];
-        return _shaderKeywords.TryGetValue(keyword.ToChars(chars), out kind);
-    }
+    private static bool TryGetKeyword(ReadOnlySpan<char> keyword, out ShaderKeyword kind)
+        => _shaderKeywords.TryGetValue(keyword, out kind);
 
     private enum ShaderKeyword : byte
     {
@@ -628,15 +613,15 @@ public class ShaderParser(
         .GetAlternateLookup<ReadOnlySpan<char>>();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool CanSkipShaderDirective(ReadOnlySpan<byte> line)
+    private bool CanSkipShaderDirective(ReadOnlySpan<char> line)
     {
         return (line[0] | 0x20) switch
         {
-            'q' => !options.OnlySource && line.StartsWithIgnoreCase("qer_"u8),
-            's' => line.StartsWithIgnoreCase("surfaceparm"u8) || line.StartsWithIgnoreCase("sort"u8),
-            'c' => line.StartsWithIgnoreCase("cull"u8),
-            'n' => line.StartsWithIgnoreCase("nopicmip"u8) || line.StartsWithIgnoreCase("nomipmaps"u8),
-            't' => line.StartsWithIgnoreCase("tesssize"u8),
+            'q' => !options.OnlySource && line.StartsWith("qer_", StringComparison.OrdinalIgnoreCase),
+            's' => line.StartsWith("surfaceparm", StringComparison.OrdinalIgnoreCase) || line.StartsWith("sort", StringComparison.OrdinalIgnoreCase),
+            'c' => line.StartsWith("cull", StringComparison.OrdinalIgnoreCase),
+            'n' => line.StartsWith("nopicmip", StringComparison.OrdinalIgnoreCase) || line.StartsWith("nomipmaps", StringComparison.OrdinalIgnoreCase),
+            't' => line.StartsWith("tesssize", StringComparison.OrdinalIgnoreCase),
             _ => false,
         };
     }

@@ -1,5 +1,4 @@
-using System.Text;
-using Pack3r.Extensions;
+﻿using System.Text;
 using Pack3r.IO;
 
 namespace Pack3r.Tests;
@@ -70,7 +69,7 @@ public class LineReaderTests
         {
             int number = (i + 1) * 100 - 1;
             Assert.Equal((i + 1) * 100, kept[i].Index);
-            Assert.Equal($"line {number}", kept[i].Value.ToAsciiString());
+            Assert.Equal($"line {number}", kept[i].Value.ToString());
             Assert.Equal($"line {number} // comment", kept[i].Raw);
         }
     }
@@ -113,6 +112,6 @@ public class LineReaderTests
         return lines;
     }
 
-    private static string Describe(int index, ReadOnlySpan<byte> raw, ReadOnlySpan<byte> value, byte firstChar)
-        => $"{index}|{raw.ToAsciiString()}|{value.ToAsciiString()}|{(firstChar > 127 ? '?' : (char)firstChar)}";
+    private static string Describe(int index, ReadOnlySpan<char> raw, ReadOnlySpan<char> value, char firstChar)
+        => $"{index}|{raw}|{value}|{firstChar}";
 }

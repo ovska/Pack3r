@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -34,7 +34,7 @@ public class MapscriptParser(
             {
                 resources.Add(resource);
             }
-            else if (line.Value.EqualsIgnoreCase("set"u8) || line.Value.EqualsIgnoreCase("create"u8))
+            else if (line.Value.Equals("set", StringComparison.OrdinalIgnoreCase) || line.Value.Equals("create", StringComparison.OrdinalIgnoreCase))
             {
                 // keywords that aren't parsed for resources
                 unsupported.Add(line.Value.ToQString());
@@ -56,9 +56,9 @@ public class MapscriptParser(
 
         if (tokens.MoveNext())
         {
-            ReadOnlySpan<byte> keyword = tokens.Current;
+            ReadOnlySpan<char> keyword = tokens.Current;
 
-            if (keyword.EqualsIgnoreCase("playsound"u8))
+            if (keyword.Equals("playsound", StringComparison.OrdinalIgnoreCase))
             {
                 // first token is the sound file
                 if (tokens.MoveNext())
@@ -67,7 +67,7 @@ public class MapscriptParser(
                     return true;
                 }
             }
-            else if (keyword.EqualsIgnoreCase("remapshader"u8))
+            else if (keyword.Equals("remapshader", StringComparison.OrdinalIgnoreCase))
             {
                 // second token is the target shader
                 if (tokens.MoveNext() && tokens.MoveNext())
@@ -76,7 +76,7 @@ public class MapscriptParser(
                     return true;
                 }
             }
-            else if (keyword.EqualsIgnoreCase("changemodel"u8) || keyword.EqualsIgnoreCase("changeskin"u8))
+            else if (keyword.Equals("changemodel", StringComparison.OrdinalIgnoreCase) || keyword.Equals("changeskin", StringComparison.OrdinalIgnoreCase))
             {
                 // first token is the skin/model
                 if (tokens.MoveNext())

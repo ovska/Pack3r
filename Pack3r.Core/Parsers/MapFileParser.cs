@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Text;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -25,7 +24,7 @@ public class MapFileParser(
         CancellationToken cancellationToken)
     {
         State state = State.None;
-        byte expect = 0;
+        char expect = '\0';
 
         // only the keys that are turned into resources, see IsResourceKey
         Dictionary<QString, (QString value, Line line)> entitydata = new(QString.Comparer);
@@ -37,9 +36,9 @@ public class MapFileParser(
         Dictionary<Resource, List<ReferenceMiscModel>> miscModels = [];
 
         // checked but never kept, so copied into reused buffers instead of creating strings
-        var currentEntity = new ByteBuffer();
-        var className = new ByteBuffer();
-        var previousTexture = new ByteBuffer();
+        var currentEntity = new CharBuffer();
+        var className = new CharBuffer();
+        var previousTexture = new CharBuffer();
         bool hasTerrain = false;
         bool hasStyleLights = false;
 
@@ -52,17 +51,17 @@ public class MapFileParser(
         {
             lineCount = line.Index;
 
-            if (line.RawSpan.StartsWith("//@$&"u8))
+            if (line.RawSpan.StartsWith("//@$&", StringComparison.Ordinal))
             {
                 // layers feature from netradiant-custom commit 1599d0a
                 continue;
             }
 
-            if (expect != 0)
+            if (expect != '\0')
             {
                 if (line.FirstChar == expect)
                 {
-                    expect = 0;
+                    expect = '\0';
                     continue;
                 }
 
@@ -97,11 +96,11 @@ public class MapFileParser(
 
             if (state == State.None)
             {
-                if (line.RawSpan.StartsWith("// entity "u8))
+                if (line.RawSpan.StartsWith("// entity ", StringComparison.Ordinal))
                 {
                     currentEntity.Set(line.Value["// entity ".Length..]);
                     state = State.Entity;
-                    expect = (byte)'{';
+                    expect = '{';
                     continue;
                 }
                 else
@@ -115,18 +114,18 @@ public class MapFileParser(
 
             if (state == State.Entity)
             {
-                if (line.FirstChar is (byte)'/' or (byte)'{')
+                if (line.FirstChar is '/' or '{')
                     continue;
 
                 if (line.FirstChar == '"')
                 {
                     line.ReadKeyValue(out var key, out var value);
 
-                    if (key.EqualsIgnoreCase("classname"u8))
+                    if (key.Equals("classname", StringComparison.OrdinalIgnoreCase))
                     {
                         className.Set(value);
                     }
-                    else if (key.EqualsIgnoreCase("terrain"u8))
+                    else if (key.Equals("terrain", StringComparison.OrdinalIgnoreCase))
                     {
                         hasTerrain = true;
                     }
@@ -137,19 +136,19 @@ public class MapFileParser(
                 }
                 else if (line.FirstChar == 'b')
                 {
-                    if (line.RawSpan.SequenceEqual("brushDef"u8))
+                    if (line.RawSpan.SequenceEqual("brushDef"))
                     {
                         state = State.BrushDef;
-                        expect = (byte)'{';
+                        expect = '{';
                         continue;
                     }
                 }
                 else if (line.FirstChar == 'p')
                 {
-                    if (line.RawSpan.SequenceEqual("patchDef2"u8))
+                    if (line.RawSpan.SequenceEqual("patchDef2"))
                     {
                         state = State.PatchDef;
-                        expect = (byte)'{';
+                        expect = '{';
                         continue;
                     }
                 }
@@ -159,8 +158,8 @@ public class MapFileParser(
 
             if (state == State.BrushDef)
             {
-                ReadOnlySpan<byte> raw = line.RawSpan;
-                int lastParen = raw.LastIndexOf((byte)')');
+                ReadOnlySpan<char> raw = line.RawSpan;
+                int lastParen = raw.LastIndexOf(')');
 
                 if (lastParen + 2 > raw.Length)
                 {
@@ -168,11 +167,11 @@ public class MapFileParser(
                     throw new ControlledException();
                 }
 
-                ReadOnlySpan<byte> shaderPart = raw[(lastParen + 2)..];
+                ReadOnlySpan<char> shaderPart = raw[(lastParen + 2)..];
 
                 if (!CanSkip(shaderPart))
                 {
-                    int space = shaderPart.IndexOf((byte)' ');
+                    int space = shaderPart.IndexOf(' ');
 
                     if (space > 1)
                     {
@@ -191,7 +190,7 @@ public class MapFileParser(
             if (state == State.PatchDef)
             {
                 // skip patch cruft
-                if (line.FirstChar is (byte)'(' or (byte)')')
+                if (line.FirstChar is '(' or ')')
                 {
                     continue;
                 }
@@ -218,7 +217,7 @@ public class MapFileParser(
             HasStyleLights = hasStyleLights,
         };
 
-        void AddTexture(in LineRef line, ReadOnlySpan<byte> value)
+        void AddTexture(in LineRef line, ReadOnlySpan<char> value)
         {
             // most faces have the same texture as the one before (85% on a real map), so skip those.
             // ordinal, as a map writes the same name the same way; a different casing just goes to the
@@ -228,13 +227,10 @@ public class MapFileParser(
 
             previousTexture.Set(value);
 
-            // decoded on the stack for the lookup; a string is only created for a texture not seen before
-            Span<char> chars = stackalloc char[256];
-            ReadOnlySpan<char> name = value.ToChars(chars);
-
-            if (textureLookup.Add(name))
+            // a string is only created for a texture not seen before
+            if (textureLookup.Add(value))
             {
-                shaders.Add(Resource.Shader($"textures/{name}", line.ToLine()));
+                shaders.Add(Resource.Shader($"textures/{value}", line.ToLine()));
             }
         }
 
@@ -258,7 +254,7 @@ public class MapFileParser(
                 {
                     if (key.Length == 5)
                     {
-                        bool isMiscModel = className.EqualsIgnoreCase("misc_model"u8);
+                        bool isMiscModel = className.Span.Equals("misc_model", StringComparison.OrdinalIgnoreCase);
                         var res = new Resource(value, isShader: false, in line, sourceOnly: isMiscModel);
 
                         if (options.OnlySource || !isMiscModel)
@@ -285,7 +281,7 @@ public class MapFileParser(
                     resources.Add(res);
                     referenceResources.Add(res);
                 }
-                else if (key.EqualsF("noise") || (key.EqualsF("sound") && className.EqualsIgnoreCase("dlight"u8)))
+                else if (key.EqualsF("noise") || (key.EqualsF("sound") && className.Span.Equals("dlight", StringComparison.OrdinalIgnoreCase)))
                 {
                     if (!value.Span.EqualsF("NOSOUND"))
                         resources.Add(Resource.File(value, in line));
@@ -314,7 +310,7 @@ public class MapFileParser(
                 {
                     shaders.Add(Resource.Shader(value, in line));
                 }
-                else if (!hasStyleLights && key.EqualsF("style") && className.EqualsIgnoreCase("light"u8))
+                else if (!hasStyleLights && key.EqualsF("style") && className.Span.Equals("light", StringComparison.OrdinalIgnoreCase))
                 {
                     hasStyleLights = true;
                 }
@@ -331,40 +327,40 @@ public class MapFileParser(
     /// Whether the entity key is used by <c>HandleKeysAndClear</c> or <see cref="ReferenceMiscModel"/>, others
     /// (origin, angle, targetname etc.) are never turned into strings.
     /// </summary>
-    private static bool IsResourceKey(ReadOnlySpan<byte> key)
+    private static bool IsResourceKey(ReadOnlySpan<char> key)
     {
-        return key.StartsWithIgnoreCase("model"u8)
-            || key.StartsWithIgnoreCase("_remap"u8)
-            || key.StartsWithIgnoreCase("targetShader"u8)
-            || key.EqualsIgnoreCase("shader"u8)
-            || key.EqualsIgnoreCase("noise"u8)
-            || key.EqualsIgnoreCase("sound"u8)
-            || key.EqualsIgnoreCase("skin"u8)
-            || key.EqualsIgnoreCase("_skin"u8)
-            || key.EqualsIgnoreCase("_fog"u8)
-            || key.EqualsIgnoreCase("_celshader"u8)
-            || key.EqualsIgnoreCase("sun"u8)
-            || key.EqualsIgnoreCase("style"u8);
+        return key.StartsWith("model", StringComparison.OrdinalIgnoreCase)
+            || key.StartsWith("_remap", StringComparison.OrdinalIgnoreCase)
+            || key.StartsWith("targetShader", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("shader", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("noise", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("sound", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("skin", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("_skin", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("_fog", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("_celshader", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("sun", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("style", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
     /// Whether the shader is one of the most common ones and should be skipped.
     /// </summary>
     /// <param name="span"><c>pgm/holo 0 0 0</c></param>
-    private static bool CanSkip(ReadOnlySpan<byte> span)
+    private static bool CanSkip(ReadOnlySpan<char> span)
     {
         if (span.Length > 12 &&
             span[0] == 'c' &&
             span[6] == '/' &&
-            span.StartsWith("common/"u8))
+            span.StartsWith("common/", StringComparison.Ordinal))
         {
             span = span["common/".Length..];
 
             return span[0] switch
             {
-                (byte)'c' when span.StartsWith("caulk "u8) => true,
-                (byte)'n' when span.StartsWith("nodraw "u8) => true,
-                (byte)'t' when span.StartsWith("trigger "u8) => true,
+                'c' when span.StartsWith("caulk ", StringComparison.Ordinal) => true,
+                'n' when span.StartsWith("nodraw ", StringComparison.Ordinal) => true,
+                't' when span.StartsWith("trigger ", StringComparison.Ordinal) => true,
                 _ => false
             };
         }
@@ -373,25 +369,23 @@ public class MapFileParser(
     }
 
     /// <summary>A reused buffer for a value that's only compared, not kept.</summary>
-    private sealed class ByteBuffer
+    private sealed class CharBuffer
     {
-        private byte[] _buffer = new byte[64];
+        private char[] _buffer = new char[64];
         private int _length;
 
-        public ReadOnlySpan<byte> Span => _buffer.AsSpan(0, _length);
+        public ReadOnlySpan<char> Span => _buffer.AsSpan(0, _length);
 
-        public void Set(ReadOnlySpan<byte> value)
+        public void Set(ReadOnlySpan<char> value)
         {
             if (value.Length > _buffer.Length)
-                _buffer = new byte[Math.Max(value.Length, _buffer.Length * 2)];
+                _buffer = new char[Math.Max(value.Length, _buffer.Length * 2)];
 
             value.CopyTo(_buffer);
             _length = value.Length;
         }
 
         public void Clear() => _length = 0;
-
-        public bool EqualsIgnoreCase(ReadOnlySpan<byte> other) => Ascii.EqualsIgnoreCase(Span, other);
     }
 }
 

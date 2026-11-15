@@ -1,4 +1,4 @@
-using Pack3r.Extensions;
+﻿using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Models;
 
@@ -16,11 +16,11 @@ public class SkinParser(ILineReader reader) : IReferenceParser
 
         foreach (var line in reader.ReadLines(asset, cancellationToken))
         {
-            int comma = line.Value.IndexOf((byte)',');
+            int comma = line.Value.IndexOf(',');
 
             if (comma >= 0)
             {
-                var value = line.Value[(comma + 1)..].TrimWhitespace().Trim((byte)'"');
+                var value = line.Value[(comma + 1)..].Trim().Trim('"');
                 result.Add(new Resource(value.ToQString(), isShader: true, line.ToLine()));
             }
         }
