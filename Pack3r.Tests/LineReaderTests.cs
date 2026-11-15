@@ -1,16 +1,13 @@
 using System.Text;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r.Tests;
 
-public sealed class LineReaderTests : IDisposable
+public class LineReaderTests
 {
-    private readonly string _path = Path.Combine(Directory.CreateTempSubdirectory("pack3r_lines_").FullName, "test.shader");
-
-    public void Dispose() => Directory.Delete(Path.GetDirectoryName(_path)!, recursive: true);
-
-    public static TheoryData<string> Contents => new()
-    {
+    private static readonly string[] Contents =
+    [
         "",
         "single line without newline",
         "unix\nline\nendings\n",
@@ -20,49 +17,102 @@ public sealed class LineReaderTests : IDisposable
         "  // comment only\n\ttextures/foo // trailing comment\n   \n{\n\tmap $lightmap\n}\n",
         "non-ascii äö bytes\n",
         "﻿bom at start\nsecond\n",
-    };
+        "a very long line " + new string('x', 200) + "\r\nshort\r\n" + new string('y', 150),
+    ];
 
-    [Theory]
-    [MemberData(nameof(Contents))]
-    public void Whole_File_And_Streaming_Should_Read_The_Same_Lines(string content)
+    public static TheoryData<string, int> ContentsAndBufferSizes()
     {
-        File.WriteAllText(_path, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var data = new TheoryData<string, int>();
 
-        var whole = new FSLineReader();
-        var streaming = new FSLineReader { WholeFileThreshold = -1 };
+        foreach (var content in Contents)
+            foreach (int size in new[] { 1, 2, 3, 7, 64, LineEnumerator.DefaultBufferSize })
+                data.Add(content, size);
 
-        Assert.Equal(Describe(streaming.ReadLines(_path, default)), Describe(whole.ReadLines(_path, default)));
-        Assert.Equal(Describe(streaming.ReadRawLines(_path)), Describe(whole.ReadRawLines(_path)));
+        return data;
+    }
+
+    /// <summary>
+    /// Every line break position, \r\n split across reads, and lines longer than the buffer: the result must be the
+    /// same as reading the file with an ASCII StreamReader, as before.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(ContentsAndBufferSizes))]
+    public void Should_Read_Same_Lines_As_StreamReader(string content, int bufferSize)
+    {
+        byte[] bytes = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(content);
+
+        foreach (bool keepRaw in new[] { false, true })
+        {
+            List<string> actual = [];
+
+            foreach (var line in LineEnumerable.FromStream(new MemoryStream(bytes), "test", keepRaw, default, bufferSize))
+                actual.Add(Describe(line.Index, line.RawSpan, line.Value, line.FirstChar));
+
+            Assert.Equal(Expected(bytes, keepRaw), actual);
+        }
     }
 
     [Fact]
-    public void Should_Read_Past_Stale_Length()
+    public void Should_Keep_Line_After_Buffer_Is_Reused()
     {
-        // FileAsset's length comes from when the directory was listed; the file may have grown since
-        File.WriteAllText(_path, "a\nb\n");
-        var info = new FileInfo(_path);
-        _ = info.Length;
-        File.WriteAllText(_path, string.Concat(Enumerable.Range(0, 10_000).Select(i => $"line {i}\n")));
+        byte[] bytes = Encoding.ASCII.GetBytes(string.Concat(Enumerable.Range(0, 1000).Select(i => $"line {i} // comment\n")));
+        List<Line> kept = [];
 
-        var lines = new FSLineReader().ReadLines(new MockFileAsset(info), default).ToList();
+        foreach (var line in LineEnumerable.FromStream(new MemoryStream(bytes), "test", keepRaw: false, default, bufferSize: 16))
+        {
+            if (line.Index % 100 == 0)
+                kept.Add(line.ToLine());
+        }
 
-        Assert.Equal(10_000, lines.Count);
-        Assert.Equal("line 9999", lines[^1].Value.ToString());
+        Assert.Equal(10, kept.Count);
+
+        for (int i = 0; i < kept.Count; i++)
+        {
+            int number = (i + 1) * 100 - 1;
+            Assert.Equal((i + 1) * 100, kept[i].Index);
+            Assert.Equal($"line {number}", kept[i].Value.ToAsciiString());
+            Assert.Equal($"line {number} // comment", kept[i].Raw);
+        }
     }
 
-    private static List<string> Describe(IEnumerable<Line> lines)
+    [Fact]
+    public void Should_Stop_When_Canceled()
     {
-        return [.. lines.Select(l => $"{l.Index}|{l.Raw}|{l.Value}|{l.FirstChar}")];
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+        {
+            foreach (var _ in LineEnumerable.FromStream(new MemoryStream("a\nb\n"u8.ToArray()), "test", false, cts.Token))
+            {
+            }
+        });
     }
 
-    private sealed class MockFileAsset(FileInfo file) : Pack3r.Models.IAsset
+    // the old reader: StreamReader with ASCII, skipping empty lines, comments and whitespace removed unless raw
+    private static List<string> Expected(byte[] bytes, bool keepRaw)
     {
-        public string Name => file.Name;
-        public string FullPath => file.FullName;
-        public AssetSource Source => null!;
-        public long Length => file.Length;
-        public Stream OpenRead() => File.OpenRead(file.FullName);
-        public System.Buffers.IMemoryOwner<byte> GetBytes(int? sizeHint, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public void AddTo(Pk3Writer writer, string? archivePath = null, Action<Stream, Stream>? transform = null) => throw new NotSupportedException();
+        using var reader = new StreamReader(new MemoryStream(bytes), Encoding.ASCII, detectEncodingFromByteOrderMarks: false);
+        List<string> lines = [];
+        string? text;
+        int index = 0;
+
+        while ((text = reader.ReadLine()) is not null)
+        {
+            index++;
+
+            if (text.Length == 0)
+                continue;
+
+            string value = keepRaw ? text : (text.Contains("//") ? text[..text.IndexOf("//")] : text).Trim();
+
+            if (value.Length > 0)
+                lines.Add($"{index}|{text}|{value}|{value[0]}");
+        }
+
+        return lines;
     }
+
+    private static string Describe(int index, ReadOnlySpan<byte> raw, ReadOnlySpan<byte> value, byte firstChar)
+        => $"{index}|{raw.ToAsciiString()}|{value.ToAsciiString()}|{(firstChar > 127 ? '?' : (char)firstChar)}";
 }

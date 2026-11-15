@@ -1,4 +1,5 @@
-﻿using Pack3r.Extensions;
+﻿using System.Text;
+using Pack3r.Extensions;
 using Pack3r.IO;
 
 namespace Pack3r.Tests.ExtensionTests;
@@ -18,16 +19,16 @@ public static class MemoryTests
     [InlineData("animmap a.tga b.tga c.tga", "animMap", "a.tga b.tga c.tga")]
     public static void Should_Match_Keyword(string input, string keyword, string? remainder)
     {
-        var line = new Line("", 1, input, keepRaw: false);
+        var line = new LineRef("", 1, Encoding.ASCII.GetBytes(input), keepRaw: false);
 
         if (remainder is not null)
         {
-            Assert.True(line.MatchKeyword(keyword, out var rem));
-            Assert.Equal(remainder, rem.ToString());
+            Assert.True(line.MatchKeyword(Encoding.ASCII.GetBytes(keyword), out var rem));
+            Assert.Equal(remainder, rem.ToAsciiString());
         }
         else
         {
-            Assert.False(line.MatchKeyword(keyword, out _));
+            Assert.False(line.MatchKeyword(Encoding.ASCII.GetBytes(keyword), out _));
         }
     }
 
@@ -78,9 +79,9 @@ public static class MemoryTests
     [InlineData("\"classname\" \"info_player_deathmatch\"", "classname", "info_player_deathmatch")]
     public static void Should_Parse_Key_And_Value(string input, string key, string value)
     {
-        var (k, v) = new Line(input, 1, input, true).ReadKeyValue();
-        Assert.Equal(key, k.ToString());
-        Assert.Equal(value, v.ToString());
+        new LineRef(input, 1, Encoding.ASCII.GetBytes(input), true).ReadKeyValue(out var k, out var v);
+        Assert.Equal(key, k.ToAsciiString());
+        Assert.Equal(value, v.ToAsciiString());
     }
 
     [Theory]

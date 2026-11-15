@@ -1,4 +1,4 @@
-﻿using Pack3r.Extensions;
+using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
 using Pack3r.Models;
@@ -17,23 +17,27 @@ public class SpeakerScriptParser(
         string path,
         CancellationToken cancellationToken)
     {
+        List<Resource> resources = [];
+
         foreach (var line in reader.ReadLines(path, cancellationToken))
         {
-            if (line.MatchKeyword("noise", out var token))
+            if (line.MatchKeyword("noise"u8, out var token))
             {
-                var noise = token.Trim('"').Trim();
+                QString noise = token.Trim((byte)'"').TrimWhitespace().ToQString();
 
-                if (noise.GetExtension().IsEmpty)
+                if (noise.Span.GetExtension().IsEmpty)
                 {
                     logger.Warn(
                         $"Speakerscript has a missing file extension on line {line.Index}: '{noise}' (will not work on 2.60b)");
                 }
                 else
                 {
-                    yield return new(noise, isShader: false, in line);
+                    resources.Add(new Resource(noise, isShader: false, line.ToLine()));
                 }
             }
         }
+
+        return resources;
     }
 
     public string GetRelativePath(string mapName)

@@ -1,27 +1,27 @@
-﻿using Pack3r.Models;
+using Pack3r.Models;
 
 namespace Pack3r.IO;
 
 /// <summary>
-/// Reads text files line by line. Synchronous: the parsers run on thread pool threads in parallel loops, so
-/// async reads would only add overhead per line.
+/// Reads text files as lines of ASCII bytes, see <see cref="LineRef"/>. A line is only valid until the next one
+/// is read; keep what's needed with <see cref="LineRef.ToLine"/> or by converting values to strings.
 /// </summary>
 public interface ILineReader
 {
     /// <summary>
     /// Reads the non-empty lines of a file as is, without removing comments or whitespace.
     /// </summary>
-    IEnumerable<Line> ReadRawLines(string path);
+    LineEnumerable ReadRawLines(string path);
 
     /// <summary>
     /// Reads the lines of a file with comments and whitespace removed, skipping lines that are left empty.
     /// </summary>
-    IEnumerable<Line> ReadLines(
+    LineEnumerable ReadLines(
         string path,
         CancellationToken cancellationToken);
 
     /// <inheritdoc cref="ReadLines(string, CancellationToken)"/>
-    IEnumerable<Line> ReadLines(
+    LineEnumerable ReadLines(
         IAsset asset,
         CancellationToken cancellationToken);
 }

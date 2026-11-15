@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using Pack3r.Extensions;
 using Pack3r.IO;
 using Pack3r.Logging;
@@ -19,6 +19,7 @@ public class MapscriptParser(
         string path,
         CancellationToken cancellationToken)
     {
+        List<Resource> resources = [];
         HashSet<QString> unsupported = [];
 
         foreach (var line in reader.ReadLines(path, cancellationToken))
@@ -31,11 +32,12 @@ public class MapscriptParser(
 
             if (TryRead(in line, out Resource? resource))
             {
-                yield return resource;
+                resources.Add(resource);
             }
-            else if (Tokens.UnsupportedMapscript().IsMatch(line.Value.Span))
+            else if (line.Value.EqualsIgnoreCase("set"u8) || line.Value.EqualsIgnoreCase("create"u8))
             {
-                unsupported.Add(line.Value);
+                // keywords that aren't parsed for resources
+                unsupported.Add(line.Value.ToQString());
             }
         }
 
@@ -44,41 +46,42 @@ public class MapscriptParser(
             var keywords = string.Join(", ", unsupported.Select(l => $"'{l}'"));
             logger.Warn($"Mapscript has keyword(s) ({keywords}) that can include un-discoverable resources such as dynamically loaded models, please manually ensure they are included");
         }
+
+        return resources;
     }
 
-    private static bool TryRead(in Line line, [NotNullWhen(true)] out Resource? resource)
+    private static bool TryRead(in LineRef line, [NotNullWhen(true)] out Resource? resource)
     {
-        var enumerator = Tokens.WhitespaceSeparatedTokens().EnumerateMatches(line.Value.Span);
+        var tokens = line.Value.EnumerateTokens();
 
-        if (enumerator.MoveNext())
+        if (tokens.MoveNext())
         {
-            var keyword = line.Value.Slice(enumerator.Current).Span;
+            ReadOnlySpan<byte> keyword = tokens.Current;
 
-            if (keyword.EqualsF("playsound"))
+            if (keyword.EqualsIgnoreCase("playsound"u8))
             {
                 // first token is the sound file
-                if (enumerator.MoveNext())
+                if (tokens.MoveNext())
                 {
-                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), isShader: false, in line);
+                    resource = new Resource(tokens.Current.TrimQuotes().ToQString(), isShader: false, line.ToLine());
                     return true;
                 }
-
             }
-            else if (keyword.EqualsF("remapshader"))
+            else if (keyword.EqualsIgnoreCase("remapshader"u8))
             {
                 // second token is the target shader
-                if (enumerator.MoveNext() && enumerator.MoveNext())
+                if (tokens.MoveNext() && tokens.MoveNext())
                 {
-                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), isShader: true, in line);
+                    resource = new Resource(tokens.Current.TrimQuotes().ToQString(), isShader: true, line.ToLine());
                     return true;
                 }
             }
-            else if (keyword.EqualsF("changemodel") || keyword.EqualsF("changeskin"))
+            else if (keyword.EqualsIgnoreCase("changemodel"u8) || keyword.EqualsIgnoreCase("changeskin"u8))
             {
                 // first token is the skin/model
-                if (enumerator.MoveNext())
+                if (tokens.MoveNext())
                 {
-                    resource = new Resource(line.Value.Slice(enumerator.Current).TrimQuotes(), isShader: false, in line)
+                    resource = new Resource(tokens.Current.TrimQuotes().ToQString(), isShader: false, line.ToLine())
                     {
                         CanReferenceResources = true
                     };
