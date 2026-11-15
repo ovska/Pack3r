@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Pack3r.IO;
 using Pack3r.Models;
 
@@ -12,8 +12,8 @@ internal sealed class StringLineReader(string data) : ILineReader
     public LineEnumerable ReadLines(IAsset asset, CancellationToken cancellationToken)
         => Read(asset.FullPath, keepRaw: false, cancellationToken);
 
-    public LineEnumerable ReadRawLines(string path)
-        => Read(path, keepRaw: true, default);
+    public LineEnumerable ReadRawLines(string path, CancellationToken cancellationToken)
+        => Read(path, keepRaw: true, cancellationToken);
 
     private LineEnumerable Read(string path, bool keepRaw, CancellationToken cancellationToken)
         => LineEnumerable.FromStream(new MemoryStream(Encoding.ASCII.GetBytes(data)), path, keepRaw, cancellationToken);

@@ -1,4 +1,4 @@
-using Pack3r.Models;
+﻿using Pack3r.Models;
 
 namespace Pack3r.IO;
 
@@ -11,7 +11,9 @@ public interface ILineReader
     /// <summary>
     /// Reads the non-empty lines of a file as is, without removing comments or whitespace.
     /// </summary>
-    LineEnumerable ReadRawLines(string path);
+    LineEnumerable ReadRawLines(
+        string path,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Reads the lines of a file with comments and whitespace removed, skipping lines that are left empty.

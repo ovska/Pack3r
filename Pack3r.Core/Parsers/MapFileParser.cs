@@ -48,7 +48,7 @@ public class MapFileParser(
         int lineCount = 0;
         var timer = Stopwatch.StartNew();
 
-        foreach (var line in reader.ReadRawLines(path))
+        foreach (var line in reader.ReadRawLines(path, cancellationToken))
         {
             lineCount = line.Index;
 
@@ -110,8 +110,6 @@ public class MapFileParser(
                     throw new ControlledException();
                 }
             }
-
-            cancellationToken.ThrowIfCancellationRequested();
 
             if (state == State.Entity)
             {
