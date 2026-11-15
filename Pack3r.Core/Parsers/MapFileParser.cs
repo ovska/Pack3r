@@ -20,6 +20,8 @@ public class MapFileParser(
     PackOptions options)
     : IMapFileParser
 {
+    private const string TexturesPrefix = "textures/";
+
     public MapAssets ParseMapAssets(
         string path,
         CancellationToken cancellationToken)
@@ -29,8 +31,8 @@ public class MapFileParser(
 
         // only the keys that are turned into resources, see IsResourceKey
         Dictionary<QString, (QString value, Line line)> entitydata = new(QString.Comparer);
-        HashSet<QString> nonPrefixedShaders = new(QString.Comparer);
-        var textureLookup = nonPrefixedShaders.GetAlternateLookup<ReadOnlySpan<char>>();
+        HashSet<QString> nonPrefixedShaders = new(AsciiIgnoreCaseComparer.Instance);
+        var textureLookup = nonPrefixedShaders.GetAlternateLookup<ReadOnlySpan<byte>>();
         ResourceList shaders = [];
         ResourceList resources = [];
         ResourceList referenceResources = [];
@@ -226,14 +228,19 @@ public class MapFileParser(
 
             previousTexture.Set(value);
 
-            // decoded on the stack for the lookup; a string is only created for a texture not seen before
-            Span<char> chars = stackalloc char[256];
-            ReadOnlySpan<char> name = value.ToChars(chars);
+            // looked up by the bytes; a string is only created for a texture not seen before
+            if (textureLookup.Contains(value))
+                return;
 
-            if (textureLookup.Add(name))
+            string shader = string.Create(TexturesPrefix.Length + value.Length, value, static (chars, bytes) =>
             {
-                shaders.Add(Resource.Shader($"textures/{name}", line.ToLine()));
-            }
+                TexturesPrefix.CopyTo(chars);
+                Encoding.ASCII.GetChars(bytes, chars[TexturesPrefix.Length..]);
+            });
+
+            // the set holds the name without the prefix, as a slice of the same string
+            nonPrefixedShaders.Add(new QString(shader.AsMemory(TexturesPrefix.Length)));
+            shaders.Add(Resource.Shader(shader, line.ToLine()));
         }
 
         void HandleKeysAndClear()
